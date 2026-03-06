@@ -1,0 +1,53 @@
+# dependencies
+node_modules/
+/.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# next.js
+/.next/
+/out/
+/build
+next-env.d.ts
+*.tsbuildinfo
+
+# env & secrets
+.env*.local
+*.pem
+
+# steampipe
+powerpipe/.powerpipe/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# os & editor
+.DS_Store
+.vercel
+*.JPG
+*.jpg
+
+# claude code sessions
+.claude/
+
+# cdk output
+infra-cdk/node_modules/
+infra-cdk/cdk.out/
+infra-cdk/*.js
+infra-cdk/*.d.ts
+!infra-cdk/cdk.json
+
+# python
+agent/__pycache__/
+*.pyc
+
+# temp
+/tmp/
+
+# claude code: include skills/hooks, exclude sessions
+!.claude/
+.claude/projects/
+.claude/todos/

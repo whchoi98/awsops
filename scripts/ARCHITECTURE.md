@@ -1,0 +1,421 @@
+# AWSops Dashboard - Architecture
+
+## 1. Infrastructure Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              Internet                                           │
+└─────────────────────────┬───────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  CloudFront (HTTPS)                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐       │
+│  │  Lambda@Edge (viewer-request)                                        │       │
+│  │  ├─ JWT 토큰 검증 (awsops_token 쿠키)                                │       │
+│  │  ├─ 토큰 없음 → Cognito Hosted UI로 302 리다이렉트                    │       │
+│  │  └─ 토큰 유효 → Origin으로 통과                                      │       │
+│  └──────────────────────────────────────────────────────────────────────┘       │
+│                                                                                 │
+│  Behaviors:                                                                     │
+│    /awsops*         → ALB:3000 (AWSopsDashboardOrigin)                         │
+│    /awsops/_next/*  → ALB:3000 (정적 리소스)                                    │
+│    /*               → ALB:80   (VSCode, PublicALBOrigin)                        │
+│                                                                                 │
+│  Security: X-Custom-Secret 헤더 자동 주입                                       │
+└─────────────────────────┬───────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  Application Load Balancer (Internet-facing)                                    │
+│  Security Group: CloudFront Prefix List Only                                    │
+│                                                                                 │
+│  Listeners:                                                                     │
+│    Port 80   → VSCode (8888)   [X-Custom-Secret 검증]                          │
+│    Port 3000 → Dashboard (3000) [X-Custom-Secret 검증]                          │
+└─────────────────────────┬───────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  EC2 Instance (t4g.2xlarge, Private Subnet)                                     │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │  ★ 모든 서비스가 이 단일 인스턴스에서 실행                               │   │
+│  │                                                                         │   │
+│  │  ┌──────────────────┐  ┌──────────────────┐  ┌───────────────────┐    │   │
+│  │  │  Next.js :3000   │  │ VSCode :8888     │  │ Steampipe :9193   │    │   │
+│  │  │  (Dashboard)     │  │ (Code Editor)    │  │ (내장 PostgreSQL) │    │   │
+│  │  └────────┬─────────┘  └──────────────────┘  └────────┬──────────┘    │   │
+│  │           │                                            │               │   │
+│  │           │         pg Pool (0.006s/query)             │               │   │
+│  │           └────────────────────────────────────────────┘               │   │
+│  │                                                                         │   │
+│  │  ┌──────────────────┐  ┌──────────────────────────────────────────┐    │   │
+│  │  │ Powerpipe (CLI)  │  │ Docker                                   │    │   │
+│  │  │ CIS Benchmark    │  │ └─ awsops-agent (Strands, arm64)        │    │   │
+│  │  └──────────────────┘  └──────────────────────────────────────────┘    │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 2. Authentication Flow
+
+```
+Browser                    CloudFront              Lambda@Edge            Cognito
+  │                            │                       │                     │
+  ├── GET /awsops ────────────▶│                       │                     │
+  │                            ├── viewer-request ────▶│                     │
+  │                            │                       ├── 쿠키 확인         │
+  │                            │                       │   (awsops_token)    │
+  │                            │                       │                     │
+  │   [토큰 없음]              │◀── 302 Redirect ──────┤                     │
+  │◀── 302 ───────────────────┤                       │                     │
+  │                            │                       │                     │
+  ├── Cognito Login Page ─────────────────────────────────────────────────▶│
+  │◀── Login Form ──────────────────────────────────────────────────────── │
+  ├── ID/PW 입력 ──────────────────────────────────────────────────────── ▶│
+  │◀── 302 + code ──────────────────────────────────────────────────────── │
+  │                            │                       │                     │
+  ├── GET /awsops/_callback ──▶│                       │                     │
+  │                            ├── viewer-request ────▶│                     │
+  │                            │                       ├── code → token 교환 │
+  │                            │                       │   (oauth2/token)    │
+  │                            │                       │                     │
+  │◀── 302 + Set-Cookie ──────┤◀── Set awsops_token ──┤                     │
+  │   (awsops_token, 1h TTL)  │                       │                     │
+  │                            │                       │                     │
+  ├── GET /awsops ────────────▶│                       │                     │
+  │                            ├── viewer-request ────▶│                     │
+  │                            │                       ├── 토큰 유효 ✓       │
+  │                            │                       │                     │
+  │◀── Dashboard HTML ────────┤◀── pass through ──────┤                     │
+```
+
+---
+
+## 3. Data Flow (Dashboard)
+
+```
+┌──────────┐     ┌─────────────────┐     ┌──────────────────────────────────────┐
+│ Browser  │     │ Next.js :3000   │     │ Steampipe (내장 PostgreSQL :9193)    │
+│          │     │                 │     │                                      │
+│ Dashboard├────▶│ POST /awsops/   │     │  ┌─────────────────────────────┐    │
+│ Pages    │     │  api/steampipe  │────▶│  │ aws plugin                  │    │
+│          │     │                 │     │  │  ├─ aws_ec2_instance        │───▶ AWS API
+│ Charts   │     │ batchQuery()    │     │  │  ├─ aws_vpc                 │
+│ Tables   │     │  3개씩 순차실행 │     │  │  ├─ aws_s3_bucket           │
+│          │     │  pg Pool max:3  │     │  │  ├─ aws_rds_db_instance     │
+│          │◀────│                 │◀────│  │  ├─ aws_lambda_function     │
+│          │     │ 5분 TTL 캐시    │     │  │  ├─ aws_iam_user/role       │
+│          │     │ (node-cache)    │     │  │  ├─ aws_cloudwatch_alarm    │
+└──────────┘     └─────────────────┘     │  │  ├─ aws_cost_by_service_*   │
+                                         │  │  └─ ... (380+ 테이블)       │
+                                         │  │                             │
+                                         │  ├─ kubernetes plugin          │
+                                         │  │  ├─ kubernetes_pod          │───▶ K8s API
+                                         │  │  ├─ kubernetes_node         │
+                                         │  │  ├─ kubernetes_deployment   │
+                                         │  │  └─ ... (60+ 테이블)       │
+                                         │  │                             │
+                                         │  └─ trivy plugin              │
+                                         │     └─ trivy_scan_vulnerability│───▶ CVE DB
+                                         └──────────────────────────────────────┘
+```
+
+---
+
+## 4. AI Assistant Flow
+
+```
+Browser (/awsops/ai)
+    │
+    ├── 사용자 질문 입력
+    │
+    ▼
+Next.js API (/awsops/api/ai)
+    │
+    ├── 키워드 분석
+    │
+    ├─── [네트워크 키워드] ──────────────────────────────────────────────┐
+    │    (ENI, 라우트, reachability, flow log, SG rule, VPN...)        │
+    │                                                                    ▼
+    │                                              AgentCore Runtime (서울)
+    │                                              ┌─────────────────────────┐
+    │                                              │ Strands Agent (arm64)   │
+    │                                              │ + Bedrock Sonnet 4.6    │
+    │                                              │   (us-east-1)           │
+    │                                              └──────────┬──────────────┘
+    │                                                         │
+    │                                                         ▼
+    │                                              AgentCore Gateway MCP (서울)
+    │                                              ┌─────────────────────────┐
+    │                                              │ 4 Lambda Targets:       │
+    │                                              │                         │
+    │                                              │ ① reachability-analyzer │
+    │                                              │   analyzeReachability   │
+    │                                              │   listInsightsPaths     │
+    │                                              │   listAnalyses          │
+    │                                              │                         │
+    │                                              │ ② flow-monitor          │
+    │                                              │   listFlowLogs          │
+    │                                              │   queryFlowLogs         │
+    │                                              │   findEni               │
+    │                                              │   getSecurityGroupRules │
+    │                                              │   getRouteTables        │
+    │                                              │   listVpnConnections    │
+    │                                              │                         │
+    │                                              │ ③ network-mcp           │
+    │                                              │   getPathTraceMethod    │
+    │                                              │   getEniDetails (+NACL) │
+    │                                              │   getTgwRoutes          │
+    │                                              │   getTgwAttachments     │
+    │                                              │   getSubnetNacls        │
+    │                                              │   getVpcConfig          │
+    │                                              │   listTransitGateways   │
+    │                                              │                         │
+    │                                              │ ④ steampipe-query       │
+    │                                              │   queryAWSResources     │
+    │                                              │   (14종 사전정의 쿼리)  │
+    │                                              └─────────────────────────┘
+    │
+    ├─── [AWS 리소스 키워드] ────────────┐
+    │    (EC2, VPC, RDS, S3, Lambda,    │
+    │     IAM, Cost, K8s, ELB...)       │
+    │                                    ▼
+    │                         Steampipe 실시간 쿼리
+    │                         ┌──────────────────────┐
+    │                         │ 자동 키워드 감지     │
+    │                         │ → SQL 생성 → 실행    │
+    │                         │ → 결과를 Claude에     │
+    │                         │   컨텍스트로 전달     │
+    │                         └──────────┬───────────┘
+    │                                    │
+    │                                    ▼
+    │                         Bedrock Sonnet/Opus 4.6
+    │                         (us-east-1)
+    │                         ┌──────────────────────┐
+    │                         │ 실제 데이터 기반     │
+    │                         │ 분석 응답 생성       │
+    │                         └──────────────────────┘
+    │
+    ├─── [일반 질문] ───────── AgentCore Runtime → Bedrock
+    │    (아키텍처, 모범사례)   (Strands Agent)
+    │
+    └─── [폴백] ────────────── Bedrock Direct
+                               (AgentCore 실패 시)
+```
+
+---
+
+## 5. CIS Compliance Flow
+
+```
+Browser (/awsops/compliance)
+    │
+    ├── "Run Benchmark" 클릭
+    │
+    ▼
+Next.js API (/awsops/api/benchmark)
+    │
+    ├── POST ?action=run
+    │
+    ▼
+Powerpipe CLI (백그라운드 실행)
+    │
+    ├── powerpipe benchmark run aws_compliance.benchmark.cis_v300
+    │     --database postgres://steampipe:***@127.0.0.1:9193/steampipe
+    │     --output json
+    │
+    ├── Steampipe PostgreSQL을 통해 AWS API 호출
+    │   (IAM, S3, CloudTrail, VPC, EC2 등 380+ 컨트롤 체크)
+    │
+    ├── 결과 JSON → /tmp/powerpipe-results/cis_v300.json
+    │
+    ▼
+Browser (5초 폴링)
+    │
+    ├── GET ?action=status  → "running" / "done"
+    ├── GET ?action=result  → JSON 결과
+    │
+    ▼
+Dashboard 렌더링
+    ├── Pass Rate, OK/ALARM/SKIP/ERROR 통계
+    ├── 섹션별 카드 + 진행률 바
+    ├── 컨트롤 목록 (OK/ALARM 아이콘)
+    └── 컨트롤 상세 패널 (Status, Reason, Resource)
+```
+
+---
+
+## 6. Network Topology Flow
+
+```
+Browser (/awsops/topology)
+    │
+    ▼
+Next.js API → Steampipe 쿼리
+    │
+    ├── VPC + Subnet 관계
+    ├── EC2 → Subnet 매핑
+    ├── ELB → VPC 매핑
+    ├── RDS → VPC 매핑
+    ├── NAT/IGW → VPC 매핑
+    ├── TGW → VPC Attachments
+    └── K8s Node → Pod 매핑
+    │
+    ▼
+React Flow (인터랙티브 그래프)
+    │
+    ├── Infrastructure 뷰:
+    │   IGW ──▶ VPC ──▶ Subnet ──▶ EC2
+    │                      │          │
+    │                     NAT        ELB
+    │                                 │
+    │   TGW ──▶ VPC (Cross-VPC)     RDS
+    │
+    └── Kubernetes 뷰:
+        Node ──▶ Pod ──▶ Pod ──▶ Pod
+```
+
+---
+
+## 7. Deployment Architecture (CloudFormation)
+
+```
+Template: /home/ec2-user/ec2_vscode/vscode_server_secure.yaml
+
+┌─────────────────────────────────────────────────────────┐
+│  VPC (10.254.0.0/16)                                    │
+│                                                         │
+│  ┌─────────────────────┐  ┌─────────────────────┐     │
+│  │ Public Subnet A     │  │ Public Subnet B     │     │
+│  │ 10.254.11.0/24      │  │ 10.254.12.0/24      │     │
+│  │                     │  │                     │     │
+│  │  ┌───────────────┐  │  │                     │     │
+│  │  │ NAT Gateway   │  │  │                     │     │
+│  │  └───────────────┘  │  │                     │     │
+│  │  ┌───────────────────────────────────┐       │     │
+│  │  │ ALB (Internet-facing)             │       │     │
+│  │  │  Port 80  → VSCode (8888)        │       │     │
+│  │  │  Port 3000 → Dashboard (3000)    │       │     │
+│  │  └───────────────────────────────────┘       │     │
+│  └─────────────────────┘  └─────────────────────┘     │
+│                                                         │
+│  ┌─────────────────────┐  ┌─────────────────────┐     │
+│  │ Private Subnet A    │  │ Private Subnet B    │     │
+│  │ 10.254.21.0/24      │  │ 10.254.22.0/24      │     │
+│  │                     │  │                     │     │
+│  │  ┌───────────────┐  │  │                     │     │
+│  │  │ EC2           │  │  │                     │     │
+│  │  │ t4g.2xlarge   │  │  │                     │     │
+│  │  │ 10.254.21.101 │  │  │                     │     │
+│  │  │               │  │  │                     │     │
+│  │  │ ┌───────────┐ │  │  │                     │     │
+│  │  │ │ Next.js   │ │  │  │ SSM VPC Endpoints   │     │
+│  │  │ │ Steampipe │ │  │  │ ┌─────────────────┐ │     │
+│  │  │ │ Powerpipe │ │  │  │ │ ssm             │ │     │
+│  │  │ │ VSCode    │ │  │  │ │ ssmmessages     │ │     │
+│  │  │ │ Docker    │ │  │  │ │ ec2messages     │ │     │
+│  │  │ └───────────┘ │  │  │ └─────────────────┘ │     │
+│  │  └───────────────┘  │  │                     │     │
+│  └─────────────────────┘  └─────────────────────┘     │
+│                                                         │
+│  Route Tables:                                          │
+│    Public  → IGW (0.0.0.0/0)                           │
+│    Private → NAT GW (0.0.0.0/0)                        │
+└─────────────────────────────────────────────────────────┘
+         │
+         ▼
+    CloudFront → ALB → EC2
+    (HTTPS)     (HTTP)  (Private)
+```
+
+---
+
+## 8. Installation Flow
+
+```
+Step 0: CloudFormation 배포              ← 00-deploy-infra.sh
+  │     (VPC, ALB, CloudFront, EC2)
+  │     기본: t4g.2xlarge (ARM64 Graviton)
+  │
+  ├── SSM 접속
+  │     aws ssm start-session --target <instance-id>
+  │
+  ▼
+Step 1: Steampipe + Powerpipe 설치       ← 01-install-base.sh
+  │     ├─ steampipe + plugins (aws, k8s, trivy)
+  │     ├─ aws.spc (ignore_error_codes for SCP)
+  │     └─ powerpipe + CIS benchmark mod
+  │
+  ▼
+Step 2: Next.js + Steampipe 서비스       ← 02-setup-nextjs.sh
+  │     ├─ npm install
+  │     ├─ steampipe service start (내장 PostgreSQL :9193)
+  │     └─ steampipe.ts password 동기화
+  │
+  ▼
+Step 3: Build + Deploy                   ← 03-build-deploy.sh
+  │     ├─ Pre-build 검증 (basePath, fetch URLs, eslint)
+  │     ├─ npm run build (production)
+  │     └─ npm run start (port 3000)
+  │
+  ▼
+Step 9: 검증 (46항목)                    ← 09-verify.sh
+  │     ├─ Services (2)
+  │     ├─ Queries (18 테이블)
+  │     ├─ Pages (20 페이지)
+  │     ├─ APIs (3 엔드포인트)
+  │     └─ Configuration (4 설정)
+  │
+  ▼ (Optional)
+Step 4: ALB 대시보드 연결                ← 04-setup-alb.sh
+  │     └─ Target Group + Listener (port 3000)
+  │
+Step 5: Cognito 인증                     ← 05-setup-cognito.sh
+  │     ├─ User Pool + Domain + App Client
+  │     ├─ Admin 사용자 생성
+  │     └─ Lambda@Edge (us-east-1) → CloudFront 연동
+  │
+Step 6: AgentCore AI                     ← 06-setup-agentcore.sh
+        ├─ IAM Roles
+        ├─ ECR + Docker image (arm64)
+        ├─ AgentCore Gateway (MCP, 서울)
+        ├─ AgentCore Runtime (Strands Agent, 서울)
+        └─ Lambda Functions (4개)
+           ├─ reachability-analyzer
+           ├─ flow-monitor
+           ├─ network-mcp
+           └─ steampipe-query
+```
+
+---
+
+## 9. Port Map
+
+| Port | Service | Access |
+|------|---------|--------|
+| 3000 | Next.js Dashboard | ALB → CloudFront |
+| 8888 | VSCode Server | ALB → CloudFront |
+| 9193 | Steampipe PostgreSQL | localhost only |
+
+---
+
+## 10. AWS Services Used
+
+| Service | Region | Purpose |
+|---------|--------|---------|
+| CloudFormation | ap-northeast-2 | 인프라 배포 |
+| EC2 (t4g.2xlarge) | ap-northeast-2 | 전체 서비스 호스팅 |
+| ALB | ap-northeast-2 | 로드밸런서 |
+| CloudFront | Global | CDN + HTTPS |
+| Cognito | ap-northeast-2 | 사용자 인증 |
+| Lambda@Edge | us-east-1 | CloudFront 인증 |
+| AgentCore Runtime | ap-northeast-2 | Strands AI Agent |
+| AgentCore Gateway | ap-northeast-2 | MCP 도구 라우팅 |
+| Lambda (4개) | ap-northeast-2 | 네트워크 분석 도구 |
+| ECR | ap-northeast-2 | Agent Docker 이미지 |
+| Bedrock (Sonnet/Opus 4.6) | us-east-1 | AI 모델 |
+| SSM | ap-northeast-2 | EC2 접근 |
+| IAM | Global | 권한 관리 |

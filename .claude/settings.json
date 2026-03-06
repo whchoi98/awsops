@@ -1,0 +1,19 @@
+{
+  "project": "awsops-dashboard",
+  "description": "AWS/K8s operations dashboard with Steampipe, Next.js, Bedrock AgentCore",
+  "defaultModel": "claude-sonnet-4-6",
+  "contextFiles": [
+    "CLAUDE.md",
+    "scripts/ARCHITECTURE.md",
+    "docs/TROUBLESHOOTING.md"
+  ],
+  "skills": {
+    "code-review": ".claude/skills/code-review/SKILL.md",
+    "refactor": ".claude/skills/refactor/SKILL.md",
+    "release": ".claude/skills/release/SKILL.md"
+  },
+  "hooks": {
+    "pre-commit": ".claude/hooks/pre-commit.sh",
+    "post-build": ".claude/hooks/post-build.sh"
+  }
+}

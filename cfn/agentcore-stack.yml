@@ -1,0 +1,267 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWSops Bedrock AgentCore - Runtime, Gateway, Endpoint, IAM, ECR, Lambda
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: awsops
+  AgentImageTag:
+    Type: String
+    Default: latest
+    Description: ECR image tag for the agent container
+  LambdaCodeBucket:
+    Type: String
+    Default: ''
+    Description: S3 bucket containing Lambda zip files (leave empty to skip Lambda creation)
+  LambdaCodePrefix:
+    Type: String
+    Default: lambda/
+    Description: S3 key prefix for Lambda zip files
+
+Conditions:
+  HasLambdaBucket: !Not [!Equals [!Ref LambdaCodeBucket, '']]
+
+Resources:
+  #──────────────────────────────────────
+  # ECR Repository
+  #──────────────────────────────────────
+  AgentECR:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub '${ProjectName}-agent'
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules":[{"rulePriority":1,"selection":{"tagStatus":"untagged","countType":"sinceImagePushed","countUnit":"days","countNumber":7},"action":{"type":"expire"}}]}
+
+  #──────────────────────────────────────
+  # IAM - AgentCore Role
+  #──────────────────────────────────────
+  AgentCoreRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-agentcore-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - bedrock.amazonaws.com
+                - bedrock-agentcore.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonBedrockFullAccess
+      Policies:
+        - PolicyName: ECRAndLambda
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                  - ecr:GetAuthorizationToken
+                  - lambda:InvokeFunction
+                  - lambda:GetFunction
+                Resource: '*'
+
+  #──────────────────────────────────────
+  # IAM - Lambda Network Role
+  #──────────────────────────────────────
+  LambdaNetworkRole:
+    Type: AWS::IAM::Role
+    Condition: HasLambdaBucket
+    Properties:
+      RoleName: !Sub '${ProjectName}-lambda-network-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: NetworkAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:Describe*
+                  - ec2:CreateNetworkInsightsPath
+                  - ec2:StartNetworkInsightsAnalysis
+                  - ec2:GetNetworkInsightsAccessScopeAnalysisFindings
+                  - tiros:*
+                  - logs:*
+                  - network-firewall:Describe*
+                  - networkmanager:Get*
+                Resource: '*'
+
+  #──────────────────────────────────────
+  # Lambda Functions (conditional)
+  #──────────────────────────────────────
+  ReachabilityAnalyzer:
+    Type: AWS::Lambda::Function
+    Condition: HasLambdaBucket
+    Properties:
+      FunctionName: !Sub '${ProjectName}-reachability-analyzer'
+      Runtime: python3.12
+      Handler: reachability_analyzer.lambda_handler
+      Role: !GetAtt LambdaNetworkRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${LambdaCodePrefix}reachability_analyzer.zip'
+      Timeout: 120
+      MemorySize: 256
+
+  FlowMonitor:
+    Type: AWS::Lambda::Function
+    Condition: HasLambdaBucket
+    Properties:
+      FunctionName: !Sub '${ProjectName}-flow-monitor'
+      Runtime: python3.12
+      Handler: flow_monitor.lambda_handler
+      Role: !GetAtt LambdaNetworkRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${LambdaCodePrefix}flow_monitor.zip'
+      Timeout: 120
+      MemorySize: 256
+
+  NetworkMcp:
+    Type: AWS::Lambda::Function
+    Condition: HasLambdaBucket
+    Properties:
+      FunctionName: !Sub '${ProjectName}-network-mcp'
+      Runtime: python3.12
+      Handler: network_mcp.lambda_handler
+      Role: !GetAtt LambdaNetworkRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${LambdaCodePrefix}network_mcp.zip'
+      Timeout: 120
+      MemorySize: 256
+
+  SteampipeQuery:
+    Type: AWS::Lambda::Function
+    Condition: HasLambdaBucket
+    Properties:
+      FunctionName: !Sub '${ProjectName}-steampipe-query'
+      Runtime: python3.12
+      Handler: steampipe_query.lambda_handler
+      Role: !GetAtt LambdaNetworkRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Sub '${LambdaCodePrefix}steampipe_query.zip'
+      Timeout: 120
+      MemorySize: 256
+
+  # Lambda permissions for AgentCore invocation
+  ReachabilityPermission:
+    Type: AWS::Lambda::Permission
+    Condition: HasLambdaBucket
+    Properties:
+      FunctionName: !Ref ReachabilityAnalyzer
+      Action: lambda:InvokeFunction
+      Principal: bedrock-agentcore.amazonaws.com
+
+  FlowMonitorPermission:
+    Type: AWS::Lambda::Permission
+    Condition: HasLambdaBucket
+    Properties:
+      FunctionName: !Ref FlowMonitor
+      Action: lambda:InvokeFunction
+      Principal: bedrock-agentcore.amazonaws.com
+
+  NetworkMcpPermission:
+    Type: AWS::Lambda::Permission
+    Condition: HasLambdaBucket
+    Properties:
+      FunctionName: !Ref NetworkMcp
+      Action: lambda:InvokeFunction
+      Principal: bedrock-agentcore.amazonaws.com
+
+  SteampipeQueryPermission:
+    Type: AWS::Lambda::Permission
+    Condition: HasLambdaBucket
+    Properties:
+      FunctionName: !Ref SteampipeQuery
+      Action: lambda:InvokeFunction
+      Principal: bedrock-agentcore.amazonaws.com
+
+  #──────────────────────────────────────
+  # AgentCore Gateway (MCP protocol)
+  #──────────────────────────────────────
+  AgentCoreGateway:
+    Type: AWS::BedrockAgentCore::Gateway
+    Properties:
+      Name: !Sub '${ProjectName}-gateway'
+      Description: AWSops MCP Gateway
+      ProtocolType: MCP
+      AuthorizerType: NONE
+      RoleArn: !GetAtt AgentCoreRole.Arn
+      Tags:
+        Project: !Ref ProjectName
+
+  #──────────────────────────────────────
+  # AgentCore Runtime (container-based)
+  #──────────────────────────────────────
+  AgentCoreRuntime:
+    Type: AWS::BedrockAgentCore::Runtime
+    DependsOn: AgentECR
+    Properties:
+      AgentRuntimeName: !Sub '${ProjectName}_agent'
+      Description: AWSops Strands Agent Runtime
+      RoleArn: !GetAtt AgentCoreRole.Arn
+      AgentRuntimeArtifact:
+        ContainerConfiguration:
+          ContainerUri: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ProjectName}-agent:${AgentImageTag}'
+      NetworkConfiguration:
+        NetworkMode: PUBLIC
+      Tags:
+        Project: !Ref ProjectName
+
+  #──────────────────────────────────────
+  # AgentCore Runtime Endpoint
+  #──────────────────────────────────────
+  AgentCoreEndpoint:
+    Type: AWS::BedrockAgentCore::RuntimeEndpoint
+    Properties:
+      AgentRuntimeId: !GetAtt AgentCoreRuntime.AgentRuntimeId
+      Name: !Sub '${ProjectName}_endpoint'
+      Description: AWSops Agent Runtime Endpoint
+      Tags:
+        Project: !Ref ProjectName
+
+Outputs:
+  ECRRepositoryUri:
+    Description: ECR Repository URI
+    Value: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ProjectName}-agent'
+
+  AgentCoreRoleArn:
+    Description: AgentCore IAM Role ARN
+    Value: !GetAtt AgentCoreRole.Arn
+
+  GatewayId:
+    Description: AgentCore Gateway ID
+    Value: !GetAtt AgentCoreGateway.GatewayId
+
+  RuntimeId:
+    Description: AgentCore Runtime ID
+    Value: !GetAtt AgentCoreRuntime.AgentRuntimeId
+
+  RuntimeArn:
+    Description: AgentCore Runtime ARN
+    Value: !GetAtt AgentCoreRuntime.AgentRuntimeArn
+
+  EndpointId:
+    Description: AgentCore Runtime Endpoint ID
+    Value: !GetAtt AgentCoreEndpoint.Id
+
+  EndpointStatus:
+    Description: AgentCore Runtime Endpoint Status
+    Value: !GetAtt AgentCoreEndpoint.Status
