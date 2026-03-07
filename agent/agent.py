@@ -20,6 +20,7 @@ GATEWAYS = {
     "ops": "https://awsops-ops-gateway-ybcvjkwu71.gateway.bedrock-agentcore.ap-northeast-2.amazonaws.com/mcp",
     "iac": "https://awsops-iac-gateway-i0vlfltmwu.gateway.bedrock-agentcore.ap-northeast-2.amazonaws.com/mcp",
     "cost": "https://awsops-cost-gateway-uanqtckgzm.gateway.bedrock-agentcore.ap-northeast-2.amazonaws.com/mcp",
+    "monitoring": "https://awsops-monitoring-gateway-lal7vj9ozv.gateway.bedrock-agentcore.ap-northeast-2.amazonaws.com/mcp",
 }
 DEFAULT_GATEWAY = "ops"
 GATEWAY_REGION = "ap-northeast-2"
@@ -48,6 +49,12 @@ You have MCP tools for:
 - AWS Knowledge: search documentation, check regional availability
 - Core MCP: execute AWS CLI commands, get solution design guidance
 Always be concise, provide actionable insights. Format in markdown. Respond in the user's language.""",
+
+    "monitoring": """You are AWSops Monitoring Specialist, an expert in AWS observability and troubleshooting.
+You have MCP tools for:
+- CloudWatch: get metric data/metadata, analyze trends, active alarms, alarm history, log groups, log analysis, Log Insights queries
+- CloudTrail: lookup API events by user/resource/time, CloudTrail Lake SQL analytics
+Always correlate metrics with events for root cause analysis. Format in markdown. Respond in the user's language.""",
 
     "cost": """You are AWSops FinOps Specialist, an expert in AWS cost optimization and financial operations.
 You have MCP tools for:

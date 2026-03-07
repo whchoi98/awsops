@@ -157,6 +157,15 @@ function needsInfra(message: string): boolean {
   return keywords.some(k => lower.includes(k));
 }
 
+// Monitoring keywords → route to Monitoring Gateway (CloudWatch + CloudTrail)
+function needsMonitoring(message: string): boolean {
+  const lower = message.toLowerCase();
+  const keywords = ['cloudwatch','metric','메트릭','alarm','알람','경보','log group','로그 그룹',
+    'log insights','cloudtrail','이벤트 조회','api 호출','audit','감사','누가','who did',
+    'cpu utilization','memory utilization','disk','네트워크 트래픽'];
+  return keywords.some(k => lower.includes(k));
+}
+
 // Cost keywords → route to Cost Gateway
 function needsCost(message: string): boolean {
   const lower = message.toLowerCase();
@@ -184,7 +193,7 @@ function needsAWSData(message: string): boolean {
 }
 
 // AgentCore Runtime invoke with gateway selection
-async function invokeAgentCore(message: string, gateway: 'infra' | 'ops' | 'iac' | 'cost' = 'ops'): Promise<string | null> {
+async function invokeAgentCore(message: string, gateway: 'infra' | 'ops' | 'iac' | 'cost' | 'monitoring' = 'ops'): Promise<string | null> {
   try {
     const command = new InvokeAgentRuntimeCommand({
       agentRuntimeArn: AGENT_RUNTIME_ARN,
@@ -243,6 +252,7 @@ export async function POST(request: NextRequest) {
     const useCodeInterpreter = needsCodeInterpreter(lastMessage);
     const useInfra = needsInfra(lastMessage);
     const useIaC = needsIaC(lastMessage);
+    const useMonitoring = needsMonitoring(lastMessage);
     const useCost = needsCost(lastMessage);
     const needsData = needsAWSData(lastMessage);
 
@@ -323,7 +333,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Route 1: Cost questions → AgentCore Runtime (Cost Gateway)
+    // Route 1: Monitoring → AgentCore Runtime (Monitoring Gateway)
+    if (useMonitoring) {
+      const agentResponse = await invokeAgentCore(lastMessage, 'monitoring');
+      if (agentResponse) {
+        return NextResponse.json({
+          content: agentResponse,
+          model: 'sonnet-4.6',
+          via: 'AgentCore Runtime → Monitoring Gateway (16 tools)',
+          queriedResources: ['monitoring-gateway'],
+        });
+      }
+    }
+
+    // Route 2: Cost questions → AgentCore Runtime (Cost Gateway)
     if (useCost) {
       const agentResponse = await invokeAgentCore(lastMessage, 'cost');
       if (agentResponse) {
