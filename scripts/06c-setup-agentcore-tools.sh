@@ -6,9 +6,9 @@ set -e
 #                                                                              #
 #   Creates:                                                                   #
 #     1. IAM Role for Lambda (network permissions)                             #
-#     2. Lambda functions (5: reachability, flow-monitor, network-mcp,         #
-#        steampipe-query, aws-knowledge) with inline Python code               #
-#     3. Gateway Targets (5) linking Lambda to Gateway via MCP                 #
+#     2. Lambda functions (6: reachability, flow-monitor, network-mcp,         #
+#        steampipe-query, aws-knowledge, core-mcp)                             #
+#     3. Gateway Targets (6) linking Lambda to Gateway via MCP                 #
 #                                                                              #
 #   Known issues handled:                                                      #
 #     - Gateway toolSchema uses inlinePayload (not OpenAPI)                   #
@@ -357,11 +357,109 @@ aws lambda add-permission --function-name awsops-aws-knowledge \
 
 echo "  Lambda: awsops-aws-knowledge (proxy → AWS Knowledge MCP)"
 
+# Deploy core-mcp Lambda (prompt_understanding + call_aws + suggest_aws_commands)
+echo ""
+echo -e "  ${YELLOW}NOTE: core-mcp provides AWS API execution and solution design guidance${NC}"
+
+cat > /tmp/aws_core_mcp.py << 'LAMBDAEOF'
+import json, boto3, shlex
+
+PROMPT_UNDERSTANDING = """# AWS Solution Design Guide
+## Analysis Framework
+1. Decompose query into: technical requirements, business objectives, constraints
+2. Map requirements to AWS services
+3. Synthesize recommendations using serverless-first architecture
+## Service Mapping
+- Compute: Lambda, ECS/EKS, EC2, App Runner
+- Storage: DynamoDB, Aurora, S3, ElastiCache, Neptune
+- AI/ML: Bedrock, SageMaker
+- Data: Redshift, Athena, Glue, Kinesis
+- Frontend: Amplify, CloudFront, AppSync, API Gateway
+- Security: Cognito, IAM, KMS, WAF
+- DevOps: CDK, CloudFormation, CodePipeline
+- Monitoring: CloudWatch, X-Ray, CloudTrail
+## Design Principles
+- Serverless-first with managed services
+- Pay-per-use pricing, built-in security, Multi-AZ HA, IaC (CDK preferred)
+"""
+
+def call_aws(cli_command, max_results=None):
+    parts = shlex.split(cli_command)
+    if len(parts) < 3 or parts[0] != "aws":
+        return {"error": "Command must start with 'aws <service> <action>'"}
+    service, action = parts[1], parts[2].replace("-", "_")
+    kwargs = {}
+    i = 3
+    while i < len(parts):
+        if parts[i].startswith("--"):
+            key = parts[i][2:].replace("-", "_")
+            if i+1 < len(parts) and not parts[i+1].startswith("--"):
+                val = parts[i+1]
+                try: val = json.loads(val)
+                except: pass
+                kwargs[key] = val; i += 2
+            else: kwargs[key] = True; i += 1
+        else: i += 1
+    if max_results: kwargs.setdefault("MaxResults", max_results)
+    try:
+        resp = getattr(boto3.client(service), action)(**kwargs)
+        resp.pop("ResponseMetadata", None)
+        return resp
+    except Exception as e: return {"error": str(e)}
+
+def suggest_aws_commands(query):
+    q = query.lower()
+    patterns = [("ec2","instance","aws ec2 describe-instances"),("s3","bucket","aws s3api list-buckets"),
+        ("vpc","","aws ec2 describe-vpcs"),("subnet","","aws ec2 describe-subnets"),
+        ("security group","","aws ec2 describe-security-groups"),("lambda","function","aws lambda list-functions"),
+        ("iam","role","aws iam list-roles"),("iam","user","aws iam list-users"),
+        ("rds","","aws rds describe-db-instances"),("ecs","cluster","aws ecs list-clusters"),
+        ("cloudwatch","alarm","aws cloudwatch describe-alarms"),("cost","","aws ce get-cost-and-usage")]
+    return [cmd for svc,kw,cmd in patterns if svc in q or (kw and kw in q)][:10] or ["aws ec2 describe-instances","aws s3api list-buckets","aws iam list-roles"]
+
+def lambda_handler(event, context):
+    params = event if isinstance(event, dict) else json.loads(event)
+    tool_name = params.get("tool_name", "")
+    args = params.get("arguments", params)
+    if not tool_name:
+        if "cli_command" in params: tool_name = "call_aws"
+        elif "query" in params: tool_name = "suggest_aws_commands"
+        else: tool_name = "prompt_understanding"
+        args = params
+    if tool_name == "prompt_understanding":
+        return {"statusCode": 200, "body": PROMPT_UNDERSTANDING}
+    elif tool_name == "call_aws":
+        cmd = args.get("cli_command", "")
+        r = [call_aws(c, args.get("max_results")) for c in cmd[:5]] if isinstance(cmd, list) else call_aws(cmd, args.get("max_results"))
+        return {"statusCode": 200, "body": json.dumps(r, default=str)[:50000]}
+    elif tool_name == "suggest_aws_commands":
+        return {"statusCode": 200, "body": json.dumps({"suggestions": suggest_aws_commands(args.get("query",""))})}
+    return {"statusCode": 400, "body": json.dumps({"error": "Unknown tool: " + tool_name})}
+LAMBDAEOF
+
+cd /tmp && zip -j aws_core_mcp.zip aws_core_mcp.py 2>/dev/null
+aws lambda create-function \
+    --function-name awsops-core-mcp --runtime python3.12 \
+    --handler "aws_core_mcp.lambda_handler" \
+    --role "$LAMBDA_ROLE_ARN" --zip-file "fileb:///tmp/aws_core_mcp.zip" \
+    --timeout 60 --memory-size 256 \
+    --region "$REGION" 2>/dev/null || \
+aws lambda update-function-code \
+    --function-name awsops-core-mcp --zip-file "fileb:///tmp/aws_core_mcp.zip" \
+    --region "$REGION" 2>/dev/null
+
+aws lambda add-permission --function-name awsops-core-mcp \
+    --statement-id agentcore-invoke --action lambda:InvokeFunction \
+    --principal bedrock-agentcore.amazonaws.com \
+    --region "$REGION" 2>/dev/null || true
+
+echo "  Lambda: awsops-core-mcp (prompt_understanding + call_aws + suggest)"
+
 # -- [3/3] Create Gateway Targets (via Python/boto3) --------------------------
 #   KNOWN ISSUE: AWS CLI has issues with inlinePayload JSON format.
 #   Using Python/boto3 with correct mcp.lambda structure.
 echo ""
-echo -e "${CYAN}[3/3] Creating Gateway targets (5) via boto3...${NC}"
+echo -e "${CYAN}[3/3] Creating Gateway targets (6) via boto3...${NC}"
 echo -e "  ${YELLOW}NOTE: Using Python/boto3 (CLI has issues with inlinePayload)${NC}"
 
 # Auto-detect Gateway ID
@@ -453,6 +551,22 @@ targets = [
            'resource_type': prop('string', 'product, api, or cfn'),
            'region': prop('string', 'AWS region code')},
         'required': ['resource_type']}}]),
+    ('core-mcp-target', 'awsops-core-mcp',
+     'AWS Core MCP - prompt understanding, AWS API execution, CLI suggestions',
+     [{'name': 'prompt_understanding',
+       'description': 'AWS solution design guide. Use FIRST for expert architecture advice.',
+       'inputSchema': {'type': 'object', 'properties': {}}},
+      {'name': 'call_aws',
+       'description': 'Execute AWS CLI commands via boto3. PRIMARY tool for AWS API calls.',
+       'inputSchema': {'type': 'object', 'properties': {
+           'cli_command': prop('string', 'AWS CLI command e.g. aws ec2 describe-instances'),
+           'max_results': prop('integer', 'Limit pagination results')},
+        'required': ['cli_command']}},
+      {'name': 'suggest_aws_commands',
+       'description': 'Suggest AWS CLI commands from natural language. FALLBACK when unsure.',
+       'inputSchema': {'type': 'object', 'properties': {
+           'query': prop('string', 'Natural language description of desired operation')},
+        'required': ['query']}}]),
 ]
 
 for name, fn, desc, tools in targets:
@@ -496,8 +610,9 @@ echo "    - awsops-flow-monitor"
 echo "    - awsops-network-mcp"
 echo "    - awsops-steampipe-query     (VPC, pg8000 → Steampipe :9193)"
 echo "    - awsops-aws-knowledge       (proxy → AWS Knowledge MCP)"
+echo "    - awsops-core-mcp            (prompt + call_aws + suggest)"
 echo ""
-echo "  Gateway Targets: 5 (via boto3 with mcp.lambda + inlinePayload)"
+echo "  Gateway Targets: 6 (via boto3 with mcp.lambda + inlinePayload)"
 echo ""
 echo "  Next: bash scripts/06d-setup-agentcore-interpreter.sh"
 echo ""
