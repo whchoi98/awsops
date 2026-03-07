@@ -6,9 +6,9 @@ AWS + Kubernetes operations dashboard with real-time resource monitoring, networ
 ## Architecture
 - **Frontend**: Next.js 14 (App Router) + Tailwind CSS dark theme + Recharts + React Flow
 - **Data**: Steampipe embedded PostgreSQL (port 9193) — 380+ AWS tables, 60+ K8s tables
-- **AI**: Bedrock Sonnet/Opus 4.6 + AgentCore Runtime (Strands) + Gateway MCP (20 tools)
-- **Auth**: Cognito + Lambda@Edge + CloudFront
-- **Infra**: CloudFormation / CDK → CloudFront → ALB → EC2 (t4g.2xlarge)
+- **AI**: Bedrock Sonnet/Opus 4.6 + AgentCore Runtime (Strands) + Gateway MCP (4 Lambda targets)
+- **Auth**: Cognito User Pool + Lambda@Edge (Python 3.12, us-east-1) + CloudFront
+- **Infra**: CDK (`infra-cdk/`) → CloudFront (CACHING_DISABLED) → ALB (SG: CF prefix list, port 80-3000) → EC2 (t4g.2xlarge, Private Subnet)
 
 ## Critical Rules
 
@@ -49,8 +49,33 @@ AWS + Kubernetes operations dashboard with real-time resource monitoring, networ
 - `src/lib/queries/*.ts` — 16 SQL query files
 - `src/app/api/ai/route.ts` — AI routing (4 routes + Code Interpreter)
 - `src/components/layout/Sidebar.tsx` — Navigation (6 groups)
+- `infra-cdk/lib/awsops-stack.ts` — CDK 인프라 (VPC, EC2, ALB, CloudFront)
+- `infra-cdk/lib/cognito-stack.ts` — CDK Cognito (User Pool, Lambda@Edge)
 - `scripts/ARCHITECTURE.md` — Full architecture documentation
 - `docs/TROUBLESHOOTING.md` — 10 known issues + solutions
+
+## Deployment Scripts (10 Steps)
+```
+Step 0:  00-deploy-infra.sh              CDK 인프라 (로컬에서 실행)
+Step 1:  01-install-base.sh              Steampipe + Powerpipe
+Step 2:  02-setup-nextjs.sh              Next.js + Steampipe 서비스
+Step 3:  03-build-deploy.sh              Production 빌드
+Step 5:  05-setup-cognito.sh             Cognito 인증
+Step 6a: 06a-setup-agentcore-runtime.sh  Runtime (IAM, ECR, Docker, Endpoint)
+Step 6b: 06b-setup-agentcore-gateway.sh  Gateway (MCP)
+Step 6c: 06c-setup-agentcore-tools.sh    Tools (4 Lambda + 4 Gateway Targets)
+Step 6d: 06d-setup-agentcore-interpreter.sh  Code Interpreter
+Step 7:  07-setup-cloudfront-auth.sh     Lambda@Edge → CloudFront 연동
+```
+- `06-setup-agentcore.sh` — 6a→6b→6c→6d 일괄 실행 래퍼
+- `install-all.sh` — Step 1→2→3→9 자동 실행 (EC2 내부)
+
+## AgentCore Known Issues
+- Gateway Target: CLI 대신 Python/boto3 사용 (`mcp.lambda` + `credentialProviderConfigurations`)
+- Docker: arm64 필수 (`docker buildx --platform linux/arm64`)
+- Code Interpreter 이름: 하이픈 불가, 언더스코어만 (`[a-zA-Z][a-zA-Z0-9_]`)
+- CloudFront CachePolicy: TTL=0 시 HeaderBehavior 불가 → 관리형 CACHING_DISABLED 사용
+- ALB SG: CloudFront prefix list 120+ IP → 포트 범위(80-3000) 단일 규칙으로 통합
 
 ## Adding New Pages
 1. Check columns: `steampipe query "SELECT column_name FROM information_schema.columns WHERE table_name='TABLE'" --output json --input=false`
