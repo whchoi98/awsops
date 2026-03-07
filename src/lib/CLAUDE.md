@@ -10,6 +10,7 @@ Core libraries: Steampipe database connection, SQL query definitions, and shared
 ## Rules
 - ALL database access goes through `steampipe.ts` `runQuery()` or `batchQuery()`
 - Never use Steampipe CLI — pg Pool is 660x faster
+- Steampipe runs with `--database-listen network` (VPC Lambda access on :9193)
 - Verify column names against `information_schema.columns` before writing queries
 - No `$` in SQL — use `conditions::text LIKE '%..%'` instead of `jsonb_path_exists`
 - Avoid SCP-blocked columns in list queries: `mfa_enabled`, `attached_policy_arns`, Lambda `tags`

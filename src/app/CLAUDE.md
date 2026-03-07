@@ -8,8 +8,9 @@ Next.js 14 App Router pages and API routes. Each subdirectory is a route segment
 - `page.tsx` — Dashboard home page
 - `globals.css` — Tailwind base + custom theme variables
 - `api/steampipe/route.ts` — Main Steampipe query endpoint
-- `api/ai/route.ts` — AI routing (4-route priority system)
+- `api/ai/route.ts` — AI routing (9-route priority: Code→Infra→IaC→Data→Security→Monitoring→Cost→AWSData→Ops)
 - `api/code/route.ts` — Code interpreter endpoint
+- `api/benchmark/route.ts` — CIS Compliance benchmark endpoint
 
 ## Rules
 - Every page file must start with `'use client'`
