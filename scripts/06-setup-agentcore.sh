@@ -137,8 +137,179 @@ echo -e "${CYAN}[5/9] Creating Lambda functions (4)...${NC}"
 
 LAMBDA_ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/AWSopsLambdaNetworkRole"
 
-# Package and deploy each Lambda function
+# Create inline Python files, zip, and deploy each Lambda function
 cd /tmp
+
+# --- reachability.py ---
+cat > /tmp/reachability.py << 'LAMBDAEOF'
+import boto3, json
+
+def lambda_handler(event, context):
+    ec2 = boto3.client('ec2')
+    params = event if isinstance(event, dict) else json.loads(event)
+    source = params['source']
+    destination = params['destination']
+    protocol = params.get('protocol', 'tcp')
+    port = params.get('port', 443)
+
+    path_resp = ec2.create_network_insights_path(
+        Source=source,
+        Destination=destination,
+        Protocol=protocol,
+        DestinationPort=int(port),
+        TagSpecifications=[{
+            'ResourceType': 'network-insights-path',
+            'Tags': [{'Key': 'CreatedBy', 'Value': 'awsops'}]
+        }]
+    )
+    path_id = path_resp['NetworkInsightsPath']['NetworkInsightsPathId']
+
+    analysis_resp = ec2.start_network_insights_analysis(
+        NetworkInsightsPathId=path_id
+    )
+    analysis_id = analysis_resp['NetworkInsightsAnalysis']['NetworkInsightsAnalysisId']
+
+    return {
+        'statusCode': 200,
+        'body': json.dumps({
+            'pathId': path_id,
+            'analysisId': analysis_id,
+            'status': analysis_resp['NetworkInsightsAnalysis']['Status']
+        })
+    }
+LAMBDAEOF
+
+# --- flowmonitor.py ---
+cat > /tmp/flowmonitor.py << 'LAMBDAEOF'
+import boto3, json
+
+def lambda_handler(event, context):
+    ec2 = boto3.client('ec2')
+    params = event if isinstance(event, dict) else json.loads(event)
+    vpc_id = params['vpc_id']
+    action = params.get('action', 'all')
+    minutes = params.get('minutes', 60)
+
+    filters = [{'Name': 'resource-id', 'Values': [vpc_id]}]
+    resp = ec2.describe_flow_logs(Filters=filters)
+
+    flow_logs = []
+    for fl in resp.get('FlowLogs', []):
+        flow_logs.append({
+            'FlowLogId': fl.get('FlowLogId'),
+            'ResourceId': fl.get('ResourceId'),
+            'TrafficType': fl.get('TrafficType'),
+            'LogStatus': fl.get('LogStatus'),
+            'LogDestination': fl.get('LogDestination')
+        })
+
+    return {
+        'statusCode': 200,
+        'body': json.dumps({
+            'vpcId': vpc_id,
+            'action': action,
+            'minutes': minutes,
+            'flowLogs': flow_logs,
+            'count': len(flow_logs)
+        })
+    }
+LAMBDAEOF
+
+# --- network_mcp.py ---
+cat > /tmp/network_mcp.py << 'LAMBDAEOF'
+import boto3, json
+
+def lambda_handler(event, context):
+    ec2 = boto3.client('ec2')
+    params = event if isinstance(event, dict) else json.loads(event)
+    resource_type = params['resource_type']
+    resource_id = params.get('resource_id')
+    vpc_id = params.get('vpc_id')
+
+    result = {}
+    if resource_type == 'security_group':
+        filters = []
+        if resource_id:
+            filters.append({'Name': 'group-id', 'Values': [resource_id]})
+        elif vpc_id:
+            filters.append({'Name': 'vpc-id', 'Values': [vpc_id]})
+        resp = ec2.describe_security_groups(Filters=filters) if filters else ec2.describe_security_groups()
+        result = {'securityGroups': resp.get('SecurityGroups', [])}
+    elif resource_type == 'nacl':
+        filters = []
+        if resource_id:
+            filters.append({'Name': 'network-acl-id', 'Values': [resource_id]})
+        elif vpc_id:
+            filters.append({'Name': 'vpc-id', 'Values': [vpc_id]})
+        resp = ec2.describe_network_acls(Filters=filters) if filters else ec2.describe_network_acls()
+        result = {'networkAcls': resp.get('NetworkAcls', [])}
+    elif resource_type == 'route_table':
+        filters = []
+        if resource_id:
+            filters.append({'Name': 'route-table-id', 'Values': [resource_id]})
+        elif vpc_id:
+            filters.append({'Name': 'vpc-id', 'Values': [vpc_id]})
+        resp = ec2.describe_route_tables(Filters=filters) if filters else ec2.describe_route_tables()
+        result = {'routeTables': resp.get('RouteTables', [])}
+    elif resource_type == 'subnet':
+        filters = []
+        if resource_id:
+            filters.append({'Name': 'subnet-id', 'Values': [resource_id]})
+        elif vpc_id:
+            filters.append({'Name': 'vpc-id', 'Values': [vpc_id]})
+        resp = ec2.describe_subnets(Filters=filters) if filters else ec2.describe_subnets()
+        result = {'subnets': resp.get('Subnets', [])}
+    elif resource_type == 'vpc':
+        if resource_id:
+            resp = ec2.describe_vpcs(VpcIds=[resource_id])
+        else:
+            resp = ec2.describe_vpcs()
+        result = {'vpcs': resp.get('Vpcs', [])}
+    else:
+        return {'statusCode': 400, 'body': json.dumps({'error': 'Unknown resource_type: ' + resource_type})}
+
+    return {'statusCode': 200, 'body': json.dumps(result, default=str)}
+LAMBDAEOF
+
+# --- steampipe_query.py ---
+cat > /tmp/steampipe_query.py << 'LAMBDAEOF'
+import boto3, json
+
+def lambda_handler(event, context):
+    ec2 = boto3.client('ec2')
+    params = event if isinstance(event, dict) else json.loads(event)
+    sql = params['sql'].lower()
+
+    result = {}
+    if 'instance' in sql or 'ec2' in sql:
+        resp = ec2.describe_instances()
+        instances = []
+        for r in resp.get('Reservations', []):
+            for i in r.get('Instances', []):
+                instances.append({
+                    'InstanceId': i.get('InstanceId'),
+                    'State': i.get('State', {}).get('Name'),
+                    'InstanceType': i.get('InstanceType'),
+                    'PrivateIp': i.get('PrivateIpAddress'),
+                    'PublicIp': i.get('PublicIpAddress')
+                })
+        result = {'instances': instances}
+    elif 'vpc' in sql:
+        resp = ec2.describe_vpcs()
+        result = {'vpcs': resp.get('Vpcs', [])}
+    elif 'subnet' in sql:
+        resp = ec2.describe_subnets()
+        result = {'subnets': resp.get('Subnets', [])}
+    elif 'security' in sql or 'sg' in sql:
+        resp = ec2.describe_security_groups()
+        result = {'securityGroups': resp.get('SecurityGroups', [])}
+    else:
+        return {'statusCode': 400, 'body': json.dumps({'error': 'Unsupported query pattern. Use keywords: instance, ec2, vpc, subnet, security'})}
+
+    return {'statusCode': 200, 'body': json.dumps(result, default=str)}
+LAMBDAEOF
+
+# Deploy all 4 Lambda functions
 declare -A FUNC_MAP=(
     ["awsops-reachability-analyzer"]="reachability"
     ["awsops-flow-monitor"]="flowmonitor"
@@ -149,14 +320,10 @@ declare -A FUNC_MAP=(
 LAMBDA_ARNS=""
 for FUNC_NAME in "${!FUNC_MAP[@]}"; do
     HANDLER="${FUNC_MAP[$FUNC_NAME]}"
-    ZIP="${HANDLER}.zip"
+    ZIP="/tmp/${HANDLER}.zip"
 
-    # Create zip if source exists
-    if [ -f "lambda-network/${HANDLER}.py" ]; then
-        zip -j "${ZIP}" "lambda-network/${HANDLER}.py" 2>/dev/null
-    fi
-
-    [ -f "$ZIP" ] || { echo "  SKIP: $FUNC_NAME (no zip)"; continue; }
+    # Zip the inline Python file we just created
+    cd /tmp && zip -j "${ZIP}" "/tmp/${HANDLER}.py" 2>/dev/null
 
     aws lambda create-function \
         --function-name "$FUNC_NAME" --runtime python3.12 \
@@ -280,30 +447,30 @@ targets = [
 ]
 
 for t in targets:
-    lambda_arn = f'arn:aws:lambda:{region}:{account_id}:function:{t["lambda_name"]}'
-    tool_schemas = []
-    for tool in t['tools']:
-        tool_schemas.append({
-            'name': tool['name'],
-            'description': tool['description'],
-            'inputSchema': {'inlinePayload': [tool['inputSchema']]}
-        })
+    lambda_arn = 'arn:aws:lambda:{}:{}:function:{}'.format(region, account_id, t['lambda_name'])
     try:
         resp = client.create_gateway_target(
             gatewayIdentifier=gw_id,
             name=t['name'],
             description=t['description'],
             targetConfiguration={
-                'lambdaTargetConfiguration': {
-                    'lambdaArn': lambda_arn,
-                    'toolSchema': tool_schemas
+                'mcp': {
+                    'lambda': {
+                        'lambdaArn': lambda_arn,
+                        'toolSchema': {
+                            'inlinePayload': t['tools']
+                        }
+                    }
                 }
-            }
+            },
+            credentialProviderConfigurations=[
+                {'credentialProviderType': 'GATEWAY_IAM_ROLE'}
+            ]
         )
         target_id = resp.get('targetId', 'N/A')
-        print(f'  Target: {t["name"]} -> {target_id}')
+        print('  Target: {} -> {}'.format(t['name'], target_id))
     except Exception as e:
-        print(f'  WARN: {t["name"]} -> {e}')
+        print('  WARN: {} -> {}'.format(t['name'], e))
 PYEOF
 else
     echo -e "  ${YELLOW}SKIP: No Gateway ID available. Create targets manually later.${NC}"
@@ -346,7 +513,8 @@ echo ""
 echo -e "${CYAN}[9/9] Creating Code Interpreter...${NC}"
 
 CI_RESULT=$(aws bedrock-agentcore-control create-code-interpreter \
-    --name awsops-code-interpreter \
+    --name awsops_code_interpreter \
+    --network-configuration '{"networkMode":"PUBLIC"}' \
     --region "$REGION" --output json 2>&1) || true
 CI_ID=$(echo "$CI_RESULT" | python3 -c "import json,sys;print(json.load(sys.stdin).get('codeInterpreterId',''))" 2>/dev/null || echo "N/A")
 echo "  Code Interpreter ID: $CI_ID"

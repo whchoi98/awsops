@@ -9,7 +9,7 @@ set -e
 #     bash scripts/install-all.sh                                              #
 #                                                                              #
 #   Runs: Step 1 -> Step 2 -> Step 3 -> Step 9 (verify)                        #
-#   Optional: Steps 4 (ALB), 5 (Cognito), 6 (AgentCore)                       #
+#   Optional: Steps 5 (Cognito), 6 (AgentCore), 7 (CloudFront Auth)           #
 #                                                                              #
 ################################################################################
 
@@ -39,9 +39,9 @@ echo "    [3/4] Production Build + Deploy            (03-build-deploy.sh)"
 echo "    [4/4] Verification                         (09-verify.sh)"
 echo ""
 echo "  Optional (run separately):"
-echo "    Step 4: ALB listener          (04-setup-alb.sh)"
-echo "    Step 5: Cognito auth          (05-setup-cognito.sh)"
-echo "    Step 6: AgentCore Runtime     (06-setup-agentcore.sh)"
+echo "    Step 5: Cognito auth              (05-setup-cognito.sh)"
+echo "    Step 6: AgentCore Runtime         (06-setup-agentcore.sh)"
+echo "    Step 7: CloudFront Lambda@Edge    (07-setup-cloudfront-auth.sh)"
 echo ""
 
 # -- Detect environment --------------------------------------------------------
@@ -114,7 +114,7 @@ if [ -n "$CF_DOMAIN" ] && [ "$CF_DOMAIN" != "None" ]; then
 fi
 
 echo "  Optional next steps:"
-echo "    bash scripts/04-setup-alb.sh        # ALB + CloudFront listener"
-echo "    bash scripts/05-setup-cognito.sh    # Cognito authentication"
-echo "    bash scripts/06-setup-agentcore.sh  # AI AgentCore + Gateway"
+echo "    bash scripts/05-setup-cognito.sh           # Cognito authentication"
+echo "    bash scripts/06-setup-agentcore.sh         # AI AgentCore + Gateway"
+echo "    bash scripts/07-setup-cloudfront-auth.sh   # Lambda@Edge -> CloudFront"
 echo ""
