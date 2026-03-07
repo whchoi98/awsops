@@ -112,34 +112,9 @@ def lambda_handler(event, context):
         'vpcId': vpc_id, 'flowLogs': flow_logs, 'count': len(flow_logs)})}
 LAMBDAEOF
 
-# --- network_mcp.py ---
-cat > /tmp/network_mcp.py << 'LAMBDAEOF'
-import boto3, json
-
-def lambda_handler(event, context):
-    ec2 = boto3.client('ec2')
-    params = event if isinstance(event, dict) else json.loads(event)
-    rt = params['resource_type']
-    rid = params.get('resource_id')
-    vpc = params.get('vpc_id')
-
-    handlers = {
-        'security_group': lambda: ec2.describe_security_groups(
-            Filters=([{'Name':'group-id','Values':[rid]}] if rid else [{'Name':'vpc-id','Values':[vpc]}] if vpc else [])),
-        'nacl': lambda: ec2.describe_network_acls(
-            Filters=([{'Name':'network-acl-id','Values':[rid]}] if rid else [{'Name':'vpc-id','Values':[vpc]}] if vpc else [])),
-        'route_table': lambda: ec2.describe_route_tables(
-            Filters=([{'Name':'route-table-id','Values':[rid]}] if rid else [{'Name':'vpc-id','Values':[vpc]}] if vpc else [])),
-        'subnet': lambda: ec2.describe_subnets(
-            Filters=([{'Name':'subnet-id','Values':[rid]}] if rid else [{'Name':'vpc-id','Values':[vpc]}] if vpc else [])),
-        'vpc': lambda: ec2.describe_vpcs(VpcIds=[rid] if rid else []),
-    }
-    if rt not in handlers:
-        return {'statusCode': 400, 'body': json.dumps({'error': 'Unknown type: ' + rt})}
-    resp = handlers[rt]()
-    resp.pop('ResponseMetadata', None)
-    return {'statusCode': 200, 'body': json.dumps(resp, default=str)}
-LAMBDAEOF
+# --- network_mcp.py (Full: VPC, TGW, VPN, ENI, Firewall, Flow Logs — 15 tools) ---
+#   Source: agent/lambda/network_mcp.py
+cp "$WORK_DIR/agent/lambda/network_mcp.py" /tmp/network_mcp.py
 
 # --- steampipe_query.py (VPC Lambda → real Steampipe SQL via pg8000) ---
 #   This Lambda runs inside the VPC and connects to EC2 Steampipe PostgreSQL.
