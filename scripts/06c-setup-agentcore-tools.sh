@@ -6,9 +6,9 @@ set -e
 #                                                                              #
 #   Creates:                                                                   #
 #     1. IAM Role for Lambda (network permissions)                             #
-#     2. Lambda functions (6: reachability, flow-monitor, network-mcp,         #
-#        steampipe-query, aws-knowledge, core-mcp)                             #
-#     3. Gateway Targets (6) linking Lambda to Gateway via MCP                 #
+#     2. Lambda functions (7: reachability, flow-monitor, network-mcp,         #
+#        steampipe-query, aws-knowledge, core-mcp, iac-mcp)                             #
+#     3. Gateway Targets (7) linking Lambda to Gateway via MCP                 #
 #                                                                              #
 #   Known issues handled:                                                      #
 #     - Gateway toolSchema uses inlinePayload (not OpenAPI)                   #
@@ -455,11 +455,106 @@ aws lambda add-permission --function-name awsops-core-mcp \
 
 echo "  Lambda: awsops-core-mcp (prompt_understanding + call_aws + suggest)"
 
+# Deploy iac-mcp Lambda (CloudFormation/CDK validation, troubleshooting, docs)
+echo ""
+echo -e "  ${YELLOW}NOTE: iac-mcp provides CFn validation, troubleshooting, CDK docs search${NC}"
+
+cat > /tmp/aws_iac_mcp.py << 'LAMBDAEOF'
+import json, boto3, urllib.request, re, html
+
+CDK_BEST_PRACTICES = "# CDK Best Practices\n## Security\n- IAM least-privilege, no wildcards\n- Encryption at rest (KMS) and transit (TLS)\n- VPC with private subnets\n- Enable CloudTrail, Flow Logs\n## Architecture\n- One stack per environment\n- Use L2/L3 constructs over L1\n- cdk diff before deploy\n- Tag all resources\n## Deployment\n- cdk bootstrap each account/region\n- --require-approval for production\n- Enable termination protection\n- Use change sets for critical updates"
+
+PRE_DEPLOY = "# Pre-Deploy Validation\n1. cfn-lint template.yaml\n2. cfn-guard validate\n3. Create change set and review\n4. Execute change set"
+
+def validate_cfn(tmpl, region='ap-northeast-2'):
+    try:
+        r = boto3.client('cloudformation', region_name=region).validate_template(TemplateBody=tmpl)
+        return {'valid': True, 'parameters': [p['ParameterKey'] for p in r.get('Parameters',[])], 'capabilities': r.get('Capabilities',[])}
+    except Exception as e: return {'valid': False, 'error': str(e)}
+
+def troubleshoot_cfn(stack, region='ap-northeast-2'):
+    try:
+        cfn = boto3.client('cloudformation', region_name=region)
+        s = cfn.describe_stacks(StackName=stack)['Stacks'][0]
+        evts = cfn.describe_stack_events(StackName=stack)['StackEvents']
+        fails = [{'resource': e.get('LogicalResourceId',''), 'type': e.get('ResourceType',''), 'reason': e.get('ResourceStatusReason','')} for e in evts if 'FAILED' in e.get('ResourceStatus','')][:10]
+        return {'stack': stack, 'status': s['StackStatus'], 'failures': fails}
+    except Exception as e: return {'error': str(e)}
+
+def search_docs(prefix, query):
+    payload = json.dumps({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"aws___search_documentation","arguments":{"search_phrase": prefix + " " + query, "limit":5}}}).encode()
+    req = urllib.request.Request("https://knowledge-mcp.global.api.aws", data=payload, headers={"Content-Type":"application/json","Accept":"application/json"})
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        data = json.loads(resp.read().decode())
+    return "\n".join(c.get("text","") for c in data.get("result",{}).get("content",[]) if c.get("type")=="text")
+
+def read_page(url, max_len=10000):
+    req = urllib.request.Request(url, headers={'User-Agent':'AWSops-IaC/1.0'})
+    with urllib.request.urlopen(req, timeout=15) as resp: raw = resp.read().decode('utf-8', errors='replace')
+    text = re.sub(r'<script[^>]*>.*?</script>','',raw,flags=re.DOTALL)
+    text = re.sub(r'<style[^>]*>.*?</style>','',text,flags=re.DOTALL)
+    text = re.sub(r'<[^>]+>',' ',text)
+    return re.sub(r'\s+',' ',html.unescape(text)).strip()[:max_len]
+
+def lambda_handler(event, context):
+    params = event if isinstance(event, dict) else json.loads(event)
+    t = params.get("tool_name",""); args = params.get("arguments", params)
+    if not t:
+        if "template_content" in params: t = "validate_cloudformation_template"
+        elif "stack_name" in params: t = "troubleshoot_cloudformation_deployment"
+        elif "query" in params and "cdk" in params.get("query","").lower(): t = "search_cdk_documentation"
+        elif "query" in params: t = "search_cloudformation_documentation"
+        elif "url" in params: t = "read_iac_documentation_page"
+        else: t = "cdk_best_practices"
+        args = params
+    if t == "validate_cloudformation_template":
+        return {"statusCode":200,"body":json.dumps(validate_cfn(args.get("template_content",""), args.get("region","ap-northeast-2")), default=str)}
+    elif t == "check_cloudformation_template_compliance":
+        tmpl = args.get("template_content",""); issues = []
+        if "AWS::IAM" in tmpl and "*" in tmpl: issues.append({"severity":"HIGH","message":"Wildcard in IAM policy"})
+        if "PubliclyAccessible" in tmpl and "true" in tmpl.lower(): issues.append({"severity":"HIGH","message":"PubliclyAccessible is true"})
+        return {"statusCode":200,"body":json.dumps({"validation":validate_cfn(tmpl),"compliance_issues":issues}, default=str)}
+    elif t == "troubleshoot_cloudformation_deployment":
+        return {"statusCode":200,"body":json.dumps(troubleshoot_cfn(args.get("stack_name",""), args.get("region","ap-northeast-2")), default=str)}
+    elif t == "get_cloudformation_pre_deploy_validation_instructions":
+        return {"statusCode":200,"body":PRE_DEPLOY}
+    elif t == "search_cdk_documentation":
+        return {"statusCode":200,"body":search_docs("CDK "+args.get("language","typescript"), args.get("query",""))[:50000]}
+    elif t == "search_cloudformation_documentation":
+        return {"statusCode":200,"body":search_docs("CloudFormation", args.get("query",""))[:50000]}
+    elif t == "search_cdk_samples_and_constructs":
+        return {"statusCode":200,"body":search_docs("CDK example "+args.get("language","typescript"), args.get("query",""))[:50000]}
+    elif t == "cdk_best_practices":
+        return {"statusCode":200,"body":CDK_BEST_PRACTICES}
+    elif t == "read_iac_documentation_page":
+        try: return {"statusCode":200,"body":read_page(args.get("url",""), args.get("max_length",10000))}
+        except Exception as e: return {"statusCode":500,"body":json.dumps({"error":str(e)})}
+    return {"statusCode":400,"body":json.dumps({"error":"Unknown tool: "+t})}
+LAMBDAEOF
+
+cd /tmp && zip -j aws_iac_mcp.zip aws_iac_mcp.py 2>/dev/null
+aws lambda create-function \
+    --function-name awsops-iac-mcp --runtime python3.12 \
+    --handler "aws_iac_mcp.lambda_handler" \
+    --role "$LAMBDA_ROLE_ARN" --zip-file "fileb:///tmp/aws_iac_mcp.zip" \
+    --timeout 60 --memory-size 256 \
+    --region "$REGION" 2>/dev/null || \
+aws lambda update-function-code \
+    --function-name awsops-iac-mcp --zip-file "fileb:///tmp/aws_iac_mcp.zip" \
+    --region "$REGION" 2>/dev/null
+
+aws lambda add-permission --function-name awsops-iac-mcp \
+    --statement-id agentcore-invoke --action lambda:InvokeFunction \
+    --principal bedrock-agentcore.amazonaws.com \
+    --region "$REGION" 2>/dev/null || true
+
+echo "  Lambda: awsops-iac-mcp (CFn validate + troubleshoot + CDK docs)"
+
 # -- [3/3] Create Gateway Targets (via Python/boto3) --------------------------
 #   KNOWN ISSUE: AWS CLI has issues with inlinePayload JSON format.
 #   Using Python/boto3 with correct mcp.lambda structure.
 echo ""
-echo -e "${CYAN}[3/3] Creating Gateway targets (6) via boto3...${NC}"
+echo -e "${CYAN}[3/3] Creating Gateway targets (7) via boto3...${NC}"
 echo -e "  ${YELLOW}NOTE: Using Python/boto3 (CLI has issues with inlinePayload)${NC}"
 
 # Auto-detect Gateway ID
@@ -567,6 +662,42 @@ targets = [
        'inputSchema': {'type': 'object', 'properties': {
            'query': prop('string', 'Natural language description of desired operation')},
         'required': ['query']}}]),
+    ('iac-mcp-target', 'awsops-iac-mcp',
+     'AWS IaC MCP - CloudFormation/CDK validation, troubleshooting, documentation',
+     [{'name': 'validate_cloudformation_template',
+       'description': 'Validate CloudFormation template syntax and schema.',
+       'inputSchema': {'type': 'object', 'properties': {
+           'template_content': prop('string', 'CloudFormation template YAML/JSON')},
+        'required': ['template_content']}},
+      {'name': 'check_cloudformation_template_compliance',
+       'description': 'Check template for security and compliance issues.',
+       'inputSchema': {'type': 'object', 'properties': {
+           'template_content': prop('string', 'CloudFormation template content')},
+        'required': ['template_content']}},
+      {'name': 'troubleshoot_cloudformation_deployment',
+       'description': 'Troubleshoot CloudFormation deployment failures.',
+       'inputSchema': {'type': 'object', 'properties': {
+           'stack_name': prop('string', 'Stack name'),
+           'region': prop('string', 'AWS region')},
+        'required': ['stack_name']}},
+      {'name': 'search_cdk_documentation',
+       'description': 'Search CDK documentation and API references.',
+       'inputSchema': {'type': 'object', 'properties': {
+           'query': prop('string', 'CDK search query')},
+        'required': ['query']}},
+      {'name': 'search_cloudformation_documentation',
+       'description': 'Search CloudFormation documentation.',
+       'inputSchema': {'type': 'object', 'properties': {
+           'query': prop('string', 'CloudFormation search query')},
+        'required': ['query']}},
+      {'name': 'cdk_best_practices',
+       'description': 'CDK security and development best practices.',
+       'inputSchema': {'type': 'object', 'properties': {}}},
+      {'name': 'read_iac_documentation_page',
+       'description': 'Fetch IaC documentation page as text.',
+       'inputSchema': {'type': 'object', 'properties': {
+           'url': prop('string', 'Documentation URL')},
+        'required': ['url']}}]),
 ]
 
 for name, fn, desc, tools in targets:
@@ -611,8 +742,9 @@ echo "    - awsops-network-mcp"
 echo "    - awsops-steampipe-query     (VPC, pg8000 → Steampipe :9193)"
 echo "    - awsops-aws-knowledge       (proxy → AWS Knowledge MCP)"
 echo "    - awsops-core-mcp            (prompt + call_aws + suggest)"
+echo "    - awsops-iac-mcp             (CFn validate + troubleshoot + CDK docs)"
 echo ""
-echo "  Gateway Targets: 6 (via boto3 with mcp.lambda + inlinePayload)"
+echo "  Gateway Targets: 7 (via boto3 with mcp.lambda + inlinePayload)"
 echo ""
 echo "  Next: bash scripts/06d-setup-agentcore-interpreter.sh"
 echo ""
