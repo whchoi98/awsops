@@ -53,7 +53,9 @@ echo -e "  ${YELLOW}NOTE: PostgreSQL 별도 설치 불필요 (Steampipe에 내�
 
 steampipe service stop --force 2>/dev/null || true
 sleep 2
-steampipe service start --database-listen local --database-port 9193
+#   --database-listen network: allows VPC Lambda (steampipe-query) to connect
+#   EC2 Security Group controls access (only Lambda SG allowed on 9193)
+steampipe service start --database-listen network --database-port 9193
 
 SP_PASSWORD=$(steampipe service status --show-password 2>&1 | grep Password | awk '{print $2}')
 if [ -z "$SP_PASSWORD" ]; then
@@ -62,10 +64,12 @@ if [ -z "$SP_PASSWORD" ]; then
     exit 1
 fi
 
+PRIVATE_IP=$(hostname -I | awk '{print $1}')
 echo "  Port:       9193"
+echo "  Listen:     network (localhost + $PRIVATE_IP)"
 echo "  User:       steampipe"
 echo "  Password:   ${SP_PASSWORD:0:4}****"
-echo "  Connection: postgres://steampipe:****@127.0.0.1:9193/steampipe"
+echo "  Connection: postgres://steampipe:****@${PRIVATE_IP}:9193/steampipe"
 
 # -- [3/3] Auto-sync password to steampipe.ts ----------------------------------
 #   steampipe.ts uses pg Pool (NOT CLI) for performance:

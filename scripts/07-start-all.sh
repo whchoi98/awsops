@@ -34,7 +34,7 @@ if steampipe service status 2>&1 | grep -q "running"; then
 else
     steampipe service stop --force 2>/dev/null || true
     sleep 2
-    steampipe service start --database-listen local --database-port 9193
+    steampipe service start --database-listen network --database-port 9193
     echo -e "  ${GREEN}Started${NC}"
 fi
 
