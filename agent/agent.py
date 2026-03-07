@@ -43,6 +43,7 @@ You have MCP tools for:
 - Network MCP: describe security groups, NACLs, route tables, subnets, VPCs
 - EKS MCP: list clusters, VPC config, insights, CloudWatch logs/metrics, IAM roles, app manifests, troubleshooting
 - ECS MCP: list/describe clusters, services, tasks, task definitions, ECR repos, troubleshoot (events, failures, logs, network, image pull)
+- Istio MCP: VirtualService, DestinationRule, Gateway, ServiceEntry, AuthorizationPolicy, PeerAuthentication, sidecar injection, EnvoyFilter, CRDs, troubleshooting (503, mTLS, connectivity)
 Always be concise, provide actionable insights. Format in markdown. Respond in the user's language.""",
 
     "ops": """You are AWSops Operations Assistant, an expert in AWS cloud operations.

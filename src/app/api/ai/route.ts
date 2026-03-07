@@ -153,7 +153,8 @@ function needsInfra(message: string): boolean {
     '라우트','라우팅','security group rule','sg rule','보안그룹 규칙','vpn','트러블슈팅','troubleshoot',
     'network path','네트워크 경로','connectivity','연결성','find ip','ip 찾','ip 검색',
     'eks','kubernetes','k8s cluster','클러스터','node group','pod log','container insight',
-    'ecs','fargate','task definition','태스크','서비스 이벤트','ecr','컨테이너'];
+    'ecs','fargate','task definition','태스크','서비스 이벤트','ecr','컨테이너',
+    'istio','service mesh','서비스 메시','virtualservice','destinationrule','sidecar','envoy','mtls'];
   return keywords.some(k => lower.includes(k));
 }
 
