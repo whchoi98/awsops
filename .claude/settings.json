@@ -7,13 +7,29 @@
     "scripts/ARCHITECTURE.md",
     "docs/TROUBLESHOOTING.md"
   ],
+  "permissions": {
+    "allow": [],
+    "deny": []
+  },
   "skills": {
     "code-review": ".claude/skills/code-review/SKILL.md",
     "refactor": ".claude/skills/refactor/SKILL.md",
-    "release": ".claude/skills/release/SKILL.md"
+    "release": ".claude/skills/release/SKILL.md",
+    "sync-docs": ".claude/skills/sync-docs/SKILL.md"
   },
   "hooks": {
     "pre-commit": ".claude/hooks/pre-commit.sh",
-    "post-build": ".claude/hooks/post-build.sh"
+    "post-build": ".claude/hooks/post-build.sh",
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/check-doc-sync.sh \"$TOOL_INPUT_PATH\" 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
   }
 }

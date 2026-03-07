@@ -58,3 +58,29 @@ AWS + Kubernetes operations dashboard with real-time resource monitoring, networ
 3. Create page: `src/app/<service>/page.tsx` ('use client', fetch pattern, detail panel)
 4. Add to Sidebar: `src/components/layout/Sidebar.tsx` (appropriate navGroup)
 5. Verify: `bash scripts/09-verify.sh`
+
+---
+
+## Auto-Sync Rules
+
+Rules below are applied automatically after Plan mode exit and on major code changes.
+
+### Post-Plan Mode Actions
+After exiting Plan mode (`/plan`), before starting implementation:
+
+1. **Architecture decision made** -> Update `docs/architecture.md`
+2. **Technical choice/trade-off made** -> Create `docs/decisions/ADR-NNN-title.md`
+3. **New module added** -> Create `CLAUDE.md` in that module directory
+4. **Operational procedure defined** -> Create runbook in `docs/runbooks/`
+5. **Changes needed in this file** -> Update relevant sections above
+
+### Code Change Sync Rules
+- New directory under `src/` -> Must create `CLAUDE.md` alongside
+- API endpoint added/changed -> Update `src/app/CLAUDE.md`
+- Query file added/changed -> Update `src/lib/CLAUDE.md`
+- Component added/changed -> Update `src/components/CLAUDE.md`
+- Infrastructure changed -> Update `docs/architecture.md` Infrastructure section
+
+### ADR Numbering
+Find the highest number in `docs/decisions/ADR-*.md` and increment by 1.
+Format: `ADR-NNN-concise-title.md`
