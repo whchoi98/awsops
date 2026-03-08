@@ -16,7 +16,7 @@ app = BedrockAgentCoreApp()
 
 # Gateway URLs by role (route.ts selects which one to use)
 GATEWAYS = {
-    "infra": "https://awsops-network-gateway-oimomguf7x.gateway.bedrock-agentcore.ap-northeast-2.amazonaws.com/mcp",
+    "infra": "https://awsops-infra-gateway-nipql9oohq.gateway.bedrock-agentcore.ap-northeast-2.amazonaws.com/mcp",
     "ops": "https://awsops-ops-gateway-ybcvjkwu71.gateway.bedrock-agentcore.ap-northeast-2.amazonaws.com/mcp",
     "iac": "https://awsops-iac-gateway-i0vlfltmwu.gateway.bedrock-agentcore.ap-northeast-2.amazonaws.com/mcp",
     "cost": "https://awsops-cost-gateway-uanqtckgzm.gateway.bedrock-agentcore.ap-northeast-2.amazonaws.com/mcp",

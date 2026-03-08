@@ -46,7 +46,7 @@ def create_target(gw_id, name, fn, desc, tools):
 
 # ========== INFRA GATEWAY ==========
 print('\n=== Infra Gateway ===')
-gw = find_gateway('network-gateway')
+gw = find_gateway('infra-gateway')
 if not gw:
     print('ERROR: Infra gateway not found'); sys.exit(1)
 

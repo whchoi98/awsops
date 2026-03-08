@@ -42,7 +42,7 @@ fi
 echo -e "${CYAN}[1/1] Creating 7 role-based Gateways...${NC}"
 
 GATEWAYS=(
-    "awsops-network-gateway:Infra - network, EKS, ECS, Istio"
+    "awsops-infra-gateway:Infra - Network, EKS, ECS, Istio"
     "awsops-iac-gateway:IaC - CloudFormation, CDK, Terraform"
     "awsops-data-gateway:Data - DynamoDB, RDS MySQL/PostgreSQL, ElastiCache, MSK"
     "awsops-security-gateway:Security - IAM users, roles, policies, simulation"
