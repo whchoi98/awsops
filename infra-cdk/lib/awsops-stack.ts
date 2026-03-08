@@ -89,10 +89,11 @@ export class AwsopsStack extends cdk.Stack {
     // Security Groups
     // -------------------------------------------------------
 
-    // ALB SG: allow HTTP from CloudFront prefix list only
+    // ALB SG: CloudFront에서만 접근 허용 / Allow from CloudFront only
     const albSg = new ec2.SecurityGroup(this, 'ALBSecurityGroup', {
       vpc: this.vpc,
-      description: 'ALB SG - HTTP from CloudFront origin-facing only',
+      securityGroupName: 'awsops-alb-sg',
+      description: 'AWSops ALB SG - CloudFront origin-facing only',
       allowAllOutbound: true,
     });
     // Use single port range (80-3000) to stay within SG rules limit
@@ -106,10 +107,11 @@ export class AwsopsStack extends cdk.Stack {
       description: 'HTTP/Dashboard ports from CloudFront origin-facing',
     });
 
-    // EC2 SG: allow traffic from ALB only
+    // EC2 SG: ALB에서만 접근 허용 / Allow from ALB only
     const ec2Sg = new ec2.SecurityGroup(this, 'EC2SecurityGroup', {
       vpc: this.vpc,
-      description: 'EC2 SG - traffic from ALB only',
+      securityGroupName: 'awsops-ec2-sg',
+      description: 'AWSops EC2 SG - ALB traffic only',
       allowAllOutbound: true,
     });
     ec2Sg.addIngressRule(albSg, ec2.Port.tcp(8888), 'VSCode from ALB');
@@ -162,13 +164,19 @@ export class AwsopsStack extends cdk.Stack {
     // -------------------------------------------------------
     // IAM Role for EC2 (SSM + CloudWatch)
     // -------------------------------------------------------
+    // EC2 역할: SSM + CloudWatch + ReadOnlyAccess (Steampipe 필수)
+    // EC2 Role: SSM + CloudWatch + ReadOnlyAccess (required for Steampipe)
     const ec2Role = new iam.Role(this, 'EC2Role', {
+      roleName: 'awsops-ec2-role',
       assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
       managedPolicies: [
         iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'),
         iam.ManagedPolicy.fromAwsManagedPolicyName('CloudWatchAgentServerPolicy'),
+        // Steampipe가 AWS 리소스를 조회하려면 ReadOnlyAccess 필요
+        // ReadOnlyAccess required for Steampipe to query AWS resources
+        iam.ManagedPolicy.fromAwsManagedPolicyName('ReadOnlyAccess'),
       ],
-      description: 'AWSops EC2 instance role with SSM and CloudWatch access',
+      description: 'AWSops EC2 role - SSM, CloudWatch, ReadOnlyAccess for Steampipe',
     });
 
     // -------------------------------------------------------
@@ -289,6 +297,7 @@ export class AwsopsStack extends cdk.Stack {
 
     // Use ARM64 AMI by default (t4g.2xlarge is ARM64 Graviton)
     this.instance = new ec2.Instance(this, 'AWSopsServer', {
+      instanceName: 'awsops-server',
       vpc: this.vpc,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       instanceType: new ec2.InstanceType(instanceType.valueAsString),
@@ -312,12 +321,13 @@ export class AwsopsStack extends cdk.Stack {
     // Application Load Balancer (Internet-facing)
     // -------------------------------------------------------
     this.alb = new elbv2.ApplicationLoadBalancer(this, 'PublicALB', {
+      loadBalancerName: 'awsops-alb',
       vpc: this.vpc,
       internetFacing: true,
       securityGroup: albSg,
       idleTimeout: cdk.Duration.seconds(3600),
     });
-    cdk.Tags.of(this.alb).add('Name', `${this.stackName}-Public-ALB`);
+    cdk.Tags.of(this.alb).add('Name', 'awsops-alb');
 
     // Custom header secret for CloudFront -> ALB validation
     const customSecret = `${this.stackName}-secret-${this.account}`;
