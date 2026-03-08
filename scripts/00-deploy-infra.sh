@@ -290,10 +290,65 @@ else
 fi
 
 ###############################################################################
-#  [5/8] CDK CLI 설치 / Install CDK CLI                                        #
+#  [5/9] 인스턴스 타입 선택 / Instance Type Selection                           #
 ###############################################################################
 echo ""
-echo -e "${CYAN}[5/8] CDK CLI 설치 / Install CDK CLI...${NC}"
+echo -e "${CYAN}[5/9] 인스턴스 타입 선택 / Instance Type Selection...${NC}"
+echo ""
+echo -e "  ${BOLD}EC2 인스턴스 타입을 선택하세요 / Select EC2 instance type:${NC}"
+echo ""
+echo -e "  ${GREEN}★ 권장: Graviton (ARM64) 인스턴스${NC}"
+echo -e "  ${DIM}  AgentCore Runtime Docker 이미지가 arm64로 빌드됩니다.${NC}"
+echo -e "  ${DIM}  Graviton recommended: AgentCore Docker image is built for arm64.${NC}"
+echo ""
+
+INSTANCE_TYPES=(
+    "t4g.2xlarge:ARM64 Graviton, 8 vCPU, 32GB  ★ 기본값 / default (권장 / recommended)"
+    "t4g.xlarge:ARM64 Graviton, 4 vCPU, 16GB"
+    "m7g.xlarge:ARM64 Graviton, 4 vCPU, 16GB (메모리 최적화 / memory optimized)"
+    "m7g.2xlarge:ARM64 Graviton, 8 vCPU, 32GB (메모리 최적화 / memory optimized)"
+    "t3.xlarge:x86_64 Intel, 4 vCPU, 16GB"
+    "t3.2xlarge:x86_64 Intel, 8 vCPU, 32GB"
+    "m7i.xlarge:x86_64 Intel, 4 vCPU, 16GB"
+    "m7i.2xlarge:x86_64 Intel, 8 vCPU, 32GB"
+)
+
+for i in "${!INSTANCE_TYPES[@]}"; do
+    ITYPE="${INSTANCE_TYPES[$i]%%:*}"
+    IDESC="${INSTANCE_TYPES[$i]##*:}"
+    printf "    %2d) %-16s %s\n" $((i+1)) "$ITYPE" "$IDESC"
+done
+echo ""
+echo "    0) 직접 입력 / Enter custom type"
+echo ""
+read -p "  번호 입력 / Enter number [1]: " ITYPE_CHOICE
+ITYPE_CHOICE="${ITYPE_CHOICE:-1}"
+
+if [ "$ITYPE_CHOICE" = "0" ]; then
+    read -p "  인스턴스 타입 입력 / Enter instance type: " INSTANCE_TYPE
+    INSTANCE_TYPE="${INSTANCE_TYPE:-t4g.2xlarge}"
+elif [[ "$ITYPE_CHOICE" =~ ^[0-9]+$ ]] && [ "$ITYPE_CHOICE" -ge 1 ] && [ "$ITYPE_CHOICE" -le "${#INSTANCE_TYPES[@]}" ]; then
+    INSTANCE_TYPE="${INSTANCE_TYPES[$((ITYPE_CHOICE-1))]%%:*}"
+else
+    INSTANCE_TYPE="t4g.2xlarge"
+fi
+
+# x86 인스턴스 경고 / Warn for x86 instances
+case "$INSTANCE_TYPE" in
+    t3.*|m7i.*|m5.*|c5.*|r5.*)
+        echo -e "  ${YELLOW}⚠ x86_64 인스턴스가 선택되었습니다.${NC}"
+        echo -e "  ${YELLOW}  AgentCore Docker 이미지를 x86_64로도 빌드해야 합니다.${NC}"
+        echo -e "  ${YELLOW}  WARNING: x86_64 selected. AgentCore Docker image needs x86_64 build too.${NC}"
+        ;;
+esac
+
+echo -e "  ${GREEN}✓ 선택된 인스턴스 / Selected: $INSTANCE_TYPE${NC}"
+
+###############################################################################
+#  [6/9] CDK CLI 설치 / Install CDK CLI                                        #
+###############################################################################
+echo ""
+echo -e "${CYAN}[6/9] CDK CLI 설치 / Install CDK CLI...${NC}"
 
 if command -v cdk &>/dev/null; then
     echo "  이미 설치됨 / Already installed: $(cdk --version)"
@@ -303,10 +358,10 @@ else
 fi
 
 ###############################################################################
-#  [6/8] CDK 빌드 + 부트스트랩 / Build + Bootstrap                             #
+#  [7/9] CDK 빌드 + 부트스트랩 / Build + Bootstrap                             #
 ###############################################################################
 echo ""
-echo -e "${CYAN}[6/8] CDK 빌드 + 부트스트랩 / Build + Bootstrap...${NC}"
+echo -e "${CYAN}[7/9] CDK 빌드 + 부트스트랩 / Build + Bootstrap...${NC}"
 
 cd "$CDK_DIR"
 npm install --quiet
@@ -330,13 +385,13 @@ bootstrap_region "$REGION"
 [ "$REGION" != "us-east-1" ] && bootstrap_region "us-east-1"
 
 ###############################################################################
-#  [7/8] 설정 확인 / Confirm Configuration                                     #
+#  [8/9] 설정 확인 / Confirm Configuration                                     #
 ###############################################################################
 echo ""
-echo -e "${CYAN}[7/8] 설정 확인 / Confirm Configuration...${NC}"
+echo -e "${CYAN}[8/9] 설정 확인 / Confirm Configuration...${NC}"
 
 # 인스턴스 타입 / Instance type
-INSTANCE_TYPE="${INSTANCE_TYPE:-t4g.2xlarge}"
+# INSTANCE_TYPE은 [5/9]에서 대화형으로 선택 / selected interactively in step 5
 
 # CloudFront Prefix List
 CF_PREFIX_LIST=$(aws ec2 describe-managed-prefix-lists \
@@ -380,10 +435,10 @@ CONFIRM="${CONFIRM:-y}"
 [ "$CONFIRM" != "y" ] && [ "$CONFIRM" != "Y" ] && { echo "  취소 / Cancelled."; exit 0; }
 
 ###############################################################################
-#  [8/8] CDK 배포 / CDK Deploy                                                #
+#  [9/9] CDK 배포 / CDK Deploy                                                #
 ###############################################################################
 echo ""
-echo -e "${CYAN}[8/8] CDK 배포 중... (5-10분) / Deploying via CDK (5-10 min)...${NC}"
+echo -e "${CYAN}[9/9] CDK 배포 중... (5-10분) / Deploying via CDK (5-10 min)...${NC}"
 echo ""
 
 cd "$CDK_DIR"
