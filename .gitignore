@@ -51,3 +51,4 @@ agent/__pycache__/
 !.claude/
 .claude/projects/
 .claude/todos/
+docs/COMPARISON_VS_FAST.md
