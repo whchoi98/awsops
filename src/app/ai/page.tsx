@@ -11,6 +11,8 @@ interface Message {
   content: string;
   model?: string;
   queriedResources?: string[];
+  via?: string;           // Routing path display / 라우팅 경로 표시
+  route?: string;         // Classified intent route / 분류된 의도 라우트
 }
 
 export default function AIPage() {
@@ -52,6 +54,8 @@ export default function AIPage() {
           content: data.content,
           model: data.model,
           queriedResources: data.queriedResources,
+          via: data.via,
+          route: data.route,
         }]);
       }
     } catch (err: any) {
@@ -168,8 +172,11 @@ export default function AIPage() {
                   {msg.content}
                 </ReactMarkdown>
               </div>
-              {msg.model && msg.role === 'assistant' && (
-                <div className="text-[10px] text-gray-600 mt-2 text-right font-mono">Claude {msg.model}</div>
+              {msg.role === 'assistant' && (msg.model || msg.via) && (
+                <div className="text-[10px] text-gray-600 mt-2 text-right font-mono">
+                  {msg.via && <span className="mr-2">{msg.via}</span>}
+                  {msg.model && <span>Claude {msg.model}</span>}
+                </div>
               )}
             </div>
             {msg.role === 'user' && (

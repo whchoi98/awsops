@@ -152,12 +152,36 @@ def get_all_tools(client):
     return tools
 
 
+# Build Strands messages from conversation history / 대화 히스토리에서 Strands 메시지 구성
+# Converts route.ts messages array to Strands Agent format / route.ts 메시지 배열을 Strands Agent 형식으로 변환
+def build_conversation(payload):
+    """Extract user input and conversation history from payload. / 페이로드에서 사용자 입력과 대화 히스토리 추출.
+    Supports both new format (messages array) and legacy format (prompt string). / 새 형식 (messages 배열)과 레거시 형식 (prompt 문자열) 모두 지원."""
+    messages_list = payload.get("messages", [])
+    if messages_list and isinstance(messages_list, list):
+        # New format: full conversation history / 새 형식: 전체 대화 히스토리
+        # Build history (all except last) + current user input (last message) / 히스토리 (마지막 제외) + 현재 사용자 입력 (마지막 메시지)
+        history = []
+        for msg in messages_list[:-1]:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if role in ("user", "assistant") and content:
+                history.append({"role": role, "content": [{"text": content}]})
+        last_msg = messages_list[-1]
+        user_input = last_msg.get("content", "")
+        return user_input, history
+
+    # Legacy format: single prompt string / 레거시 형식: 단일 프롬프트 문자열
+    user_input = payload.get("prompt", payload.get("message", ""))
+    return user_input, []
+
+
 # Main handler: AgentCore Runtime entrypoint / 메인 핸들러: AgentCore Runtime 진입점
-# Receives payload from route.ts with prompt and gateway role / route.ts에서 프롬프트와 게이트웨이 역할이 포함된 페이로드 수신
+# Receives payload from route.ts with messages array and gateway role / route.ts에서 메시지 배열과 게이트웨이 역할이 포함된 페이로드 수신
 @app.entrypoint
 def handler(payload):
-    # Extract user input from payload (supports both 'prompt' and 'message' keys) / 페이로드에서 사용자 입력 추출 ('prompt'와 'message' 키 모두 지원)
-    user_input = payload.get("prompt", payload.get("message", ""))
+    # Extract conversation history and current input / 대화 히스토리와 현재 입력 추출
+    user_input, history = build_conversation(payload)
     if not user_input:
         return "No input provided."
 
@@ -167,7 +191,7 @@ def handler(payload):
     gateway_url = GATEWAYS.get(gateway_role, GATEWAYS[DEFAULT_GATEWAY])
     system_prompt = SYSTEM_PROMPTS.get(gateway_role, SYSTEM_PROMPTS[DEFAULT_GATEWAY])
 
-    logging.info(f"Gateway: {gateway_role} -> {gateway_url}")
+    logging.info(f"Gateway: {gateway_role} -> {gateway_url} (history: {len(history)} messages)")
 
     try:
         # Create MCP client with SigV4-signed transport to the selected gateway / 선택된 게이트웨이에 SigV4 서명 전송으로 MCP 클라이언트 생성
@@ -179,21 +203,26 @@ def handler(payload):
             tool_names = [t.tool_name for t in tools]
             logging.info(f"Gateway [{gateway_role}] MCP tools ({len(tools)}): {tool_names}")
 
-            # Create Strands Agent with model, tools, and role-specific prompt / 모델, 도구, 역할별 프롬프트로 Strands Agent 생성
+            # Create Strands Agent with model, tools, role-specific prompt, and history / 모델, 도구, 역할별 프롬프트, 히스토리로 Strands Agent 생성
             agent = Agent(
                 model=model,
                 tools=tools,
                 system_prompt=system_prompt,
+                messages=history if history else None,
             )
 
-            # Invoke the agent and return the text response / 에이전트 호출 후 텍스트 응답 반환
+            # Invoke the agent with current user input / 현재 사용자 입력으로 에이전트 호출
             response = agent(user_input)
             return response.message['content'][0]['text']
 
     except Exception as e:
         logging.error(f"Gateway MCP error [{gateway_role}]: {e}")
         # Fallback: run without MCP tools (Bedrock direct) / 폴백: MCP 도구 없이 실행 (Bedrock 직접 호출)
-        agent = Agent(model=model, system_prompt=system_prompt)
+        agent = Agent(
+            model=model,
+            system_prompt=system_prompt,
+            messages=history if history else None,
+        )
         response = agent(user_input)
         return response.message['content'][0]['text']
 
