@@ -118,26 +118,20 @@ export const queries = {
     ORDER BY node_name
   `,
 
-  // EC2 Network In/Out 최신 요약 (인스턴스별) / Latest network summary per instance
+  // EC2 Network In/Out: EC2 인스턴스 목록 + 네트워크 정보 / Instance list with network info
+  // (Network 메트릭은 클릭 시 CloudWatch API로 조회 / Network metrics fetched on click via CloudWatch)
   ec2NetworkLatest: `
-    SELECT DISTINCT ON (nin.dimensions ->> 'InstanceId')
-      nin.dimensions ->> 'InstanceId' AS instance_id,
+    SELECT
+      i.instance_id,
       i.tags ->> 'Name' AS name,
       i.instance_type,
-      ROUND((nin.average / 1048576)::numeric, 2) AS net_in_mb,
-      ROUND((nout.average / 1048576)::numeric, 2) AS net_out_mb,
-      ROUND(((nin.average + nout.average) / 1048576)::numeric, 2) AS net_total_mb,
-      nin.timestamp
-    FROM aws_cloudwatch_metric_statistic_data_point nin
-    JOIN aws_cloudwatch_metric_statistic_data_point nout
-      ON nin.dimensions = nout.dimensions AND nin.timestamp = nout.timestamp
-      AND nout.namespace = 'AWS/EC2' AND nout.metric_name = 'NetworkOut' AND nout.period = 3600
-    JOIN aws_ec2_instance i ON (nin.dimensions ->> 'InstanceId') = i.instance_id
-    WHERE nin.namespace = 'AWS/EC2'
-      AND nin.metric_name = 'NetworkIn'
-      AND nin.period = 3600
-      AND i.instance_state = 'running'
-    ORDER BY nin.dimensions ->> 'InstanceId', nin.timestamp DESC
+      i.instance_state,
+      i.private_ip_address,
+      i.public_ip_address,
+      i.monitoring_state
+    FROM aws_ec2_instance i
+    WHERE i.instance_state = 'running'
+    ORDER BY i.tags ->> 'Name', i.instance_id
   `,
 
   // Per-instance network (needs instance_id parameter)

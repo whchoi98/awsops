@@ -257,14 +257,22 @@ export default function MonitoringPage() {
       {/* Network In/Out */}
       {activeTab === 'network' && (
         <>
-          <p className="text-xs text-gray-500">인스턴스별 Network In/Out (MB/h, CloudWatch). 클릭하면 시계열 그래프를 볼 수 있습니다. / Per-instance Network In/Out. Click for time series.</p>
+          <p className="text-xs text-gray-500">실행 중인 EC2 인스턴스 목록. 클릭하면 NetworkIn/Out 시계열 그래프를 볼 수 있습니다. / Running EC2 instances. Click for NetworkIn/Out time series chart.</p>
           <DataTable columns={[
             { key: 'name', label: 'Instance', render: (v: string, row: any) => v || row.instance_id?.slice(-12) },
             { key: 'instance_type', label: 'Type' },
-            { key: 'net_in_mb', label: 'Net In (MB/h)', render: (v: number) => <span className="font-mono text-accent-cyan">{v ?? '--'}</span> },
-            { key: 'net_out_mb', label: 'Net Out (MB/h)', render: (v: number) => <span className="font-mono text-accent-green">{v ?? '--'}</span> },
-            { key: 'net_total_mb', label: 'Total (MB/h)', render: (v: number) => <span className="font-mono font-bold text-accent-orange">{v ?? '--'}</span> },
-            { key: 'timestamp', label: 'Time', render: (v: string) => v ? new Date(v).toLocaleTimeString() : '--' },
+            { key: 'private_ip_address', label: 'Private IP' },
+            { key: 'public_ip_address', label: 'Public IP', render: (v: string) => v || '-' },
+            { key: 'monitoring_state', label: 'Monitoring', render: (v: string) => (
+              <span className={`text-xs px-2 py-0.5 rounded-full ${v === 'enabled' ? 'bg-accent-green/10 text-accent-green' : 'bg-navy-700 text-gray-400'}`}>
+                {v === 'enabled' ? 'detailed' : 'basic'}
+              </span>
+            )},
+            { key: 'instance_id', label: 'Network', render: (_v: string, row: any) => (
+              <button className="text-xs text-accent-cyan hover:underline font-medium" onClick={(e) => { e.stopPropagation(); fetchNetwork(row.instance_id); }}>
+                View In/Out
+              </button>
+            )},
           ]} data={loading && !ec2Network.length ? undefined : ec2Network}
              onRowClick={(row) => fetchNetwork(row.instance_id)} />
         </>
