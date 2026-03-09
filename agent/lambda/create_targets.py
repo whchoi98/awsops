@@ -18,7 +18,13 @@ def prop(t, d=''):
 
 
 def find_gateway(name_pattern):
+    """정확한 이름 매칭으로 Gateway 조회 / Find gateway by exact name match"""
+    full_name = 'awsops-{}'.format(name_pattern) if not name_pattern.startswith('awsops-') else name_pattern
     gws = client.list_gateways().get('items', [])
+    for g in gws:
+        if g.get('name', '') == full_name:
+            return g['gatewayId']
+    # 폴백: 부분 매칭 / Fallback: partial match
     for g in gws:
         if name_pattern in g.get('name', ''):
             return g['gatewayId']
