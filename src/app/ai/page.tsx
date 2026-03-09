@@ -45,6 +45,13 @@ export default function AIPage() {
           model,
         }),
       });
+      // Handle non-JSON responses (502, HTML error pages, etc.) / 비-JSON 응답 처리 (502, HTML 에러 페이지 등)
+      const contentType = res.headers.get('content-type') || '';
+      if (!res.ok || !contentType.includes('application/json')) {
+        const errorText = res.ok ? 'Unexpected response format' : `Server error (${res.status})`;
+        setMessages([...newMessages, { role: 'assistant', content: `Error: ${errorText}. Please try again.`, model }]);
+        return;
+      }
       const data = await res.json();
       if (data.error) {
         setMessages([...newMessages, { role: 'assistant', content: `Error: ${data.error}`, model }]);

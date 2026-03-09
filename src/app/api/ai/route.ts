@@ -290,7 +290,9 @@ async function executeCodeInterpreter(code: string): Promise<{ output: string; e
   }
 }
 
-// AgentCore Runtime invoke with conversation history / 대화 히스토리를 포함한 AgentCore Runtime 호출
+// AgentCore Runtime invoke with conversation history and timeout / 대화 히스토리와 타임아웃을 포함한 AgentCore Runtime 호출
+const AGENTCORE_TIMEOUT_MS = 60000; // 60 seconds max for AgentCore / AgentCore 최대 60초
+
 async function invokeAgentCore(
   messages: Array<{role: string; content: string}>,
   gateway: string
@@ -303,22 +305,32 @@ async function invokeAgentCore(
       qualifier: 'DEFAULT',
       payload: JSON.stringify({ messages: recentMessages, gateway }),
     });
-    const response = await agentCoreClient.send(command);
-    const sessionId = response.runtimeSessionId;
-    const body = await streamToString(response.response);
-    const text = body.startsWith('"') ? JSON.parse(body) : body;
 
-    // Stop session to release microVM / microVM 해제를 위해 세션 중지
-    if (sessionId) {
-      try {
-        await agentCoreClient.send(new StopRuntimeSessionCommand({
-          agentRuntimeArn: AGENT_RUNTIME_ARN,
-          runtimeSessionId: sessionId,
-          qualifier: 'DEFAULT',
-        }));
-      } catch {}
-    }
-    return text;
+    // Race between AgentCore call and timeout / AgentCore 호출과 타임아웃 경쟁
+    const timeoutPromise = new Promise<null>((resolve) =>
+      setTimeout(() => { console.warn(`[AgentCore] Timeout after ${AGENTCORE_TIMEOUT_MS}ms for gateway=${gateway}`); resolve(null); }, AGENTCORE_TIMEOUT_MS)
+    );
+
+    const agentPromise = (async () => {
+      const response = await agentCoreClient.send(command);
+      const sessionId = response.runtimeSessionId;
+      const body = await streamToString(response.response);
+      const text = body.startsWith('"') ? JSON.parse(body) : body;
+
+      // Stop session to release microVM / microVM 해제를 위해 세션 중지
+      if (sessionId) {
+        try {
+          await agentCoreClient.send(new StopRuntimeSessionCommand({
+            agentRuntimeArn: AGENT_RUNTIME_ARN,
+            runtimeSessionId: sessionId,
+            qualifier: 'DEFAULT',
+          }));
+        } catch {}
+      }
+      return text as string;
+    })();
+
+    return await Promise.race([agentPromise, timeoutPromise]);
   } catch (err: any) {
     console.error('[AgentCore Error]', err?.message || err);
     return null;
