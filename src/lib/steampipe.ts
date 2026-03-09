@@ -9,7 +9,7 @@ const pool = new Pool({
   database: 'steampipe',
   user: 'steampipe',
   password: '6bbf_4c5e_89bb',
-  max: 3,
+  max: 5,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 30000,
   statement_timeout: 120000,
@@ -57,8 +57,8 @@ export async function batchQuery(
   const results: Record<string, { rows: unknown[]; error?: string }> = {};
   const entries = Object.entries(queries);
 
-  // Run in sequential batches of 3 to avoid pool exhaustion
-  const BATCH_SIZE = 3;
+  // Run in sequential batches of 5 (matches pool max) / 풀 크기에 맞춰 5개씩 병렬 실행
+  const BATCH_SIZE = 5;
   for (let i = 0; i < entries.length; i += BATCH_SIZE) {
     const batch = entries.slice(i, i + BATCH_SIZE);
     const settled = await Promise.allSettled(
