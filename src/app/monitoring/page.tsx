@@ -30,6 +30,7 @@ export default function MonitoringPage() {
           queries: {
             ec2CpuLatest: metQ.ec2CpuLatest,
             ec2CpuHourly: metQ.ec2CpuHourly,
+            ec2NetworkLatest: metQ.ec2NetworkLatest,
             ebsIopsLatest: metQ.ebsIopsLatest,
             ebsIopsHourly: metQ.ebsIopsHourly,
             rdsMetrics: metQ.rdsMetrics,
@@ -57,6 +58,7 @@ export default function MonitoringPage() {
   const rdsCpuDaily = get('rdsCpuDaily');
   const k8sNodes = get('k8sNodes');
   const k8sPodRes = get('k8sPodRes');
+  const ec2Network = get('ec2NetworkLatest');
 
   // Summary stats
   const avgCpuAll = ec2Cpu.length > 0
@@ -195,7 +197,7 @@ export default function MonitoringPage() {
 
   const tabs: { key: TabKey; label: string; icon: any }[] = [
     { key: 'ec2', label: `EC2 CPU (${ec2Cpu.length})`, icon: Cpu },
-    { key: 'network', label: 'Network', icon: Wifi },
+    { key: 'network', label: `Network (${ec2Network.length})`, icon: Wifi },
     { key: 'memory', label: `Memory (${k8sNodes.length} nodes)`, icon: MemoryStick },
     { key: 'ebs', label: `EBS IOPS (${ebsLatest.length})`, icon: HardDrive },
     { key: 'rds', label: `RDS (${rdsMetrics.length})`, icon: Database },
@@ -252,21 +254,18 @@ export default function MonitoringPage() {
            onRowClick={(row) => showDetail(row.instance_id, 'ec2')} />
       )}
 
-      {/* Network */}
+      {/* Network In/Out */}
       {activeTab === 'network' && (
         <>
-          <p className="text-xs text-gray-500">Click an instance to view NetworkIn/Out time series (CloudWatch, hourly).</p>
+          <p className="text-xs text-gray-500">인스턴스별 Network In/Out (MB/h, CloudWatch). 클릭하면 시계열 그래프를 볼 수 있습니다. / Per-instance Network In/Out. Click for time series.</p>
           <DataTable columns={[
             { key: 'name', label: 'Instance', render: (v: string, row: any) => v || row.instance_id?.slice(-12) },
             { key: 'instance_type', label: 'Type' },
-            { key: 'instance_state', label: 'State' },
-            { key: 'avg_cpu', label: 'CPU %', render: (v: number) => <span className={`font-mono ${cpuColor(v)}`}>{v}%</span> },
-            { key: 'instance_id', label: 'Action', render: (_v: string, row: any) => (
-              <button className="text-xs text-accent-cyan hover:underline" onClick={(e) => { e.stopPropagation(); fetchNetwork(row.instance_id); }}>
-                View Network
-              </button>
-            )},
-          ]} data={loading && !ec2Cpu.length ? undefined : ec2Cpu}
+            { key: 'net_in_mb', label: 'Net In (MB/h)', render: (v: number) => <span className="font-mono text-accent-cyan">{v ?? '--'}</span> },
+            { key: 'net_out_mb', label: 'Net Out (MB/h)', render: (v: number) => <span className="font-mono text-accent-green">{v ?? '--'}</span> },
+            { key: 'net_total_mb', label: 'Total (MB/h)', render: (v: number) => <span className="font-mono font-bold text-accent-orange">{v ?? '--'}</span> },
+            { key: 'timestamp', label: 'Time', render: (v: string) => v ? new Date(v).toLocaleTimeString() : '--' },
+          ]} data={loading && !ec2Network.length ? undefined : ec2Network}
              onRowClick={(row) => fetchNetwork(row.instance_id)} />
         </>
       )}
