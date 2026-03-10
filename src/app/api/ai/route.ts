@@ -15,15 +15,16 @@ import {
 import { runQuery } from '@/lib/steampipe';
 
 // Service configuration / 서비스 설정
-const BEDROCK_REGION = 'us-east-1';
+const BEDROCK_REGION = 'ap-northeast-2';
 const AGENTCORE_REGION = 'ap-northeast-2';
 const AGENT_RUNTIME_ARN = 'arn:aws:bedrock-agentcore:ap-northeast-2:605134447633:runtime/awsops_agent-zMwFdo9X4Y';
 const CODE_INTERPRETER_ID = 'awsops_code_interpreter-pnEkzLpDfH';
 
 // Available Bedrock models / 사용 가능한 Bedrock 모델
+// Seoul region uses global.* prefix for cross-region inference / 서울 리전은 global.* 접두사 사용
 const MODELS: Record<string, string> = {
-  'sonnet-4.6': 'us.anthropic.claude-sonnet-4-6',
-  'opus-4.6': 'us.anthropic.claude-opus-4-6-v1',
+  'sonnet-4.6': 'global.anthropic.claude-sonnet-4-6',
+  'opus-4.6': 'global.anthropic.claude-opus-4-6-v1',
 };
 
 // AWS SDK clients / AWS SDK 클라이언트
