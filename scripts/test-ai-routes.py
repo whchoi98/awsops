@@ -115,6 +115,56 @@ CATEGORIES = list(QUESTION_BANK.keys())
 TOTAL_QUESTIONS = sum(len(qs) for qs in QUESTION_BANK.values())
 
 
+# -- Content validation / 응답 내용 검증 ------------------------------------
+# Patterns that indicate a failed or empty response / 실패 또는 빈 응답을 나타내는 패턴
+FAIL_PATTERNS = [
+    "직접 실행할 수 없",
+    "직접 조회할 수 없",
+    "직접 접근할 수 없",
+    "도구가 실행 역할",
+    "연결 불가",
+    "연결 오류",
+    "MCP 서버 연결",
+    "Failed to obtain",
+    "credentials",
+    "InternalServerException",
+    "tool_call>",
+    "tool_response>",
+]
+
+# Minimum content length per route to consider valid / 유효한 최소 응답 길이
+MIN_CONTENT_LENGTH = 100
+
+
+def validate_content(content, route):
+    """Validate response content quality. / 응답 내용 품질 검증.
+    Returns (is_valid, issues) / (유효 여부, 문제 목록) 반환."""
+    issues = []
+
+    if not content:
+        return False, ["empty response / 빈 응답"]
+
+    if len(content) < MIN_CONTENT_LENGTH:
+        issues.append(f"too short ({len(content)} chars) / 너무 짧음")
+
+    # Check for failure patterns / 실패 패턴 확인
+    content_lower = content.lower()
+    for pattern in FAIL_PATTERNS:
+        if pattern.lower() in content_lower:
+            issues.append(f"fail pattern: '{pattern}'")
+
+    # Check for raw tool tags exposed to user / 사용자에게 노출된 도구 태그 확인
+    if "<tool_call>" in content or "<tool_response>" in content:
+        issues.append("raw tool tags exposed / 도구 태그 노출")
+
+    # Route-specific checks / 라우트별 검증
+    if route == "code" and "```" not in content and "output" not in content_lower:
+        issues.append("no code block or output / 코드 블록 또는 출력 없음")
+
+    is_valid = len(issues) == 0
+    return is_valid, issues
+
+
 # -- API call / API 호출 ---------------------------------------------------
 def call_ai(question):
     """Call AI API and return result dict. / AI API 호출 후 결과 딕셔너리 반환."""
@@ -125,12 +175,17 @@ def call_ai(question):
         resp = urllib.request.urlopen(req, timeout=TIMEOUT)
         elapsed = time.time() - start
         data = json.loads(resp.read())
+        content = data.get("content", "")
+        route = data.get("route", "?")
+        is_valid, issues = validate_content(content, route)
         return {
             "time": elapsed,
-            "route": data.get("route", "?"),
+            "route": route,
             "via": data.get("via", "?"),
-            "content_length": len(data.get("content", "")),
-            "content_preview": data.get("content", "")[:200].replace("\n", " "),
+            "content_length": len(content),
+            "content_preview": content[:200].replace("\n", " "),
+            "content_valid": is_valid,
+            "content_issues": issues,
             "error": None,
         }
     except Exception as e:
@@ -140,6 +195,8 @@ def call_ai(question):
             "via": "?",
             "content_length": 0,
             "content_preview": "",
+            "content_valid": False,
+            "content_issues": [f"request error: {str(e)[:80]}"],
             "error": str(e)[:100],
         }
 
@@ -242,6 +299,8 @@ def run_tests(test_list):
     results = []
     pass_count = 0
     fail_count = 0
+    content_ok = 0
+    content_warn = 0
     route_match = 0
     total_time = 0
 
@@ -265,8 +324,23 @@ def run_tests(test_list):
             if matched:
                 route_match += 1
             match_icon = "✓" if matched else "✗"
-            result["status"] = "OK"
-            print(f" {elapsed:>5.1f}s  ✅ route={result['route']:<11} {match_icon} {result['via'][:35]}")
+
+            # Content validation result / 응답 내용 검증 결과
+            if result["content_valid"]:
+                content_ok += 1
+                quality = "📗"
+                result["status"] = "OK"
+            else:
+                content_warn += 1
+                quality = "📙"
+                result["status"] = "WARN"
+
+            print(f" {elapsed:>5.1f}s  {quality} route={result['route']:<11} {match_icon} {result['content_length']:>5}ch {result['via'][:30]}")
+
+            # Show content issues if any / 내용 문제 표시
+            if result["content_issues"]:
+                for issue in result["content_issues"]:
+                    print(f"         ⚠ {issue}")
 
         results.append(result)
 
@@ -280,7 +354,8 @@ def run_tests(test_list):
     print(f"\n{'='*90}")
     print(f"  SUMMARY / 요약")
     print(f"{'='*90}")
-    print(f"  Total:        {pass_count} passed / {fail_count} failed / {total} total")
+    print(f"  API Status:   {pass_count} passed / {fail_count} failed / {total} total")
+    print(f"  Content:      📗 {content_ok} valid / 📙 {content_warn} issues / ❌ {fail_count} errors")
     print(f"  Route match:  {route_match}/{total} ({route_match/total*100:.0f}%)" if total else "")
     print(f"  Avg time:     {avg_time:.1f}s")
     print(f"  Min / Max:    {min_time:.1f}s / {max_time:.1f}s")
@@ -314,6 +389,7 @@ def run_tests(test_list):
         "url": URL, "timeout": TIMEOUT,
         "summary": {
             "passed": pass_count, "failed": fail_count, "total": total,
+            "content_valid": content_ok, "content_issues": content_warn,
             "route_match": route_match,
             "avg_time_sec": round(avg_time, 2),
             "min_time_sec": round(min_time, 2),
