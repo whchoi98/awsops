@@ -130,15 +130,23 @@ export default function DashboardPage() {
         onRefresh={() => fetchData(true)}
       />
 
-      {/* Top Stats Row */}
+      {/* Top Stats Row — all cards clickable / 모든 카드 클릭 가능 */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <StatsCard label="EC2 Instances" value={totalEC2} icon={Server} color="cyan"
-          change={running ? `${running.value} running` : undefined} />
-        <StatsCard label="S3 Buckets" value={Number(s3?.total_buckets) || 0} icon={Database} color="green"
-          change={Number(s3?.public_buckets) > 0 ? `${s3.public_buckets} public!` : undefined} />
-        <StatsCard label="Monthly Cost" value={cost?.total_cost ? `$${Number(cost.total_cost).toLocaleString()}` : '$--'} icon={DollarSign} color="purple" />
-        <StatsCard label="Network" value={`${Number(vpc?.vpc_count) || 0} VPCs`} icon={Network} color="orange"
-          change={`${vpc?.subnet_count || 0} Subnets, ${vpc?.sg_count || 0} SGs`} />
+        <div onClick={() => router.push('/ec2')} className="cursor-pointer transition-all hover:scale-[1.02]">
+          <StatsCard label="EC2 Instances" value={totalEC2} icon={Server} color="cyan"
+            change={running ? `${running.value} running` : undefined} />
+        </div>
+        <div onClick={() => router.push('/s3')} className="cursor-pointer transition-all hover:scale-[1.02]">
+          <StatsCard label="S3 Buckets" value={Number(s3?.total_buckets) || 0} icon={Database} color="green"
+            change={Number(s3?.public_buckets) > 0 ? `${s3.public_buckets} public!` : undefined} />
+        </div>
+        <div onClick={() => router.push('/cost')} className="cursor-pointer transition-all hover:scale-[1.02]">
+          <StatsCard label="Monthly Cost" value={cost?.total_cost ? `$${Number(cost.total_cost).toLocaleString()}` : '$--'} icon={DollarSign} color="purple" />
+        </div>
+        <div onClick={() => router.push('/vpc')} className="cursor-pointer transition-all hover:scale-[1.02]">
+          <StatsCard label="Network" value={`${Number(vpc?.vpc_count) || 0} VPCs`} icon={Network} color="orange"
+            change={`${vpc?.subnet_count || 0} Subnets, ${vpc?.sg_count || 0} SGs`} />
+        </div>
         {/* Security Issues: clickable → /security, hover tooltip, alert color / 보안 이슈: 클릭 → /security, 호버 툴팁, 경고 색상 */}
         {(() => {
           const pubBuckets = Number(sec?.public_buckets) || 0;
@@ -153,7 +161,7 @@ export default function DashboardPage() {
           return (
             <div
               onClick={() => router.push('/security')}
-              className={`cursor-pointer transition-all hover:scale-[1.02] hover:border-accent-cyan/50 rounded-lg ${totalIssues > 0 ? 'ring-1 ring-accent-red/30' : ''}`}
+              className={`cursor-pointer transition-all hover:scale-[1.02] rounded-lg ${totalIssues > 0 ? 'ring-1 ring-accent-red/30' : ''}`}
               title={totalIssues > 0 ? `⚠ ${details} — Click to view details` : '✓ No security issues detected'}
             >
               <StatsCard label="Security Issues" value={totalIssues} icon={ShieldCheck}
@@ -162,46 +170,56 @@ export default function DashboardPage() {
             </div>
           );
         })()}
-        <StatsCard label="K8s Pods" value={totalPods} icon={Box} color="pink"
-          change={runningPodsCount > 0 ? `${runningPodsCount} running` : undefined} />
+        <div onClick={() => router.push('/k8s')} className="cursor-pointer transition-all hover:scale-[1.02]">
+          <StatsCard label="K8s Pods" value={totalPods} icon={Box} color="pink"
+            change={runningPodsCount > 0 ? `${runningPodsCount} running` : undefined} />
+        </div>
       </div>
 
       {/* Live Resources Grid */}
       <div>
         <h2 className="text-xs font-mono uppercase text-gray-400 tracking-wider mb-3">Live Resources</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <LiveResourceCard title="EC2" icon={Server} color="cyan"
-            status={Number(running?.value) > 0 ? 'running' : (totalEC2 > 0 ? 'stopped' : 'inactive')}
-            stats={[
-              { label: 'Running', value: Number(running?.value) || 0 },
-              { label: 'Total', value: totalEC2 },
-            ]}
-            lastChecked={lastUpdated?.toLocaleTimeString() || '--'} />
+          <div onClick={() => router.push('/ec2')} className="cursor-pointer transition-all hover:scale-[1.02]">
+            <LiveResourceCard title="EC2" icon={Server} color="cyan"
+              status={Number(running?.value) > 0 ? 'running' : (totalEC2 > 0 ? 'stopped' : 'inactive')}
+              stats={[
+                { label: 'Running', value: Number(running?.value) || 0 },
+                { label: 'Total', value: totalEC2 },
+              ]}
+              lastChecked={lastUpdated?.toLocaleTimeString() || '--'} />
+          </div>
 
-          <LiveResourceCard title="RDS" icon={Database} color="green"
-            status={Number(rds?.total_instances) > 0 ? 'active' : 'inactive'}
-            stats={[
-              { label: 'Instances', value: Number(rds?.total_instances) || 0 },
-              { label: 'Storage', value: `${Number(rds?.total_storage_gb) || 0} GB` },
-            ]}
-            lastChecked={lastUpdated?.toLocaleTimeString() || '--'} />
+          <div onClick={() => router.push('/rds')} className="cursor-pointer transition-all hover:scale-[1.02]">
+            <LiveResourceCard title="RDS" icon={Database} color="green"
+              status={Number(rds?.total_instances) > 0 ? 'active' : 'inactive'}
+              stats={[
+                { label: 'Instances', value: Number(rds?.total_instances) || 0 },
+                { label: 'Storage', value: `${Number(rds?.total_storage_gb) || 0} GB` },
+              ]}
+              lastChecked={lastUpdated?.toLocaleTimeString() || '--'} />
+          </div>
 
-          <LiveResourceCard title="ECS" icon={Container} color="purple"
-            status={Number(ecs?.total_clusters) > 0 ? 'running' : 'inactive'}
-            stats={[
-              { label: 'Clusters', value: Number(ecs?.total_clusters) || 0 },
-              { label: 'Tasks', value: Number(ecs?.total_tasks) || 0 },
-            ]}
-            lastChecked={lastUpdated?.toLocaleTimeString() || '--'} />
+          <div onClick={() => router.push('/ecs')} className="cursor-pointer transition-all hover:scale-[1.02]">
+            <LiveResourceCard title="ECS" icon={Container} color="purple"
+              status={Number(ecs?.total_clusters) > 0 ? 'running' : 'inactive'}
+              stats={[
+                { label: 'Clusters', value: Number(ecs?.total_clusters) || 0 },
+                { label: 'Tasks', value: Number(ecs?.total_tasks) || 0 },
+              ]}
+              lastChecked={lastUpdated?.toLocaleTimeString() || '--'} />
+          </div>
 
-          <LiveResourceCard title="Kubernetes" icon={Box} color="pink"
-            status={Number(k8sNodes?.total_nodes) > 0 ? 'healthy' : 'inactive'}
-            stats={[
-              { label: 'Nodes', value: Number(k8sNodes?.total_nodes) || 0 },
-              { label: 'Pods', value: totalPods },
-              { label: 'Deploys', value: Number(k8sDeploy?.total_deployments) || 0 },
-            ]}
-            lastChecked={lastUpdated?.toLocaleTimeString() || '--'} />
+          <div onClick={() => router.push('/k8s')} className="cursor-pointer transition-all hover:scale-[1.02]">
+            <LiveResourceCard title="Kubernetes" icon={Box} color="pink"
+              status={Number(k8sNodes?.total_nodes) > 0 ? 'healthy' : 'inactive'}
+              stats={[
+                { label: 'Nodes', value: Number(k8sNodes?.total_nodes) || 0 },
+                { label: 'Pods', value: totalPods },
+                { label: 'Deploys', value: Number(k8sDeploy?.total_deployments) || 0 },
+              ]}
+              lastChecked={lastUpdated?.toLocaleTimeString() || '--'} />
+          </div>
         </div>
       </div>
 
