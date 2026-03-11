@@ -41,25 +41,18 @@ export default function EC2Page() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const fetchDetail = async (instanceId: string, instanceType?: string) => {
+  const fetchDetail = async (instanceId: string) => {
     setDetailLoading(true);
     try {
-      const detailSql = ec2Q.detail.replace('{instance_id}', instanceId);
-      const queries: Record<string, string> = { detail: detailSql };
-      // Fetch instance type specs (memory, network) / 인스턴스 타입 사양 조회
-      if (instanceType) {
-        queries.typeSpec = ec2Q.instanceTypeSpec.replace('{instance_type}', instanceType);
-      }
+      const sql = ec2Q.detail.replace('{instance_id}', instanceId);
       const res = await fetch('/awsops/api/steampipe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ queries }),
+        body: JSON.stringify({ queries: { detail: sql } }),
       });
       const result = await res.json();
       if (result.detail?.rows?.[0]) {
-        const detail = result.detail.rows[0];
-        const typeSpec = result.typeSpec?.rows?.[0] || {};
-        setSelected({ ...detail, _typeSpec: typeSpec });
+        setSelected(result.detail.rows[0]);
       }
     } catch {} finally { setDetailLoading(false); }
   };
@@ -129,7 +122,7 @@ export default function EC2Page() {
           { key: 'region', label: 'Region' },
         ]}
         data={loading && !list.length ? undefined : list}
-        onRowClick={(row) => fetchDetail(row.instance_id, row.instance_type)}
+        onRowClick={(row) => fetchDetail(row.instance_id)}
       />
 
       {/* Detail Panel */}
@@ -189,18 +182,10 @@ export default function EC2Page() {
                   <Row label="vCPUs" value={`${(Number(selected.cpu_options_core_count) || 0) * (Number(selected.cpu_options_threads_per_core) || 1)}`} />
                   <Row label="Cores" value={selected.cpu_options_core_count} />
                   <Row label="Threads/Core" value={selected.cpu_options_threads_per_core} />
-                  {selected._typeSpec?.memory_mib && (
-                    <Row label="Memory" value={`${(Number(selected._typeSpec.memory_mib) / 1024).toFixed(1)} GiB`} />
-                  )}
-                  {selected._typeSpec?.network_performance && (
-                    <Row label="Network" value={selected._typeSpec.network_performance} />
-                  )}
-                  {selected._typeSpec?.max_enis && (
-                    <Row label="Max ENIs" value={selected._typeSpec.max_enis} />
-                  )}
-                  {selected._typeSpec?.instance_storage_supported !== undefined && (
-                    <Row label="Instance Storage" value={selected._typeSpec.instance_storage_supported ? 'Yes' : 'No'} />
-                  )}
+                  <Row label="Memory" value={selected.memory_mib ? `${(Number(selected.memory_mib) / 1024).toFixed(1)} GiB` : '--'} />
+                  <Row label="Network" value={selected.network_performance || '--'} />
+                  <Row label="Max ENIs" value={selected.max_enis || '--'} />
+                  <Row label="Instance Storage" value={selected.instance_storage_supported === 'true' ? 'Yes' : 'No'} />
                 </Section>
 
                 {/* Network */}

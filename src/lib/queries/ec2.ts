@@ -41,42 +41,48 @@ export const queries = {
 
   detail: `
     SELECT
-      instance_id,
-      instance_state,
-      instance_type,
-      image_id,
-      key_name,
-      architecture,
-      platform_details,
-      virtualization_type,
-      hypervisor,
-      ebs_optimized,
-      ena_support,
-      monitoring_state,
-      placement_availability_zone,
-      placement_tenancy,
-      private_ip_address,
-      private_dns_name,
-      public_ip_address,
-      public_dns_name,
-      vpc_id,
-      subnet_id,
-      cpu_options_core_count,
-      cpu_options_threads_per_core,
-      root_device_type,
-      root_device_name,
-      iam_instance_profile_arn,
-      launch_time,
-      state_transition_time,
-      security_groups,
-      block_device_mappings,
-      network_interfaces,
-      tags,
-      region
+      i.instance_id,
+      i.instance_state,
+      i.instance_type,
+      i.image_id,
+      i.key_name,
+      i.architecture,
+      i.platform_details,
+      i.virtualization_type,
+      i.hypervisor,
+      i.ebs_optimized,
+      i.ena_support,
+      i.monitoring_state,
+      i.placement_availability_zone,
+      i.placement_tenancy,
+      i.private_ip_address,
+      i.private_dns_name,
+      i.public_ip_address,
+      i.public_dns_name,
+      i.vpc_id,
+      i.subnet_id,
+      i.cpu_options_core_count,
+      i.cpu_options_threads_per_core,
+      i.root_device_type,
+      i.root_device_name,
+      i.iam_instance_profile_arn,
+      i.launch_time,
+      i.state_transition_time,
+      i.security_groups,
+      i.block_device_mappings,
+      i.network_interfaces,
+      i.tags,
+      i.region,
+      t.memory_info ->> 'SizeInMiB' AS memory_mib,
+      t.network_info ->> 'NetworkPerformance' AS network_performance,
+      t.network_info ->> 'MaximumNetworkInterfaces' AS max_enis,
+      t.instance_storage_supported
     FROM
-      aws_ec2_instance
+      aws_ec2_instance i
+    LEFT JOIN
+      aws_ec2_instance_type t ON i.instance_type = t.instance_type
     WHERE
-      instance_id = '{instance_id}'
+      i.instance_id = '{instance_id}'
   `,
 
   // Instance type specs (memory, vCPU, network) / 인스턴스 타입 사양 (메모리, vCPU, 네트워크)
