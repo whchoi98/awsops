@@ -34,10 +34,12 @@ export default function StatsCard({ label, value, icon: Icon, color, change }: S
       {change && (
         <p
           className={`text-xs mt-2 ${
-            change.startsWith('+')
+            change.startsWith('+') || change.startsWith('✓')
               ? 'text-accent-green'
-              : change.startsWith('-')
+              : change.startsWith('-') || change.startsWith('⚠')
               ? 'text-accent-red'
+              : /\d+\s+(Public|Open|Unencrypted)/i.test(change)
+              ? 'text-accent-orange'
               : 'text-gray-500'
           }`}
         >

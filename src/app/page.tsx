@@ -6,6 +6,7 @@ import StatsCard from '@/components/dashboard/StatsCard';
 import LiveResourceCard from '@/components/dashboard/LiveResourceCard';
 import PieChartCard from '@/components/charts/PieChartCard';
 import BarChartCard from '@/components/charts/BarChartCard';
+import { useRouter } from 'next/navigation';
 import {
   Server, Database, DollarSign, Box, Shield, Network,
   Bell, Container, ShieldCheck, AlertTriangle,
@@ -28,6 +29,7 @@ interface DashboardData {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [data, setData] = useState<DashboardData>({});
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -135,12 +137,31 @@ export default function DashboardPage() {
         <StatsCard label="S3 Buckets" value={Number(s3?.total_buckets) || 0} icon={Database} color="green"
           change={Number(s3?.public_buckets) > 0 ? `${s3.public_buckets} public!` : undefined} />
         <StatsCard label="Monthly Cost" value={cost?.total_cost ? `$${Number(cost.total_cost).toLocaleString()}` : '$--'} icon={DollarSign} color="purple" />
-        <StatsCard label="Network" value={Number(vpc?.vpc_count) || 0} icon={Network} color="orange"
-          change={`${vpc?.subnet_count || 0} subnets, ${vpc?.sg_count || 0} SGs`} />
-        <StatsCard label="Security Issues" value={
-          (Number(sec?.public_buckets) || 0) + (Number(sec?.open_sgs) || 0) + (Number(sec?.unencrypted_volumes) || 0)
-        } icon={ShieldCheck}
-          color={(Number(sec?.public_buckets) || 0) + (Number(sec?.open_sgs) || 0) + (Number(sec?.unencrypted_volumes) || 0) > 0 ? 'red' : 'green'} />
+        <StatsCard label="Network" value={`${Number(vpc?.vpc_count) || 0} VPCs`} icon={Network} color="orange"
+          change={`${vpc?.subnet_count || 0} Subnets, ${vpc?.sg_count || 0} SGs`} />
+        {/* Security Issues: clickable → /security, hover tooltip, alert color / 보안 이슈: 클릭 → /security, 호버 툴팁, 경고 색상 */}
+        {(() => {
+          const pubBuckets = Number(sec?.public_buckets) || 0;
+          const openSgs = Number(sec?.open_sgs) || 0;
+          const unencVols = Number(sec?.unencrypted_volumes) || 0;
+          const totalIssues = pubBuckets + openSgs + unencVols;
+          const details = [
+            pubBuckets > 0 ? `${pubBuckets} Public S3` : '',
+            openSgs > 0 ? `${openSgs} Open SG` : '',
+            unencVols > 0 ? `${unencVols} Unencrypted EBS` : '',
+          ].filter(Boolean).join(', ');
+          return (
+            <div
+              onClick={() => router.push('/awsops/security')}
+              className={`cursor-pointer transition-all hover:scale-[1.02] hover:border-accent-cyan/50 rounded-lg ${totalIssues > 0 ? 'ring-1 ring-accent-red/30' : ''}`}
+              title={totalIssues > 0 ? `⚠ ${details} — Click to view details` : '✓ No security issues detected'}
+            >
+              <StatsCard label="Security Issues" value={totalIssues} icon={ShieldCheck}
+                color={totalIssues > 0 ? 'red' : 'green'}
+                change={totalIssues > 0 ? details : '✓ All clear'} />
+            </div>
+          );
+        })()}
         <StatsCard label="K8s Pods" value={totalPods} icon={Box} color="pink"
           change={runningPodsCount > 0 ? `${runningPodsCount} running` : undefined} />
       </div>
