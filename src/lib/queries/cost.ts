@@ -2,7 +2,7 @@ export const queries = {
   // Dashboard summary: total cost for current month / 대시보드 요약: 이번 달 총 비용
   summary: `
     SELECT
-      ROUND(CAST(SUM(unblended_cost_amount) AS numeric), 2) AS total_cost,
+      ROUND(SUM(unblended_cost_amount)::numeric, 2) AS total_cost,
       MIN(period_start) AS period_start,
       MAX(period_end) AS period_end
     FROM
@@ -16,8 +16,8 @@ export const queries = {
       period_start,
       period_end,
       service,
-      ROUND(CAST(blended_cost_amount AS numeric), 2) AS blended_cost,
-      ROUND(CAST(unblended_cost_amount AS numeric), 2) AS unblended_cost,
+      ROUND(blended_cost_amount::numeric, 2) AS blended_cost,
+      ROUND(unblended_cost_amount::numeric, 2) AS unblended_cost,
       blended_cost_unit AS currency
     FROM
       aws_cost_by_service_monthly
@@ -30,8 +30,8 @@ export const queries = {
       period_start,
       period_end,
       service,
-      ROUND(CAST(blended_cost_amount AS numeric), 2) AS blended_cost,
-      ROUND(CAST(unblended_cost_amount AS numeric), 2) AS unblended_cost,
+      ROUND(blended_cost_amount::numeric, 2) AS blended_cost,
+      ROUND(unblended_cost_amount::numeric, 2) AS unblended_cost,
       blended_cost_unit AS currency
     FROM
       aws_cost_by_service_daily
@@ -42,7 +42,7 @@ export const queries = {
   serviceCost: `
     SELECT
       service AS name,
-      ROUND(CAST(SUM(unblended_cost_amount) AS numeric), 2) AS value
+      ROUND(SUM(unblended_cost_amount)::numeric, 2) AS value
     FROM
       aws_cost_by_service_monthly
     WHERE
@@ -60,8 +60,8 @@ export const queries = {
       service,
       period_start,
       period_end,
-      ROUND(CAST(blended_cost_amount AS numeric), 4) AS blended_cost,
-      ROUND(CAST(unblended_cost_amount AS numeric), 4) AS unblended_cost,
+      ROUND(blended_cost_amount::numeric, 4) AS blended_cost,
+      ROUND(unblended_cost_amount::numeric, 4) AS unblended_cost,
       blended_cost_unit AS currency
     FROM
       aws_cost_by_service_monthly
