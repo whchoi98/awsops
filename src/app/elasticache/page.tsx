@@ -78,8 +78,8 @@ export default function ElastiCachePage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <PieChartCard title="Engine Distribution" data={get('engines') as { name: string; value: number }[]} />
-        <BarChartCard title="Node Type Distribution" data={get('nodeTypes') as { name: string; value: number }[]} />
+        <PieChartCard title="Engine Distribution" data={get('engines').map((r: any) => ({ name: String(r.name), value: Number(r.value) || 0 }))} />
+        <BarChartCard title="Node Type Distribution" data={get('nodeTypes').map((r: any) => ({ name: String(r.name), value: Number(r.value) || 0 }))} />
       </div>
 
       <div>

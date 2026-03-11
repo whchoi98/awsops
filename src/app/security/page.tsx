@@ -57,7 +57,7 @@ export default function SecurityPage() {
   const openSGs = get('openSecurityGroups');
   const unencryptedVols = get('unencryptedVolumes');
   const trivyVulns = get('trivyVulnerabilities');
-  const trivySummary = get('trivySummary') as { name: string; value: number }[];
+  const trivySummary = get('trivySummary').map((r: any) => ({ name: String(r.name), value: Number(r.value) || 0 }));
 
   const publicBucketCount = Number(summary?.public_buckets) || 0;
   const mfaIssues = Number(summary?.mfa_not_enabled) || 0;

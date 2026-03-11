@@ -71,7 +71,7 @@ export default function LambdaPage() {
   const getFirst = (key: string) => get(key)[0] || {};
 
   const summary = getFirst('summary') as Record<string, unknown>;
-  const runtimeData = get('runtimeDistribution') as { name: string; value: number }[];
+  const runtimeData = get('runtimeDistribution').map((r: any) => ({ name: String(r.name), value: Number(r.value) || 0 }));
   const list = get('list');
 
   const totalFunctions = Number(summary?.total_functions) || 0;

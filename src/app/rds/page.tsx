@@ -64,7 +64,7 @@ export default function RDSPage() {
   const getFirst = (key: string) => get(key)[0] || {};
 
   const summary = getFirst('summary') as Record<string, unknown>;
-  const engineData = get('engineDistribution') as { name: string; value: number }[];
+  const engineData = get('engineDistribution').map((r: any) => ({ name: String(r.name), value: Number(r.value) || 0 }));
   const list = get('list');
 
   const totalInstances = Number(summary?.total_instances) || 0;

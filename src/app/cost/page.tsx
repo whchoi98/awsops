@@ -49,7 +49,7 @@ export default function CostPage() {
   const get = (key: string) => data[key]?.rows || [];
   const monthlyRows = get('monthlyCost');
   const dailyRows = get('dailyCost');
-  const serviceCostData = get('serviceCost') as { name: string; value: number }[];
+  const serviceCostData = get('serviceCost').map((r: any) => ({ name: String(r.name), value: Number(r.value) || 0 }));
 
   const hasData = monthlyRows.length > 0 || dailyRows.length > 0;
   const hasError = data['monthlyCost']?.error || data['dailyCost']?.error;

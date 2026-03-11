@@ -65,7 +65,7 @@ export default function CloudWatchPage() {
 
   const summary = getFirst('summary') as Record<string, unknown>;
   const alarmList = get('alarmList');
-  const namespaceData = get('namespaceDistribution') as { name: string; value: number }[];
+  const namespaceData = get('namespaceDistribution').map((r: any) => ({ name: String(r.name), value: Number(r.value) || 0 }));
 
   const okCount = Number(summary?.ok_state) || 0;
   const alarmCount = Number(summary?.in_alarm) || 0;
