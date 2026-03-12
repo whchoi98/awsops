@@ -69,6 +69,7 @@ export default function TopologyPage() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'infra' | 'k8s'>('infra');
   const [k8sSearch, setK8sSearch] = useState('');
+  const [k8sSelected, setK8sSelected] = useState<{ type: string; key: string } | null>(null);
 
   const fetchData = useCallback(async (bustCache = false) => {
     setLoading(true);
@@ -300,7 +301,86 @@ export default function TopologyPage() {
     return { pods: hlPods, nodes: hlNodes, svcs: hlSvcs, ings: hlIngs };
   }, [k8sSearch, k8sMapData]);
 
+  // Click-based highlight / 클릭 기반 하이라이트
+  const k8sClickHl = useMemo(() => {
+    const hl = { pods: new Set<string>(), nodes: new Set<string>(), svcs: new Set<string>(), ings: new Set<string>() };
+    if (!k8sSelected) return hl;
+
+    if (k8sSelected.type === 'pod') {
+      const pod = k8sMapData.pods.find((p: any) => p.name === k8sSelected.key);
+      if (pod) {
+        hl.pods.add(pod.name);
+        if (pod.node_name) hl.nodes.add(pod.node_name);
+        // Find services selecting this pod
+        Object.entries(k8sMapData.svcToPods).forEach(([svcKey, podNames]) => {
+          if (podNames.includes(pod.name)) { hl.svcs.add(svcKey); }
+        });
+        // Find ingresses routing to those services
+        Object.entries(k8sMapData.ingToSvc).forEach(([ingKey, svcKeys]) => {
+          if (svcKeys.some(s => hl.svcs.has(s))) hl.ings.add(ingKey);
+        });
+      }
+    } else if (k8sSelected.type === 'svc') {
+      hl.svcs.add(k8sSelected.key);
+      const podNames = k8sMapData.svcToPods[k8sSelected.key] || [];
+      podNames.forEach(p => {
+        hl.pods.add(p);
+        const pod = k8sMapData.pods.find((pp: any) => pp.name === p);
+        if (pod?.node_name) hl.nodes.add(pod.node_name);
+      });
+      Object.entries(k8sMapData.ingToSvc).forEach(([ingKey, svcKeys]) => {
+        if (svcKeys.includes(k8sSelected.key)) hl.ings.add(ingKey);
+      });
+    } else if (k8sSelected.type === 'ing') {
+      hl.ings.add(k8sSelected.key);
+      const svcKeys = k8sMapData.ingToSvc[k8sSelected.key] || [];
+      svcKeys.forEach(s => {
+        hl.svcs.add(s);
+        (k8sMapData.svcToPods[s] || []).forEach(p => {
+          hl.pods.add(p);
+          const pod = k8sMapData.pods.find((pp: any) => pp.name === p);
+          if (pod?.node_name) hl.nodes.add(pod.node_name);
+        });
+      });
+    } else if (k8sSelected.type === 'node') {
+      hl.nodes.add(k8sSelected.key);
+      (k8sMapData.podsByNode[k8sSelected.key] || []).forEach((p: any) => {
+        hl.pods.add(p.name);
+        Object.entries(k8sMapData.svcToPods).forEach(([svcKey, podNames]) => {
+          if (podNames.includes(p.name)) hl.svcs.add(svcKey);
+        });
+      });
+      Object.entries(k8sMapData.ingToSvc).forEach(([ingKey, svcKeys]) => {
+        if (svcKeys.some(s => hl.svcs.has(s))) hl.ings.add(ingKey);
+      });
+    }
+    return hl;
+  }, [k8sSelected, k8sMapData]);
+
+  // Combined highlight: search OR click / 검색 또는 클릭 하이라이트 통합
   const hasK8sSearch = k8sSearch.length > 0;
+  const hasK8sClick = k8sSelected !== null;
+  const hasK8sHl = hasK8sSearch || hasK8sClick;
+  const isK8sHl = (type: string, key: string) => {
+    if (hasK8sSearch) {
+      if (type === 'pod') return k8sHighlight.pods.has(key);
+      if (type === 'svc') return k8sHighlight.svcs.has(key);
+      if (type === 'ing') return k8sHighlight.ings.has(key);
+      if (type === 'node') return k8sHighlight.nodes.has(key);
+    }
+    if (hasK8sClick) {
+      if (type === 'pod') return k8sClickHl.pods.has(key);
+      if (type === 'svc') return k8sClickHl.svcs.has(key);
+      if (type === 'ing') return k8sClickHl.ings.has(key);
+      if (type === 'node') return k8sClickHl.nodes.has(key);
+    }
+    return false;
+  };
+  const k8sDim = (type: string, key: string) => hasK8sHl && !isK8sHl(type, key);
+  const toggleK8s = (type: string, key: string) => {
+    if (k8sSelected?.type === type && k8sSelected?.key === key) setK8sSelected(null);
+    else setK8sSelected({ type, key });
+  };
 
   const activeNodes = view === 'infra' ? infraNodes : [];
   const activeEdges = view === 'infra' ? infraEdges : [];
@@ -385,9 +465,20 @@ export default function TopologyPage() {
             </div>
             {hasK8sSearch && (
               <>
-                <button onClick={() => setK8sSearch('')} className="text-xs text-gray-500 hover:text-white">Clear</button>
+                <button onClick={() => setK8sSearch('')} className="text-xs text-gray-500 hover:text-white">Clear search</button>
                 <span className="text-xs text-accent-cyan">
                   {k8sHighlight.pods.size} pods · {k8sHighlight.svcs.size} services · {k8sHighlight.nodes.size} nodes
+                </span>
+              </>
+            )}
+            {hasK8sClick && (
+              <>
+                <button onClick={() => setK8sSelected(null)}
+                  className="text-xs px-2 py-0.5 rounded bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/30 hover:bg-accent-cyan/20">
+                  Clear selection
+                </button>
+                <span className="text-xs text-gray-400">
+                  {k8sSelected?.type}: {k8sSelected?.key.split('/').pop()?.slice(0, 30)}
                 </span>
               </>
             )}
@@ -402,10 +493,11 @@ export default function TopologyPage() {
                 {k8sMapData.ingresses.length === 0 ? <p className="text-gray-600 text-xs">No ingresses</p> :
                   k8sMapData.ingresses.map((ing: any) => {
                     const key = `${ing.namespace}/${ing.name}`;
-                    const hl = hasK8sSearch && k8sHighlight.ings.has(key);
-                    const dim = hasK8sSearch && !hl;
+                    const hl = isK8sHl('ing', key);
+                    const dim = k8sDim('ing', key);
                     return (
-                      <div key={key} className={`rounded-lg border p-2 text-xs font-mono transition-all ${hl ? 'border-accent-cyan ring-2 ring-accent-cyan/50 bg-accent-cyan/10' : dim ? 'border-navy-700 opacity-30' : 'border-accent-pink/40 bg-accent-pink/5'}`}>
+                      <div key={key} onClick={() => toggleK8s('ing', key)}
+                        className={`rounded-lg border p-2 text-xs font-mono transition-all cursor-pointer ${hl ? 'border-accent-cyan ring-2 ring-accent-cyan/50 bg-accent-cyan/10' : dim ? 'border-navy-700 opacity-30' : 'border-accent-pink/40 bg-accent-pink/5 hover:border-accent-pink'}`}>
                         <p className="text-white font-semibold">{ing.name}</p>
                         <p className="text-gray-500">{ing.namespace} · {ing.ingress_class_name || 'default'}</p>
                         {(() => { try { const lb = JSON.parse(ing.load_balancer || '{}'); const ings = lb.Ingress || lb.ingress || []; return ings.length > 0 ? <p className="text-accent-pink text-[9px] mt-0.5 truncate">{ings[0].Hostname || ings[0].hostname || ings[0].IP || ings[0].ip}</p> : null; } catch { return null; } })()}
@@ -422,11 +514,12 @@ export default function TopologyPage() {
               <div className="space-y-1.5 max-h-[65vh] overflow-y-auto pr-1">
                 {k8sMapData.services.map((svc: any) => {
                   const key = `${svc.namespace}/${svc.name}`;
-                  const hl = hasK8sSearch && k8sHighlight.svcs.has(key);
-                  const dim = hasK8sSearch && !hl;
+                  const hl = isK8sHl('svc', key);
+                  const dim = k8sDim('svc', key);
                   const podCount = (k8sMapData.svcToPods[key] || []).length;
                   return (
-                    <div key={key} className={`rounded-lg border p-2 text-xs font-mono transition-all ${hl ? 'border-accent-cyan ring-2 ring-accent-cyan/50 bg-accent-cyan/10' : dim ? 'border-navy-700 opacity-30' : 'border-accent-orange/30 bg-navy-800'}`}>
+                    <div key={key} onClick={() => toggleK8s('svc', key)}
+                      className={`rounded-lg border p-2 text-xs font-mono transition-all cursor-pointer ${hl ? 'border-accent-cyan ring-2 ring-accent-cyan/50 bg-accent-cyan/10' : dim ? 'border-navy-700 opacity-30' : 'border-accent-orange/30 bg-navy-800 hover:border-accent-orange'}`}>
                       <div className="flex justify-between"><span className="text-white">{svc.name}</span><span className="text-gray-600">{svc.type}</span></div>
                       <p className="text-gray-500">{svc.namespace} · {svc.cluster_ip} · {podCount} pods</p>
                     </div>
@@ -440,10 +533,11 @@ export default function TopologyPage() {
               <h3 className="text-xs font-mono uppercase text-gray-400 tracking-wider mb-3">Pods ({k8sMapData.pods.length})</h3>
               <div className="space-y-1 max-h-[65vh] overflow-y-auto pr-1">
                 {k8sMapData.pods.map((p: any) => {
-                  const hl = hasK8sSearch && k8sHighlight.pods.has(p.name);
-                  const dim = hasK8sSearch && !hl;
+                  const hl = isK8sHl('pod', p.name);
+                  const dim = k8sDim('pod', p.name);
                   return (
-                    <div key={p.name} className={`rounded border px-2 py-1 text-[10px] font-mono transition-all ${hl ? 'border-accent-cyan ring-1 ring-accent-cyan/50 bg-accent-cyan/10' : dim ? 'border-navy-700 opacity-20' : 'border-navy-600 bg-navy-800'}`}>
+                    <div key={p.name} onClick={() => toggleK8s('pod', p.name)}
+                      className={`rounded border px-2 py-1 text-[10px] font-mono transition-all cursor-pointer ${hl ? 'border-accent-cyan ring-1 ring-accent-cyan/50 bg-accent-cyan/10' : dim ? 'border-navy-700 opacity-20' : 'border-navy-600 bg-navy-800 hover:border-navy-400'}`}>
                       <span className="text-white">{p.name.length > 30 ? p.name.slice(0, 28) + '..' : p.name}</span>
                       <span className="text-gray-600 ml-1">{p.namespace}</span>
                       <span className="text-gray-700 ml-1">{p.node_name?.split('.')[0]?.slice(-12)}</span>
@@ -458,11 +552,12 @@ export default function TopologyPage() {
               <h3 className="text-xs font-mono uppercase text-gray-400 tracking-wider mb-3">Nodes ({Object.keys(k8sMapData.podsByNode).length})</h3>
               <div className="space-y-2 max-h-[65vh] overflow-y-auto pr-1">
                 {Object.entries(k8sMapData.podsByNode).map(([nodeName, nodePods]: [string, any]) => {
-                  const hl = hasK8sSearch && k8sHighlight.nodes.has(nodeName);
-                  const dim = hasK8sSearch && !hl;
-                  const hlPodCount = hasK8sSearch ? (nodePods as any[]).filter((p: any) => k8sHighlight.pods.has(p.name)).length : 0;
+                  const hl = isK8sHl('node', nodeName);
+                  const dim = k8sDim('node', nodeName);
+                  const hlPodCount = hasK8sHl ? (nodePods as any[]).filter((p: any) => isK8sHl('pod', p.name)).length : 0;
                   return (
-                    <div key={nodeName} className={`rounded-lg border p-2 text-xs font-mono transition-all ${hl ? 'border-accent-green ring-2 ring-accent-green/50 bg-accent-green/10' : dim ? 'border-navy-700 opacity-30' : 'border-accent-green/30 bg-navy-800'}`}>
+                    <div key={nodeName} onClick={() => toggleK8s('node', nodeName)}
+                      className={`rounded-lg border p-2 text-xs font-mono transition-all cursor-pointer ${hl ? 'border-accent-green ring-2 ring-accent-green/50 bg-accent-green/10' : dim ? 'border-navy-700 opacity-30' : 'border-accent-green/30 bg-navy-800 hover:border-accent-green'}`}>
                       <p className="text-accent-green font-semibold">{nodeName.split('.')[0]}</p>
                       <p className="text-gray-500">{(nodePods as any[]).length} pods{hlPodCount > 0 ? ` · ${hlPodCount} matched` : ''}</p>
                     </div>
