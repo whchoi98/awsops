@@ -7,7 +7,6 @@ import LineChartCard from '@/components/charts/LineChartCard';
 import BarChartCard from '@/components/charts/BarChartCard';
 import DataTable from '@/components/table/DataTable';
 import { Activity, Cpu, HardDrive, Database, X, MemoryStick, Wifi, ArrowLeft, Calendar } from 'lucide-react';
-import LineChartCard from '@/components/charts/LineChartCard';
 import { queries as metQ } from '@/lib/queries/metrics';
 
 type TabKey = 'ec2' | 'network' | 'memory' | 'ebs' | 'rds';
