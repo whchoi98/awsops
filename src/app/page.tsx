@@ -9,7 +9,7 @@ import BarChartCard from '@/components/charts/BarChartCard';
 import {
   Server, Database, DollarSign, Box, Shield, Network,
   Bell, Container, ShieldCheck, AlertTriangle, Zap, Table,
-  FileSearch, Globe, Shield, Package,
+  FileSearch, Globe, Package,
 } from 'lucide-react';
 import { queries as ec2Q } from '@/lib/queries/ec2';
 import { queries as s3Q } from '@/lib/queries/s3';
