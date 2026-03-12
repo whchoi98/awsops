@@ -139,19 +139,20 @@ export default function AIPage() {
 
   return (
     <div className="flex flex-col h-screen">
-      <div className="px-6 pt-6 pb-3 flex items-center justify-between border-b border-navy-600">
-        <div className="flex items-center gap-3">
-          <Header title="AI Assistant" />
-          <span className="text-[11px] text-gray-500 font-mono bg-navy-900 px-2 py-1 rounded border border-navy-600">Powered by Amazon Bedrock AgentCore</span>
+      {/* Header — same style as EC2/VPC pages / EC2/VPC 페이지와 동일 스타일 */}
+      <div className="p-6 pb-4">
+        <div className="flex items-center justify-between">
+          <Header title="AI Assistant" subtitle="Powered by Amazon Bedrock AgentCore" />
+          <select value={model} onChange={(e) => setModel(e.target.value as any)}
+            className="bg-navy-900 border border-navy-600 rounded-lg px-3 py-2 text-xs text-gray-300 focus:ring-accent-cyan focus:border-accent-cyan">
+            <option value="sonnet-4.6">Claude Sonnet 4.6</option>
+            <option value="opus-4.6">Claude Opus 4.6</option>
+          </select>
         </div>
-        <select value={model} onChange={(e) => setModel(e.target.value as any)}
-          className="bg-navy-900 border border-navy-600 rounded-lg px-3 py-2 text-xs text-gray-300 focus:ring-accent-cyan focus:border-accent-cyan">
-          <option value="sonnet-4.6">Claude Sonnet 4.6</option>
-          <option value="opus-4.6">Claude Opus 4.6</option>
-        </select>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="max-w-4xl mx-auto space-y-4">
         {/* Welcome */}
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16">
@@ -257,6 +258,7 @@ export default function AIPage() {
           </div>
         )}
         <div ref={messagesEndRef} />
+        </div>
       </div>
 
       {/* Input area */}
