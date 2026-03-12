@@ -160,8 +160,9 @@ export default function AIPage() {
               <Sparkles size={40} className="text-accent-cyan" />
             </div>
             <h2 className="text-xl font-semibold text-white mb-2">AWSops AI Assistant</h2>
-            <p className="text-sm text-gray-400 text-center max-w-md mb-6">
-              AWS 인프라에 대해 질문하세요. 실시간 Steampipe 데이터를 기반으로 답변합니다.
+            <p className="text-sm text-gray-400 text-center max-w-md mb-6 leading-relaxed">
+              AWS 인프라에 대해 질문하세요.<br />
+              Amazon Bedrock AgentCore가 LLM과 Tools를 활용해 답변을 드립니다.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-w-2xl w-full">
               {suggestions.map((s, i) => (
