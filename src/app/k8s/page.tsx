@@ -205,7 +205,7 @@ export default function K8sOverviewPage() {
 
   // Node Detail View / 노드 상세 뷰
   if (selectedNode && selectedNodeData) {
-    const { node, nodePods, req, capCpu, allocCpu, capMiB, allocMiB } = selectedNodeData;
+    const { node, nodePods, req, capCpu, allocCpu, capMiB, allocMiB } = selectedNodeData as any;
     const cpuReqPct = Math.min(Math.round((req.cpuReq / capCpu) * 100), 100);
     const memReqPct = Math.min(Math.round((req.memReqMiB / capMiB) * 100), 100);
     const cpuAllocPct = Math.round((allocCpu / capCpu) * 100);
