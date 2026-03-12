@@ -101,7 +101,7 @@ export default function CostPage() {
   const monthlyTotals: Record<string, number> = {};
   filteredMonthly.forEach((r: any) => {
     const p = String(r.period_start || '').slice(0, 7);
-    monthlyTotals[p] = (monthlyTotals[p] || 0) + (Number(r.blended_cost) || 0);
+    monthlyTotals[p] = (monthlyTotals[p] || 0) + (Number(r.cost) || 0);
   });
   const sortedMonths = Object.keys(monthlyTotals).sort();
   const thisMonth = sortedMonths.length > 0 ? monthlyTotals[sortedMonths[sortedMonths.length - 1]] || 0 : 0;
@@ -118,7 +118,7 @@ export default function CostPage() {
   const dailyTotals: Record<string, number> = {};
   filteredDaily.forEach((r: any) => {
     const day = String(r.period_start || '').slice(0, 10);
-    dailyTotals[day] = (dailyTotals[day] || 0) + (Number(r.blended_cost) || 0);
+    dailyTotals[day] = (dailyTotals[day] || 0) + (Number(r.cost) || 0);
   });
   const sortedDays = Object.keys(dailyTotals).sort();
   const dailyAvg = sortedDays.length > 0 ? sortedDays.reduce((sum, d) => sum + dailyTotals[d], 0) / sortedDays.length : 0;
@@ -143,8 +143,8 @@ export default function CostPage() {
     const svc = String(r.service || 'Unknown');
     const p = String(r.period_start || '').slice(0, 7);
     if (!serviceTotals[svc]) serviceTotals[svc] = { current: 0, previous: 0 };
-    if (p === currentMonth) serviceTotals[svc].current += Number(r.blended_cost) || 0;
-    if (p === previousMonth) serviceTotals[svc].previous += Number(r.blended_cost) || 0;
+    if (p === currentMonth) serviceTotals[svc].current += Number(r.cost) || 0;
+    if (p === previousMonth) serviceTotals[svc].previous += Number(r.cost) || 0;
   });
 
   const serviceTableRows = Object.entries(serviceTotals)
@@ -302,7 +302,7 @@ export default function CostPage() {
               <div className="p-6 space-y-6">
                 <Section title="Cost Summary" icon={DollarSign}>
                   <Row label="Service" value={selected.service} />
-                  <Row label="Total Cost" value={`$${selected.rows.reduce((s: number, r: any) => s + (Number(r.blended_cost) || 0), 0).toFixed(2)}`} />
+                  <Row label="Total Cost" value={`$${selected.rows.reduce((s: number, r: any) => s + (Number(r.cost) || 0), 0).toFixed(2)}`} />
                   <Row label="Periods" value={`${selected.rows.length} months`} />
                 </Section>
 
@@ -310,7 +310,7 @@ export default function CostPage() {
                 <LineChartCard title="Monthly Trend" color="#00d4ff"
                   data={selected.rows.slice().reverse().map((r: any) => ({
                     name: String(r.period_start || '').slice(0, 7),
-                    value: Math.round((Number(r.blended_cost) || 0) * 100) / 100,
+                    value: Math.round((Number(r.cost) || 0) * 100) / 100,
                   }))} />
 
                 <Section title="Monthly Breakdown" icon={TrendingUp}>
@@ -318,17 +318,11 @@ export default function CostPage() {
                     <div className="space-y-2">
                       {selected.rows.map((r: any, i: number) => {
                         const period2 = String(r.period_start || '').slice(0, 7);
-                        const cost = Number(r.blended_cost) || 0;
-                        const unblended = Number(r.unblended_cost) || 0;
+                        const cost = Number(r.cost) || 0;
                         return (
                           <div key={i} className="flex items-center justify-between bg-navy-800 rounded p-2">
                             <span className="text-sm font-mono text-gray-300">{period2}</span>
-                            <div className="text-right">
-                              <span className="text-sm font-mono text-white">${cost.toFixed(2)}</span>
-                              {Math.abs(unblended - cost) > 0.01 && (
-                                <span className="text-xs text-gray-500 ml-2">(unblended: ${unblended.toFixed(2)})</span>
-                              )}
-                            </div>
+                            <span className="text-sm font-mono text-white">${cost.toFixed(2)}</span>
                           </div>
                         );
                       })}
