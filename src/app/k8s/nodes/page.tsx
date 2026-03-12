@@ -124,9 +124,66 @@ export default function K8sNodesPage() {
           <StatsCard label="Total Memory" value={memLabel} icon={HardDrive} color="orange" />
         </div>
 
-        {/* Charts */}
+        {/* Allocation % Charts / 할당률 차트 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <BarChartCard title="CPU Capacity per Node" data={cpuBarData} color="#00d4ff" />
+          <div className="bg-navy-800 rounded-lg border border-navy-600 p-5">
+            <h3 className="text-sm font-semibold text-white mb-4">CPU Allocation per Node</h3>
+            <div className="space-y-3">
+              {nodes.map((n: any) => {
+                const cap = Number(n.capacity_cpu) || 1;
+                const alloc = Number(n.allocatable_cpu) || 0;
+                const used = cap - alloc;
+                const pct = Math.round((used / cap) * 100);
+                return (
+                  <div key={`cpu-${n.name}`}>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-gray-400 font-mono truncate max-w-[200px]">{n.name}</span>
+                      <span className="text-white font-mono">{used}/{cap} vCPU ({pct}%)</span>
+                    </div>
+                    <div className="h-4 bg-navy-900 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${pct >= 80 ? 'bg-accent-red' : pct >= 50 ? 'bg-accent-orange' : 'bg-accent-cyan'}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+              {nodes.length === 0 && <p className="text-gray-500 text-sm">No nodes</p>}
+            </div>
+          </div>
+
+          <div className="bg-navy-800 rounded-lg border border-navy-600 p-5">
+            <h3 className="text-sm font-semibold text-white mb-4">Memory Allocation per Node</h3>
+            <div className="space-y-3">
+              {nodes.map((n: any) => {
+                const capMiB = parseMiB(n.capacity_memory) || 1;
+                const allocMiB = parseMiB(n.allocatable_memory) || 0;
+                const usedMiB = capMiB - allocMiB;
+                const pct = Math.round((usedMiB / capMiB) * 100);
+                return (
+                  <div key={`mem-${n.name}`}>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-gray-400 font-mono truncate max-w-[200px]">{n.name}</span>
+                      <span className="text-white font-mono">{formatK8sMemory(`${usedMiB}Mi`)}/{formatK8sMemory(`${capMiB}Mi`)} ({pct}%)</span>
+                    </div>
+                    <div className="h-4 bg-navy-900 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${pct >= 80 ? 'bg-accent-red' : pct >= 50 ? 'bg-accent-orange' : 'bg-accent-purple'}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+              {nodes.length === 0 && <p className="text-gray-500 text-sm">No nodes</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* Capacity Charts / 용량 차트 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <BarChartCard title="CPU Capacity per Node (vCPU)" data={cpuBarData} color="#00d4ff" />
           <BarChartCard title="Memory Capacity per Node (GiB)" data={memBarData} color="#a855f7" />
         </div>
 
