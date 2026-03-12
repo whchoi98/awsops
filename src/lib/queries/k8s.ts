@@ -6,7 +6,7 @@ export const queries = {
       status,
       version,
       endpoint,
-      vpc_config ->> 'VpcId' AS vpc_id,
+      resources_vpc_config ->> 'VpcId' AS vpc_id,
       platform_version,
       created_at,
       region
