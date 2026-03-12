@@ -796,7 +796,7 @@ async function handleNonStreaming(messages: Array<{role: string; content: string
   try {
     const routes = await classifyIntent(messages);
     const primaryRoute = routes[0];
-    const primaryConfig = ROUTE_REGISTRY[primaryRoute];
+    const _primaryConfig = ROUTE_REGISTRY[primaryRoute];
 
     // Single route (most common) / 단일 라우트 (일반적)
     if (routes.length === 1) {
