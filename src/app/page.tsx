@@ -108,12 +108,12 @@ export default function DashboardPage() {
   // CIS benchmark cached result / CIS 벤치마크 캐시 결과
   const [cisSummary, setCisSummary] = useState<any>(null);
   useEffect(() => {
-    fetch('/awsops/api/benchmark?benchmark=cis_v300&action=status')
+    fetch('/awsops/api/benchmark?benchmark=cis_v400&action=status')
       .then(r => r.json())
       .then(s => {
         // hasResult가 true면 결과 파일 존재 (status가 done이 아니어도)
         if (s.hasResult) {
-          fetch('/awsops/api/benchmark?benchmark=cis_v300&action=result')
+          fetch('/awsops/api/benchmark?benchmark=cis_v400&action=result')
             .then(r => r.json())
             .then(d => {
               // summary.status.ok/alarm/skip/error 구조
