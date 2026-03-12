@@ -170,6 +170,8 @@ export default function K8sExplorerPage() {
   const [activeTab, setActiveTab] = useState('pods');
   const [selectedNamespace, setSelectedNamespace] = useState('');
   const [searchText, setSearchText] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [nodeFilter, setNodeFilter] = useState('');
   const [selectedRow, setSelectedRow] = useState<number | undefined>(undefined);
   const [selectedResource, setSelectedResource] = useState<any>(null);
   const [data, setData] = useState<DashboardData>({});
@@ -221,6 +223,8 @@ export default function K8sExplorerPage() {
   useEffect(() => {
     setSelectedRow(undefined);
     setSelectedResource(null);
+    setStatusFilter('');
+    setNodeFilter('');
   }, [activeTab]);
 
   const resources = data.resources?.rows || [];
@@ -258,11 +262,32 @@ export default function K8sExplorerPage() {
     return Array.from(nsSet).sort();
   }, [resources]);
 
-  // Client-side filtering
+  // Filter option lists / 필터 옵션 목록
+  const statusList = useMemo(() => {
+    const statuses = new Set<string>();
+    resources.forEach((r: any) => {
+      const s = r.phase || r.status || '';
+      if (s) statuses.add(String(s));
+    });
+    return Array.from(statuses).sort();
+  }, [resources]);
+  const nodeList = useMemo(() => {
+    const nds = new Set<string>();
+    resources.forEach((r: any) => { if (r.node_name) nds.add(String(r.node_name)); });
+    return Array.from(nds).sort();
+  }, [resources]);
+
+  // Client-side filtering / 클라이언트 필터링
   const filteredResources = useMemo(() => {
     let filtered = resources;
     if (selectedNamespace) {
       filtered = filtered.filter((r: any) => r.namespace === selectedNamespace);
+    }
+    if (statusFilter) {
+      filtered = filtered.filter((r: any) => (r.phase || r.status || '') === statusFilter);
+    }
+    if (nodeFilter) {
+      filtered = filtered.filter((r: any) => String(r.node_name || '') === nodeFilter);
     }
     if (searchText) {
       const lower = searchText.toLowerCase();
@@ -273,7 +298,10 @@ export default function K8sExplorerPage() {
       );
     }
     return filtered;
-  }, [resources, selectedNamespace, searchText]);
+  }, [resources, selectedNamespace, statusFilter, nodeFilter, searchText]);
+
+  const hasFilters = selectedNamespace || statusFilter || nodeFilter || searchText;
+  const clearAllFilters = () => { setSelectedNamespace(''); setStatusFilter(''); setNodeFilter(''); setSearchText(''); };
 
   const handleRowSelect = (row: any, index: number) => {
     if (selectedRow === index) {
@@ -347,25 +375,39 @@ export default function K8sExplorerPage() {
         })}
       </div>
 
-      {/* Filters */}
-      <div className="px-4 py-2 flex items-center gap-3 border-b border-navy-700/50">
-        <NamespaceFilter
-          namespaces={namespaces}
-          selected={selectedNamespace}
-          onChange={setSelectedNamespace}
-        />
-        <div className="relative flex-1 max-w-sm">
+      {/* Filters / 필터 */}
+      <div className="px-4 py-2 flex flex-wrap items-center gap-2 border-b border-navy-700/50">
+        {/* Search / 검색 */}
+        <div className="relative">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
-          <input
-            type="text"
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            placeholder="Filter resources..."
-            className="w-full bg-navy-800 border border-navy-600 rounded-lg pl-9 pr-3 py-2 text-sm text-gray-300 font-mono placeholder-gray-600 focus:outline-none focus:border-accent-cyan/50 focus:ring-1 focus:ring-accent-cyan/20"
-          />
+          <input type="text" value={searchText} onChange={(e) => setSearchText(e.target.value)}
+            placeholder="Search..."
+            className="bg-navy-800 border border-navy-600 rounded-lg pl-9 pr-3 py-1.5 text-xs text-gray-300 font-mono placeholder-gray-600 w-44 focus:outline-none focus:border-accent-cyan/50" />
         </div>
+        {/* Namespace / 네임스페이스 */}
+        <NamespaceFilter namespaces={namespaces} selected={selectedNamespace} onChange={setSelectedNamespace} />
+        {/* Status / 상태 */}
+        {statusList.length > 0 && (
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+            className="bg-navy-800 border border-navy-600 rounded-lg px-2 py-1.5 text-xs text-gray-300 font-mono focus:border-accent-cyan/50">
+            <option value="">All Status</option>
+            {statusList.map(s => <option key={s} value={s}>{s} ({resources.filter((r: any) => (r.phase || r.status || '') === s).length})</option>)}
+          </select>
+        )}
+        {/* Node / 노드 */}
+        {nodeList.length > 0 && (
+          <select value={nodeFilter} onChange={(e) => setNodeFilter(e.target.value)}
+            className="bg-navy-800 border border-navy-600 rounded-lg px-2 py-1.5 text-xs text-gray-300 font-mono focus:border-accent-cyan/50">
+            <option value="">All Nodes</option>
+            {nodeList.map(n => <option key={n} value={n}>{n.split('.')[0]} ({resources.filter((r: any) => String(r.node_name || '') === n).length})</option>)}
+          </select>
+        )}
+        {/* Clear / 초기화 */}
+        {hasFilters && (
+          <button onClick={clearAllFilters} className="text-[10px] text-gray-500 hover:text-white transition-colors">Clear</button>
+        )}
         <span className="text-gray-600 text-xs ml-auto">
-          /{currentConfig?.label?.toLowerCase()} [{filteredResources.length}]
+          /{currentConfig?.label?.toLowerCase()} [{filteredResources.length}/{resources.length}]
         </span>
       </div>
 
