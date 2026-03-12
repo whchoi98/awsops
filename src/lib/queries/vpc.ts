@@ -8,7 +8,8 @@ export const queries = {
       (SELECT COUNT(*) FROM aws_vpc_internet_gateway) AS internet_gateway_count,
       (SELECT COUNT(*) FROM aws_ec2_transit_gateway) AS tgw_count,
       (SELECT COUNT(*) FROM aws_ec2_application_load_balancer) AS alb_count,
-      (SELECT COUNT(*) FROM aws_ec2_network_load_balancer) AS nlb_count
+      (SELECT COUNT(*) FROM aws_ec2_network_load_balancer) AS nlb_count,
+      (SELECT COUNT(*) FROM aws_vpc_route_table) AS route_table_count
   `,
 
   vpcDetail: `
@@ -108,6 +109,17 @@ export const queries = {
       jsonb_array_length(routes) AS route_count
     FROM aws_vpc_route_table
     ORDER BY vpc_id, route_table_id
+  `,
+
+  routeTableDetail: `
+    SELECT
+      route_table_id, vpc_id, owner_id, region,
+      tags ->> 'Name' AS name,
+      associations::text AS associations,
+      routes::text AS routes,
+      tags
+    FROM aws_vpc_route_table
+    WHERE route_table_id = '{rt_id}'
   `,
 
   tgwList: `

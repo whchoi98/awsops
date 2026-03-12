@@ -9,7 +9,7 @@ import DataTable from '@/components/table/DataTable';
 import { Network, X, Tag, Shield, Globe, ArrowRightLeft } from 'lucide-react';
 import { queries as vpcQ } from '@/lib/queries/vpc';
 
-type TabKey = 'vpcs' | 'subnets' | 'sgs' | 'tgw' | 'elb' | 'nat' | 'igw';
+type TabKey = 'vpcs' | 'subnets' | 'sgs' | 'rtb' | 'tgw' | 'elb' | 'nat' | 'igw';
 
 export default function VPCPage() {
   const [data, setData] = useState<any>({});
@@ -34,6 +34,7 @@ export default function VPCPage() {
             natList: vpcQ.natList,
             igwList: vpcQ.igwList,
             tgwList: vpcQ.tgwList,
+            rtbList: vpcQ.routeTableList,
             tgwAttachments: vpcQ.tgwAttachments,
             elbList: vpcQ.elbList,
           },
@@ -67,6 +68,7 @@ export default function VPCPage() {
   const vpcs = get('vpcList');
   const subnets = get('subnetList');
   const sgs = get('sgList');
+  const rtbs = get('rtbList');
   const tgws = get('tgwList');
   const tgwAttachments = get('tgwAttachments');
   const elbs = get('elbList');
@@ -96,6 +98,7 @@ export default function VPCPage() {
     { key: 'vpcs', label: `VPCs (${vpcs.length})` },
     { key: 'subnets', label: `Subnets (${subnets.length})` },
     { key: 'sgs', label: `SGs (${sgs.length})` },
+    { key: 'rtb', label: `Route Tables (${rtbs.length})` },
     { key: 'tgw', label: `TGW (${tgws.length})` },
     { key: 'elb', label: `ELB (${elbs.length})` },
     { key: 'nat', label: `NAT (${nats.length})` },
@@ -106,10 +109,11 @@ export default function VPCPage() {
     <div className="p-6 space-y-6 animate-fade-in">
       <Header title="VPC & Network" subtitle="Virtual Private Cloud, Transit Gateway, Load Balancers" onRefresh={() => fetchData(true)} />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-9 gap-4">
         <StatsCard label="VPCs" value={Number(summary?.vpc_count) || 0} icon={Network} color="cyan" />
         <StatsCard label="Subnets" value={Number(summary?.subnet_count) || 0} icon={Network} color="green" />
         <StatsCard label="Security Groups" value={Number(summary?.security_group_count) || 0} icon={Shield} color="purple" />
+        <StatsCard label="Route Tables" value={Number(summary?.route_table_count) || 0} icon={ArrowRightLeft} color="orange" />
         <StatsCard label="TGW" value={Number(summary?.tgw_count) || 0} icon={ArrowRightLeft} color="orange" />
         <StatsCard label="ALB" value={Number(summary?.alb_count) || 0} icon={Globe} color="pink" />
         <StatsCard label="NLB" value={Number(summary?.nlb_count) || 0} icon={Globe} color="red" />
@@ -166,6 +170,19 @@ export default function VPCPage() {
           { key: 'region', label: 'Region' },
         ]} data={loading && !sgs.length ? undefined : sgs}
            onRowClick={(row) => fetchDetail('sg', vpcQ.sgDetail, '{group_id}', row.group_id)} />
+      )}
+
+      {/* Route Tables */}
+      {activeTab === 'rtb' && (
+        <DataTable columns={[
+          { key: 'route_table_id', label: 'Route Table ID' },
+          { key: 'name', label: 'Name', render: (v: string) => v || <span className="text-gray-600">--</span> },
+          { key: 'vpc_id', label: 'VPC' },
+          { key: 'association_count', label: 'Associations' },
+          { key: 'route_count', label: 'Routes' },
+          { key: 'region', label: 'Region' },
+        ]} data={loading && !rtbs.length ? undefined : rtbs}
+           onRowClick={(row) => fetchDetail('rtb', vpcQ.routeTableDetail, '{rt_id}', row.route_table_id)} />
       )}
 
       {/* Transit Gateways */}
@@ -340,6 +357,56 @@ export default function VPCPage() {
                         ))}
                       </div>
                     ) : <p className="text-gray-500 text-sm">No outbound rules</p>}
+                  </Section>
+                </>)}
+
+                {/* Route Table Detail */}
+                {detailType === 'rtb' && (<>
+                  <Section title="Route Table" icon={ArrowRightLeft}>
+                    <Row label="Route Table ID" value={selected.route_table_id} />
+                    <Row label="VPC ID" value={selected.vpc_id} />
+                    <Row label="Owner" value={selected.owner_id} />
+                    <Row label="Region" value={selected.region} />
+                  </Section>
+                  <Section title="Associations" icon={Network}>
+                    {(() => {
+                      const assocs = parseArray(selected.associations);
+                      return assocs.length > 0 ? (
+                        <div className="space-y-2">
+                          {assocs.map((a: any, i: number) => (
+                            <div key={i} className="bg-navy-800 rounded p-2 text-xs font-mono space-y-1">
+                              <Row label="Association ID" value={a.RouteTableAssociationId || a.route_table_association_id} />
+                              <Row label="Subnet" value={a.SubnetId || a.subnet_id || 'Main'} />
+                              <Row label="Main" value={a.Main || a.main ? 'Yes' : 'No'} />
+                            </div>
+                          ))}
+                        </div>
+                      ) : <p className="text-gray-500 text-sm">No associations</p>;
+                    })()}
+                  </Section>
+                  <Section title="Routes" icon={ArrowRightLeft}>
+                    {(() => {
+                      const routes = parseArray(selected.routes);
+                      return routes.length > 0 ? (
+                        <div className="space-y-1">
+                          <div className="grid grid-cols-3 gap-2 text-[10px] font-mono uppercase text-gray-500 mb-1 px-2">
+                            <span>Destination</span><span>Target</span><span>State</span>
+                          </div>
+                          {routes.map((r: any, i: number) => {
+                            const dest = r.DestinationCidrBlock || r.destination_cidr_block || r.DestinationPrefixListId || r.destination_prefix_list_id || '--';
+                            const target = r.GatewayId || r.gateway_id || r.NatGatewayId || r.nat_gateway_id || r.TransitGatewayId || r.transit_gateway_id || r.VpcPeeringConnectionId || r.vpc_peering_connection_id || r.NetworkInterfaceId || r.network_interface_id || 'local';
+                            const state = r.State || r.state || '--';
+                            return (
+                              <div key={i} className={`grid grid-cols-3 gap-2 text-xs font-mono px-2 py-1.5 rounded ${state === 'active' ? 'bg-navy-900' : 'bg-navy-900/50 text-gray-600'}`}>
+                                <span className="text-accent-cyan">{dest}</span>
+                                <span className="text-gray-300">{target}</span>
+                                <span className={state === 'active' ? 'text-accent-green' : 'text-accent-red'}>{state}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : <p className="text-gray-500 text-sm">No routes</p>;
+                    })()}
                   </Section>
                 </>)}
 
