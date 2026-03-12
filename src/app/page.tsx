@@ -66,6 +66,7 @@ export default function DashboardPage() {
             ecsSummary: ecsQ.summary,
             dynamoSummary: dynamoQ.summary,
             costSummary: costQ.summary,
+            costDetail: costQ.dashboardDetail,
             k8sNodes: k8sQ.nodeSummary,
             k8sPods: k8sQ.podSummary,
             k8sDeploy: k8sQ.deploymentSummary,
@@ -97,6 +98,7 @@ export default function DashboardPage() {
   const ecs = getFirst('ecsSummary') as any;
   const dynamo = getFirst('dynamoSummary') as any;
   const cost = getFirst('costSummary') as any;
+  const costDtl = getFirst('costDetail') as any;
   const k8sNodes = getFirst('k8sNodes') as any;
   const k8sDeploy = getFirst('k8sDeploy') as any;
   const sec = getFirst('secSummary') as any;
@@ -263,8 +265,17 @@ export default function DashboardPage() {
             })()}
           </CardLink>
           <CardLink href="/cost">
-            <StatsCard label="Monthly Cost" value={cost?.total_cost ? `$${Number(cost.total_cost).toLocaleString()}` : '$--'}
-              icon={DollarSign} color="orange" />
+            {(() => {
+              const thisM = Number(costDtl?.this_month) || 0;
+              const lastM = Number(costDtl?.last_month) || 0;
+              const daily = Number(costDtl?.daily_avg) || 0;
+              const mom = lastM > 0 ? ((thisM - lastM) / lastM * 100).toFixed(0) : '0';
+              return (
+                <StatsCard label="Monthly Cost" value={cost?.total_cost ? `$${Number(cost.total_cost).toLocaleString()}` : '$--'}
+                  icon={DollarSign} color="orange"
+                  change={`$${daily.toFixed(0)}/day · Last $${lastM.toLocaleString()} · ${Number(mom) > 0 ? '+' : ''}${mom}% MoM`} />
+              );
+            })()}
           </CardLink>
         </div>
       </div>
