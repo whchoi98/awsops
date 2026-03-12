@@ -141,6 +141,24 @@ export default function AIPage() {
     '전체 리소스 현황을 요약해줘',
   ];
 
+  // Follow-up suggestions by route / 라우트별 연관 추천 질문
+  const followUpMap: Record<string, string[]> = {
+    security: ['IAM 사용자 목록과 Access Key 상태를 보여줘', 'MFA가 설정되지 않은 사용자가 있는지 확인해줘', '보안그룹 중 0.0.0.0/0 인바운드가 있는지 확인해줘'],
+    network: ['VPC 서브넷과 라우트 테이블을 보여줘', 'NAT Gateway 상태를 확인해줘', 'Transit Gateway 라우팅을 분석해줘'],
+    container: ['EKS 노드의 CPU/메모리 사용률을 확인해줘', 'ECS 서비스 상태를 보여줘', 'Istio 서비스 메시 현황을 알려줘'],
+    cost: ['서비스별 비용을 비교해줘', '전월 대비 비용 증가 원인을 분석해줘', '비용 최적화 방안을 추천해줘'],
+    monitoring: ['CloudWatch 로그 그룹 목록을 보여줘', '최근 CloudTrail 이벤트를 조회해줘', 'EC2 메모리 사용량 추세를 보여줘'],
+    data: ['DynamoDB 테이블 상세를 확인해줘', 'RDS 스냅샷 목록을 보여줘', 'ElastiCache 모범사례를 알려줘'],
+    'aws-data': ['Lambda 함수 목록과 런타임을 알려줘', 'S3 버킷 중 공개 접근 가능한 것이 있는지 확인해줘', '전체 리소스 요약을 보여줘'],
+    iac: ['Terraform VPC 모듈을 검색해줘', 'CDK로 Lambda 배포하는 방법을 알려줘', 'CloudFormation 스택 상태를 확인해줘'],
+    code: ['AWS 비용 데이터를 차트로 시각화해줘', '랜덤 숫자 통계를 계산해줘', 'JSON 데이터를 파싱하는 코드를 만들어줘'],
+    general: ['서울 리전에서 사용 가능한 서비스를 확인해줘', 'ECS와 EKS 차이점을 알려줘', '서버리스 아키텍처를 추천해줘'],
+  };
+
+  // Get follow-up suggestions from last assistant message / 마지막 응답의 라우트에서 추천 질문 가져오기
+  const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant');
+  const followUps = lastAssistant?.route ? (followUpMap[lastAssistant.route] || followUpMap['general'] || []) : [];
+
   return (
     <div className="flex flex-col h-screen">
       {/* Header — matches Dashboard style / 대시보드와 동일 스타일 */}
@@ -275,6 +293,17 @@ export default function AIPage() {
                 <span className="transition-all duration-300">{statusMessage || 'Processing...'}</span>
               </div>
             </div>
+          </div>
+        )}
+        {/* Follow-up suggestions / 연관 추천 질문 */}
+        {!loading && followUps.length > 0 && messages.length > 0 && (
+          <div className="flex flex-wrap gap-2 py-2">
+            {followUps.map((q, i) => (
+              <button key={i} onClick={() => { setInput(q); inputRef.current?.focus(); }}
+                className="text-xs px-3 py-1.5 rounded-full bg-navy-800 border border-navy-600 text-gray-400 hover:text-accent-cyan hover:border-accent-cyan/50 transition-colors">
+                {q}
+              </button>
+            ))}
           </div>
         )}
         <div ref={messagesEndRef} />
