@@ -172,20 +172,20 @@ export default function DashboardPage() {
     <div className="p-6 space-y-6 animate-fade-in">
       <Header title="AWSops Dashboard" subtitle="AWS + Kubernetes Resource Overview" onRefresh={() => fetchData(true)} />
 
-      {/* Row 1: Compute & Containers / 컴퓨팅 & 컨테이너 */}
+      {/* Row 1: Compute & Containers (6) / 컴퓨팅 & 컨테이너 */}
       <div>
         <h2 className="text-xs font-mono uppercase text-gray-400 tracking-wider mb-3">Compute & Containers</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <CardLink href="/ec2">
             <StatsCard label="EC2" value={totalEC2} icon={Server} color="cyan"
-              change={[running ? `${running.value} running` : '', `${Number(ec2States.find((r: any) => r.name === 'stopped')?.value) || 0} stopped`, `${Number(lambda?.total_functions) ? '' : ''}${Number(vpc?.security_group_count) || 0} SGs`].filter(Boolean).slice(0, 2).join(' · ')} />
+              change={`${Number(running?.value) || 0} running · ${totalEC2 - (Number(running?.value) || 0)} stopped`} />
           </CardLink>
           <CardLink href="/lambda">
             <StatsCard label="Lambda" value={Number(lambda?.total_functions) || 0} icon={Zap} color="purple"
               change={`${Number(lambda?.unique_runtimes) || 0} runtimes · ${Number(lambda?.long_timeout_functions) || 0} long timeout`} />
           </CardLink>
           <CardLink href="/ecs">
-            <StatsCard label="ECS Tasks" value={Number(ecs?.total_tasks) || 0} icon={Container} color="orange"
+            <StatsCard label="ECS" value={Number(ecs?.total_tasks) || 0} icon={Container} color="orange"
               change={`${Number(ecs?.total_clusters) || 0} clusters · ${Number(ecs?.total_services) || 0} services`} />
           </CardLink>
           <CardLink href="/ecr">
@@ -193,34 +193,34 @@ export default function DashboardPage() {
               change={`${Number(ecrSum?.scan_enabled) || 0} scan · ${Number(ecrSum?.immutable_tags) || 0} immutable`} />
           </CardLink>
           <CardLink href="/k8s">
-            <StatsCard label="K8s Nodes" value={Number(k8sNodes?.total_nodes) || 0} icon={Box} color="pink"
-              change={`${Number(k8sNodes?.ready_nodes) || 0} ready · ${totalPods} pods`} />
+            <StatsCard label="EKS" value={Number(k8sNodes?.total_nodes) || 0} icon={Box} color="pink"
+              change={`${Number(k8sNodes?.ready_nodes) || 0} ready · ${totalPods} pods · ${Number(k8sDeploy?.total_deployments) || 0} deploy`} />
           </CardLink>
-          <CardLink href="/k8s">
-            <StatsCard label="K8s Pods" value={totalPods} icon={Box} color="green"
-              change={`${Number(podSum?.running_pods) || 0} running · ${Number(podSum?.pending_pods) || 0} pending · ${Number(podSum?.failed_pods) || 0} failed`} />
-          </CardLink>
-          <CardLink href="/k8s">
-            <StatsCard label="Deployments" value={Number(k8sDeploy?.total_deployments) || 0} icon={Box} color="cyan"
-              change={`${Number(k8sDeploy?.fully_available) || 0} available · ${Number(k8sDeploy?.partially_available) || 0} partial`} />
+          <CardLink href="/cloudfront-cdn">
+            <StatsCard label="CloudFront" value={Number(cf?.total_distributions) || 0} icon={Globe} color="cyan"
+              change={`${Number(cf?.enabled_count) || 0} enabled · ${Number(cf?.http_allowed) || 0} HTTP`} />
           </CardLink>
         </div>
       </div>
 
-      {/* Row 2: Network & Data / 네트워크 & 데이터 */}
+      {/* Row 2: Network & Data (6) / 네트워크 & 데이터 */}
       <div>
         <h2 className="text-xs font-mono uppercase text-gray-400 tracking-wider mb-3">Network & Data</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <CardLink href="/vpc">
             <StatsCard label="VPCs" value={Number(vpc?.vpc_count) || 0} icon={Network} color="orange"
-              change={`${vpc?.subnet_count || 0} Subnets · ${Number(vpc?.nat_gateway_count) || 0} NAT GW · ${Number(vpc?.tgw_count) || 0} TGW`} />
+              change={`${vpc?.subnet_count || 0} Subnets · ${Number(vpc?.nat_gateway_count) || 0} NAT · ${Number(vpc?.tgw_count) || 0} TGW`} />
           </CardLink>
-          <CardLink href="/vpc">
-            <StatsCard label="Security Groups" value={Number(vpc?.security_group_count) || 0} icon={Shield} color="cyan"
-              change={`${Number(vpc?.alb_count) || 0} ALB · ${Number(vpc?.nlb_count) || 0} NLB`} />
+          <CardLink href="/waf">
+            <StatsCard label="WAF" value={Number(waf?.total_web_acls) || 0} icon={Shield} color="purple"
+              change={`${Number(waf?.total_rule_groups) || 0} rules · ${Number(waf?.total_ip_sets) || 0} IP sets`} />
+          </CardLink>
+          <CardLink href="/s3">
+            <StatsCard label="S3 Buckets" value={Number(s3?.total_buckets) || 0} icon={Database} color="green"
+              change={pubBuckets > 0 ? `${pubBuckets} public! · ${Number(s3?.total_buckets) - pubBuckets} private` : `All private`} />
           </CardLink>
           <CardLink href="/rds">
-            <StatsCard label="RDS" value={Number(rds?.total_instances) || 0} icon={Database} color="green"
+            <StatsCard label="RDS" value={Number(rds?.total_instances) || 0} icon={Database} color="cyan"
               change={`${Number(rds?.total_storage_gb) || 0} GB · ${Number(rds?.multi_az_count) || 0} Multi-AZ`} />
           </CardLink>
           <CardLink href="/dynamodb">
@@ -230,18 +230,6 @@ export default function DashboardPage() {
           <CardLink href="/elasticache">
             <StatsCard label="ElastiCache" value={Number(ecache?.total_clusters) || 0} icon={Database} color="orange"
               change={`${Number(ecache?.redis_count) || 0} Redis · ${Number(ecache?.memcached_count) || 0} Memcached · ${Number(ecache?.total_nodes) || 0} nodes`} />
-          </CardLink>
-          <CardLink href="/s3">
-            <StatsCard label="S3 Buckets" value={Number(s3?.total_buckets) || 0} icon={Database} color="green"
-              change={pubBuckets > 0 ? `${pubBuckets} public! · ${Number(s3?.total_buckets) - pubBuckets} private` : `All private`} />
-          </CardLink>
-          <CardLink href="/cloudfront-cdn">
-            <StatsCard label="CloudFront" value={Number(cf?.total_distributions) || 0} icon={Globe} color="cyan"
-              change={`${Number(cf?.enabled_count) || 0} enabled · ${Number(cf?.http_allowed) || 0} HTTP`} />
-          </CardLink>
-          <CardLink href="/waf">
-            <StatsCard label="WAF" value={Number(waf?.total_web_acls) || 0} icon={Shield} color="purple"
-              change={`${Number(waf?.total_rule_groups) || 0} rule groups · ${Number(waf?.total_ip_sets) || 0} IP sets`} />
           </CardLink>
         </div>
       </div>
