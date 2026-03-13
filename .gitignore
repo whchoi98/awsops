@@ -44,8 +44,13 @@ infra-cdk/*.d.ts
 agent/__pycache__/
 *.pyc
 
-# temp
+# temp & backups / 임시 및 백업 파일
 /tmp/
+*.bak
+*.orig
+*.tmp
+*.swp
+*~
 
 # claude code: include skills/hooks, exclude sessions
 !.claude/
