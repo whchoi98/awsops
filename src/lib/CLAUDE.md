@@ -13,8 +13,8 @@
   (Cost Explorer data snapshot save/load for fallback)
 - `app-config.ts` — 앱 설정 파일 읽기/쓰기 (data/config.json, costEnabled 등)
   (App config file read/write, costEnabled etc.)
-- `queries/*.ts` — 20개 SQL 쿼리 파일 — AWS/K8s 서비스별 1개
-  (20 SQL query files — one per AWS/K8s service)
+- `queries/*.ts` — 22개 SQL 쿼리 파일 — AWS/K8s 서비스별 1개
+  (22 SQL query files — one per AWS/K8s service)
 
 ## 규칙 / Rules
 - 모든 데이터베이스 접근은 `steampipe.ts`의 `runQuery()` 또는 `batchQuery()`를 통해 수행

@@ -104,8 +104,8 @@ Browser                    CloudFront              Lambda@Edge            Cognit
 │ Pages    │     │  api/steampipe  │────▶│  │ aws plugin                  │    │
 │          │     │                 │     │  │  ├─ aws_ec2_instance        │───▶ AWS API
 │ Charts   │     │ batchQuery()    │     │  │  ├─ aws_vpc                 │
-│ Tables   │     │  3개씩 순차실행 │     │  │  ├─ aws_s3_bucket           │
-│          │     │  pg Pool max:3  │     │  │  ├─ aws_rds_db_instance     │
+│ Tables   │     │  5개씩 순차실행 │     │  │  ├─ aws_s3_bucket           │
+│          │     │  pg Pool max:5  │     │  │  ├─ aws_rds_db_instance     │
 │          │◀────│                 │◀────│  │  ├─ aws_lambda_function     │
 │          │     │ 5분 TTL 캐시    │     │  │  ├─ aws_iam_user/role       │
 │          │     │ (node-cache)    │     │  │  ├─ aws_cloudwatch_alarm    │
@@ -125,7 +125,8 @@ Browser                    CloudFront              Lambda@Edge            Cognit
 
 ---
 
-## 4. AI Assistant Flow (9-Route Priority)
+## 4. AI Assistant Flow (10-Route Priority)
+## 4. AI 어시스턴트 흐름 (10단계 라우팅 우선순위)
 
 ```
 Browser (/awsops/ai)
@@ -133,41 +134,45 @@ Browser (/awsops/ai)
     ├── 사용자 질문 입력
     │
     ▼
-Next.js API (/awsops/api/ai)  ── route.ts 키워드 분석 (9-route priority)
+Next.js API (/awsops/api/ai)  ── route.ts 키워드 분석 (10-route priority)
     │
-    │  ┌─────────────────────────────────────────────────────────────────────┐
-    │  │  Route Priority                                                     │
-    │  │                                                                     │
-    │  │  1. Code 실행 키워드 ──────────────────→ Code Interpreter           │
-    │  │  2. Infra 키워드 (ENI, flow log...) ──→ AgentCore → Infra GW (12)  │
-    │  │  3. IaC 키워드 (CDK, CFn, TF...) ────→ AgentCore → IaC GW (16)    │
-    │  │  4. Data 키워드 (DynamoDB, RDS...) ──→ AgentCore → Data GW (24)    │
-    │  │  5. Security 키워드 (IAM, policy..) ─→ AgentCore → Security GW (14)│
-    │  │  6. Monitoring 키워드 (CW, trail..) ─→ AgentCore → Monitoring GW(16)│
-    │  │  7. Cost 키워드 (billing, budget..) ─→ AgentCore → Cost GW (9)     │
-    │  │  8. AWS 리소스 키워드 (EC2, S3...) ──→ Steampipe + Bedrock Direct  │
-    │  │  9. 일반 질문 ────────────────────────→ AgentCore → Ops GW (9)     │
-    │  │                                          (폴백 → Bedrock Direct)    │
-    │  └─────────────────────────────────────────────────────────────────────┘
+    │  ┌──────────────────────────────────────────────────────────────────────┐
+    │  │  라우팅 우선순위 / Route Priority                                     │
+    │  │                                                                      │
+    │  │   1. Code 실행 키워드 ──────────────────→ Code Interpreter           │
+    │  │   2. Network 키워드 (ENI, flow log..) ─→ AgentCore → Network GW(17) │
+    │  │   3. Container 키워드 (EKS, ECS...) ──→ AgentCore → Container GW(24)│
+    │  │   4. IaC 키워드 (CDK, CFn, TF...) ────→ AgentCore → IaC GW (12)    │
+    │  │   5. Data 키워드 (DynamoDB, RDS...) ──→ AgentCore → Data GW (24)    │
+    │  │   6. Security 키워드 (IAM, policy..) ─→ AgentCore → Security GW(14) │
+    │  │   7. Monitoring 키워드 (CW, trail..) ─→ AgentCore → Monitoring GW(16)│
+    │  │   8. Cost 키워드 (billing, budget..) ─→ AgentCore → Cost GW (9)     │
+    │  │   9. AWS 리소스 키워드 (EC2, S3...) ──→ Steampipe + Bedrock Direct  │
+    │  │  10. 일반 질문 ────────────────────────→ AgentCore → Ops GW (9)     │
+    │  │                                           (폴백 → Bedrock Direct)    │
+    │  └──────────────────────────────────────────────────────────────────────┘
     │
-    │  [Routes 2-7, 9] AgentCore Runtime (서울)
+    │  [Routes 2-8, 10] AgentCore Runtime (서울)
     │                   ┌───────────────────────────────────┐
     │                   │ Strands Agent (arm64)              │
-    │                   │ + Bedrock Sonnet/Opus 4.6 (us-east-1) │
+    │                   │ + Bedrock Sonnet/Opus 4.6         │
     │                   └──────────────┬────────────────────┘
     │                                  │ gateway 파라미터로 라우팅
     │                                  ▼
-    │                   7 Role-based AgentCore Gateways (서울)
+    │                   8 역할 기반 AgentCore Gateways (서울)
+    │                   8 Role-based AgentCore Gateways (Seoul)
     │                   ┌───────────────────────────────────┐
     │                   │                                   │
-    │                   │  Infra GW ─── 12 tools ──┐       │
-    │                   │  IaC GW ──── 16 tools ──┤       │
-    │                   │  Data GW ─── 24 tools ──┤       │
-    │                   │  Security GW─ 14 tools ──┤ 19    │
-    │                   │  Monitoring GW 16 tools ──┤ Lambda │
-    │                   │  Cost GW ─── 9 tools ───┤       │
-    │                   │  Ops GW ──── 9 tools ───┘       │
+    │                   │  Network GW ─── 17 tools ─┐      │
+    │                   │  Container GW ─ 24 tools ─┤      │
+    │                   │  IaC GW ─────── 12 tools ─┤      │
+    │                   │  Data GW ────── 24 tools ─┤ 19   │
+    │                   │  Security GW ── 14 tools ─┤ Lambda│
+    │                   │  Monitoring GW─ 16 tools ─┤      │
+    │                   │  Cost GW ────── 9 tools ──┤      │
+    │                   │  Ops GW ─────── 9 tools ──┘      │
     │                   │                                   │
+    │                   │  합계: 125 MCP 도구               │
     │                   │  Total: 125 MCP tools             │
     │                   └───────────────────────────────────┘
     │
@@ -384,15 +389,17 @@ Step 6: AgentCore AI                     ← 06-setup-agentcore.sh (래퍼)
   │     ├─ AgentCore Runtime (Strands Agent)
   │     └─ Runtime Endpoint
   │
-  ├─ Step 6b: 7 Gateways                ← 06b-setup-agentcore-gateway.sh
-  │     ├─ 7 role-based AgentCore Gateways (MCP protocol, NONE auth)
-  │     │   ├─ awsops-infra-gateway      (network + EKS)
+  ├─ Step 6b: 8 Gateways                ← 06b-setup-agentcore-gateway.sh
+  │     ├─ 8개 역할 기반 AgentCore Gateways (MCP 프로토콜, NONE 인증)
+  │     │   (8 role-based AgentCore Gateways, MCP protocol, NONE auth)
+  │     │   ├─ awsops-network-gateway    (VPC, TGW, VPN, ENI, Flow Logs)
+  │     │   ├─ awsops-container-gateway  (EKS, ECS, Istio)
   │     │   ├─ awsops-iac-gateway        (CDK, CFn, Terraform)
   │     │   ├─ awsops-data-gateway       (DynamoDB, RDS, ElastiCache, MSK)
   │     │   ├─ awsops-security-gateway   (IAM, policy simulation)
   │     │   ├─ awsops-monitoring-gateway (CloudWatch, CloudTrail)
   │     │   ├─ awsops-cost-gateway       (Cost Explorer, budgets)
-  │     │   └─ awsops-ops-gateway        (general operations)
+  │     │   └─ awsops-ops-gateway        (일반 운영 / general operations)
   │     └─ route.ts gateway 파라미터로 선택
   │
   ├─ Step 6c: Tools & MCP               ← 06c-setup-agentcore-tools.sh
@@ -407,7 +414,8 @@ Step 6: AgentCore AI                     ← 06-setup-agentcore.sh (래퍼)
   │     │   ├─ Ops: steampipe-query, istio-mcp, eks-mcp
   │     │   └─ (VPC Lambda: steampipe-query uses SG for DB access)
   │     └─ Gateway Targets (create_targets.py, boto3)
-  │         ├─ 125 MCP tools across 7 Gateways
+  │         ├─ 8개 Gateway에 걸쳐 125개 MCP 도구
+  │         │   (125 MCP tools across 8 Gateways)
   │         ├─ targetConfiguration: mcp.lambda (※2)
   │         └─ credentialProviderConfigurations: GATEWAY_IAM_ROLE
   │
@@ -453,7 +461,7 @@ Step 7: CloudFront Lambda@Edge 연동      ← 07-setup-cloudfront-auth.sh
 | Cognito User Pool | ap-northeast-2 | 사용자 인증 (OAuth2 code flow) | Step 5 |
 | Lambda@Edge | us-east-1 | CloudFront 인증 (Python 3.12) | Step 5 → Step 7 |
 | AgentCore Runtime | ap-northeast-2 | Strands AI Agent (arm64 container) | Step 6a |
-| AgentCore Gateway (7개) | ap-northeast-2 | 7 role-based Gateways (Infra/IaC/Data/Security/Monitoring/Cost/Ops) | Step 6b |
+| AgentCore Gateway (8개) | ap-northeast-2 | 8개 역할 기반 Gateway (Network/Container/IaC/Data/Security/Monitoring/Cost/Ops) | Step 6b |
 | Lambda (19개) | ap-northeast-2 | MCP 도구: Network, DynamoDB, RDS, ElastiCache, MSK, IAM, CloudWatch, CloudTrail, Cost, CDK, CFn, Terraform, Steampipe, Istio, EKS | Step 6c |
 | AgentCore Code Interpreter | ap-northeast-2 | Python 코드 실행 샌드박스 | Step 6d |
 | ECR | ap-northeast-2 | Agent Docker 이미지 (arm64) | Step 6a |

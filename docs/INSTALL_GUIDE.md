@@ -21,30 +21,39 @@ Browser → CloudFront (Cognito Auth) → ALB → EC2 (Next.js:3000)
                                                             └─ Lambda: Steampipe Query
 ```
 
-## 대시보드 페이지 (21개) / Dashboard Pages (21 pages)
+## 대시보드 페이지 (30개) / Dashboard Pages (30 pages)
 
-| Category | Page | Path | Features |
+| 카테고리 / Category | 페이지 / Page | 경로 / Path | 기능 / Features |
 |----------|------|------|----------|
-| **Overview** | Dashboard | `/awsops` | Stats, Live Resources, Charts, Warnings |
-| | AI Assistant | `/awsops/ai` | Claude Sonnet/Opus 4.6, Steampipe context |
-| **Compute** | EC2 | `/awsops/ec2` | Instances, detail panel |
-| | Lambda | `/awsops/lambda` | Functions, runtimes |
-| | ECS | `/awsops/ecs` | Clusters, services, tasks |
-| | EKS | `/awsops/k8s` | Nodes, pods, deployments |
-| | EKS Explorer | `/awsops/k8s/explorer` | K9s-style terminal UI |
-| **Network** | VPC/Network | `/awsops/vpc` | VPC, Subnet, SG, TGW, ELB, NAT, IGW |
-| | Topology | `/awsops/topology` | Interactive resource graph (React Flow) |
-| **Storage & DB** | S3 | `/awsops/s3` | Buckets, versioning, public access |
-| | RDS | `/awsops/rds` | Instances, engines |
-| | DynamoDB | `/awsops/dynamodb` | Tables |
-| | ElastiCache | `/awsops/elasticache` | Redis/Memcached clusters |
-| **Monitoring** | Monitoring | `/awsops/monitoring` | CPU, Memory, Network, Disk I/O |
-| | CloudWatch | `/awsops/cloudwatch` | Alarms |
-| | CloudTrail | `/awsops/cloudtrail` | Trails, events |
-| | Cost | `/awsops/cost` | Monthly/daily cost, service breakdown |
-| **Security** | IAM | `/awsops/iam` | Users, roles, trust policies |
-| | Security | `/awsops/security` | Public buckets, open SGs, CVE |
-| | CIS Compliance | `/awsops/compliance` | CIS v1.5-v4.0 benchmarks |
+| **Overview** | Dashboard | `/awsops` | 20개 StatsCards, 차트, 경고 (20 StatsCards, Charts, Warnings) |
+| | AI Assistant | `/awsops/ai` | Claude Sonnet/Opus 4.6, SSE 스트리밍, 멀티 라우트 (SSE streaming, multi-route) |
+| | AgentCore | `/awsops/agentcore` | 런타임 상태, 8 Gateway, 125 도구 (Runtime status, 8 Gateways, 125 tools) |
+| **Compute** | EC2 | `/awsops/ec2` | 인스턴스 + 상세 패널 (Instances + detail panel) |
+| | Lambda | `/awsops/lambda` | 함수, 런타임, 메모리/타임아웃 (Functions, runtimes, memory/timeout) |
+| | ECS | `/awsops/ecs` | 클러스터, 서비스, 태스크 (Clusters, services, tasks) |
+| | ECR | `/awsops/ecr` | 리포지토리, 이미지, 스캔 (Repositories, images, scan) |
+| | EKS Overview | `/awsops/k8s` | 클러스터, 노드, Pod 요약 (Clusters, nodes, pod summary) |
+| | EKS Pods/Nodes/Deploy/Svc | `/awsops/k8s/*` | Pod, 노드, Deployment, Service 목록 (4 sub-pages) |
+| | EKS Explorer | `/awsops/k8s/explorer` | K9s 스타일 터미널 UI (K9s-style terminal UI) |
+| **Network & CDN** | VPC / Network | `/awsops/vpc` | VPC, Subnet, SG, TGW, ELB, NAT, IGW + 리소스 맵 (Resource Map) |
+| | CloudFront | `/awsops/cloudfront-cdn` | 배포, Origins, Aliases (Distributions) |
+| | WAF | `/awsops/waf` | Web ACL, 규칙, IP Sets (Rules, IP Sets) |
+| | Topology | `/awsops/topology` | 인프라 맵 + K8s 맵 (React Flow) |
+| **Storage & DB** | EBS | `/awsops/ebs` | 볼륨, 스냅샷, 암호화, EC2 어태치먼트 매핑 (Volumes, Snapshots, encryption, attachment mapping) |
+| | S3 | `/awsops/s3` | 버킷 TreeMap, 검색, IAM 분석 (TreeMap, search, IAM) |
+| | RDS | `/awsops/rds` | 인스턴스, SG 체이닝, 메트릭 (SG chaining, metrics) |
+| | DynamoDB | `/awsops/dynamodb` | 테이블 (Tables) |
+| | ElastiCache | `/awsops/elasticache` | 클러스터, SG, 메트릭 (Clusters, SG, metrics) |
+| | OpenSearch | `/awsops/opensearch` | 도메인, 암호화, VPC, 클러스터 구성 (Domains, encryption, VPC, cluster config) |
+| | MSK | `/awsops/msk` | Kafka 클러스터, 브로커 노드, CPU/메모리/네트워크 메트릭 (Clusters, broker nodes, metrics) |
+| **Monitoring** | Monitoring | `/awsops/monitoring` | CPU, 메모리, 네트워크, Disk I/O (날짜 범위) |
+| | CloudWatch | `/awsops/cloudwatch` | 알람 (Alarms) |
+| | CloudTrail | `/awsops/cloudtrail` | 트레일, 이벤트 (Trails, events) |
+| | Cost | `/awsops/cost` | 비용 분석, MSP 자동 감지, 스냅샷 폴백 (Cost analysis, MSP auto-detect, snapshot fallback) |
+| | Resource Inventory | `/awsops/inventory` | 리소스 수량 추이, 비용 영향 추정 (Resource count trends, cost impact estimation) |
+| **Security** | IAM | `/awsops/iam` | 사용자, 역할, 트러스트 정책 (Users, roles, trust policies) |
+| | Security | `/awsops/security` | Public S3, Open SG, Unencrypted EBS, CVE |
+| | CIS Compliance | `/awsops/compliance` | CIS v1.5~v4.0 벤치마크 (431 controls) |
 
 ## 사전 요구 사항 / Prerequisites
 

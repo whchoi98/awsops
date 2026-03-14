@@ -65,7 +65,7 @@
 
 ## 주요 파일 / Key Files
 - `src/lib/steampipe.ts` — pg 풀 + 배치 쿼리 + 캐시 + Cost 가용성 probe (pg Pool + batchQuery + cache + checkCostAvailability)
-- `src/lib/queries/*.ts` — 20개 SQL 쿼리 파일 (20 SQL query files)
+- `src/lib/queries/*.ts` — 22개 SQL 쿼리 파일 (22 SQL query files)
 - `src/lib/resource-inventory.ts` — 리소스 인벤토리 스냅샷 (Resource inventory snapshots)
 - `src/lib/cost-snapshot.ts` — Cost 데이터 스냅샷 폴백 (Cost data snapshot fallback)
 - `src/lib/app-config.ts` — 앱 설정 (costEnabled 등) (App config)

@@ -10,13 +10,14 @@ AWSops Dashboard is an AWS + Kubernetes operations dashboard providing real-time
 - **Styling**: Tailwind CSS dark navy theme with custom accent colors
 - **Charts**: Recharts for metrics visualization
 - **Topology**: React Flow for network topology diagrams
-- **Pages**: 29 resource pages (EC2, EBS, S3, VPC, IAM, Lambda, RDS, ECS, Inventory, etc.)
+- **페이지**: 30개 리소스 페이지 (EC2, EBS, S3, VPC, IAM, Lambda, RDS, ECS, MSK, OpenSearch, Inventory 등)
+  (30 resource pages)
 
 ### Data Layer (`src/lib/`)
 - **Steampipe**: Embedded PostgreSQL on port 9193 — 380+ AWS tables, 60+ K8s tables
 - **Connection**: pg Pool (max 5, 120s timeout, sequential batch of 5)
 - **Cache**: node-cache with 5-minute TTL
-- **Queries**: 20 SQL query files in `src/lib/queries/`
+- **쿼리**: `src/lib/queries/`에 22개 SQL 쿼리 파일 (22 SQL query files)
 - **Inventory**: Resource count snapshots (data/inventory/, zero extra queries)
 - **Cost Snapshot**: Cost data fallback for MSP accounts (data/cost/)
 - **Config**: App config (data/config.json, costEnabled auto-detect)

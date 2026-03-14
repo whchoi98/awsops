@@ -39,7 +39,7 @@
 │                                                                              │
 │  ┌─────────────────┐  ┌──────────────────┐  ┌────────────────────────────┐  │
 │  │  Next.js :3000  │  │  Steampipe :9193 │  │  VSCode :8888             │  │
-│  │  (29 Pages)     │──│  (Embedded PG)   │  │  (code-server)            │  │
+│  │  (30 Pages)     │──│  (Embedded PG)   │  │  (code-server)            │  │
 │  │  (4 APIs)       │  │  aws / k8s / trivy│  │                           │  │
 │  └─────────────────┘  └──────────────────┘  └────────────────────────────┘  │
 │  ┌─────────────────┐  ┌──────────────────────────────────────────────────┐  │
@@ -66,7 +66,7 @@
 
 ## Features / 기능
 
-### Dashboard Pages (29 pages)
+### 대시보드 페이지 (30개) / Dashboard Pages (30 pages)
 
 | Category | Page | Path | Features / 기능 |
 |----------|------|------|-----------------|
@@ -256,7 +256,7 @@ bash scripts/10-verify.sh       # Health check
 ```
 awsops/
 ├── src/
-│   ├── app/                      # 29 pages + 4 API routes
+│   ├── app/                      # 30 pages + 5 API routes
 │   │   ├── page.tsx              # Dashboard home (18 StatsCards)
 │   │   ├── ai/                   # AI Assistant (SSE streaming)
 │   │   ├── ec2/                  # EC2 instances
@@ -276,15 +276,20 @@ awsops/
 │   │   ├── monitoring/           # CPU/Memory/Network/Disk (date range)
 │   │   ├── cloudwatch/           # CloudWatch alarms
 │   │   ├── cloudtrail/           # CloudTrail events
+│   │   ├── opensearch/            # OpenSearch 도메인 (domains, encryption, VPC)
+│   │   ├── msk/                  # MSK Kafka 클러스터 (clusters, broker nodes, metrics)
 │   │   ├── cost/                 # Cost Explorer (period/service, MSP auto-detect)
 │   │   ├── inventory/            # Resource Inventory (count trends, cost impact)
 │   │   ├── iam/                  # IAM users/roles
 │   │   ├── security/             # Security findings
 │   │   ├── compliance/           # CIS v1.5~v4.0 benchmarks
-│   │   └── api/                  # API routes (ai, steampipe, code, benchmark)
+│   │   └── api/                  # API routes (ai, steampipe, msk, code, benchmark)
 │   ├── components/               # 14 shared components (Sidebar, Charts, Table, K9s)
 │   ├── lib/steampipe.ts          # pg Pool (NOT CLI) — max 5, 120s timeout, 5min cache
-│   ├── lib/queries/              # 20 SQL query files (ec2, ebs, vpc, s3, rds, k8s, iam, cost...)
+│   ├── lib/resource-inventory.ts  # 리소스 인벤토리 스냅샷 (resource snapshots)
+│   ├── lib/cost-snapshot.ts      # Cost 데이터 스냅샷 (cost data fallback)
+│   ├── lib/app-config.ts         # 앱 설정 (app config: costEnabled)
+│   ├── lib/queries/              # 22 SQL query files (ec2, ebs, msk, opensearch, vpc, s3, rds, k8s...)
 │   └── types/aws.ts              # TypeScript type definitions
 ├── agent/                        # Strands Agent (Docker, arm64)
 │   ├── agent.py                  # Main entrypoint with dynamic gateway selection
