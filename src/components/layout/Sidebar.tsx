@@ -26,6 +26,8 @@ import {
   Package,
   BarChart3,
   HardDrive,
+  Radio,
+  Search,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -77,6 +79,8 @@ const navGroups: NavGroup[] = [
       { label: 'RDS', href: '/rds', icon: Database },
       { label: 'DynamoDB', href: '/dynamodb', icon: Table },
       { label: 'ElastiCache', href: '/elasticache', icon: Database },
+      { label: 'OpenSearch', href: '/opensearch', icon: Search },
+      { label: 'MSK', href: '/msk', icon: Radio },
     ],
   },
   {

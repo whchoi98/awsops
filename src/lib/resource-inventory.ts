@@ -29,6 +29,8 @@ const RESOURCE_MAP: Record<string, Record<string, string>> = {
   wafSummary:    { total_web_acls: 'WAF Web ACLs' },
   ecrSummary:    { total_repos: 'ECR Repositories' },
   ebsSummary:    { total_volumes: 'EBS Volumes', unencrypted_count: 'Unencrypted EBS' },
+  mskSummary:    { total_clusters: 'MSK Clusters' },
+  osSummary:     { total_domains: 'OpenSearch Domains' },
   secSummary:    { public_buckets: 'Public S3 Buckets', open_sgs: 'Open Security Groups', total_snapshots: 'EBS Snapshots' },
 };
 

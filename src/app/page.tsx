@@ -9,7 +9,7 @@ import BarChartCard from '@/components/charts/BarChartCard';
 import {
   Server, Database, DollarSign, Box, Shield, Network,
   Bell, Container, ShieldCheck, AlertTriangle, Zap, Table,
-  FileSearch, Globe, Package, HardDrive,
+  FileSearch, Globe, Package, HardDrive, Radio, Search,
 } from 'lucide-react';
 import { queries as ec2Q } from '@/lib/queries/ec2';
 import { queries as s3Q } from '@/lib/queries/s3';
@@ -29,6 +29,8 @@ import { queries as cfQ } from '@/lib/queries/cloudfront';
 import { queries as wafQ } from '@/lib/queries/waf';
 import { queries as ecrQ } from '@/lib/queries/ecr';
 import { queries as ebsQ } from '@/lib/queries/ebs';
+import { queries as mskQ } from '@/lib/queries/msk';
+import { queries as osQ } from '@/lib/queries/opensearch';
 
 interface DashboardData {
   [key: string]: { rows: Record<string, unknown>[]; error?: string };
@@ -85,6 +87,8 @@ export default function DashboardPage() {
             wafSummary: wafQ.summary,
             ecrSummary: ecrQ.summary,
             ebsSummary: ebsQ.summary,
+            mskSummary: mskQ.summary,
+            osSummary: osQ.summary,
             k8sWarnings: k8sQ.warningEvents,
           },
         }),
@@ -132,6 +136,8 @@ export default function DashboardPage() {
   const waf = getFirst('wafSummary') as any;
   const ecrSum = getFirst('ecrSummary') as any;
   const ebs = getFirst('ebsSummary') as any;
+  const msk = getFirst('mskSummary') as any;
+  const os = getFirst('osSummary') as any;
   const podSum = getFirst('k8sPods') as any;
   const totalPods = Number(podSum?.total_pods) || 0;
 
@@ -232,7 +238,7 @@ export default function DashboardPage() {
       {/* Row 2: Network & Data (6) / 네트워크 & 데이터 */}
       <div>
         <h2 className="text-xs font-mono uppercase text-gray-400 tracking-wider mb-3">Network & Storage</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-4">
           <CardLink href="/vpc">
             <StatsCard label="VPCs" value={Number(vpc?.vpc_count) || 0} icon={Network} color="orange"
               change={`${vpc?.subnet_count || 0} Subnets · ${Number(vpc?.nat_gateway_count) || 0} NAT · ${Number(vpc?.tgw_count) || 0} TGW`} />
@@ -260,6 +266,14 @@ export default function DashboardPage() {
           <CardLink href="/elasticache">
             <StatsCard label="ElastiCache" value={Number(ecache?.total_clusters) || 0} icon={Database} color="orange"
               change={`${Number(ecache?.redis_count) || 0} Redis · ${Number(ecache?.memcached_count) || 0} Memcached · ${Number(ecache?.total_nodes) || 0} nodes`} />
+          </CardLink>
+          <CardLink href="/opensearch">
+            <StatsCard label="OpenSearch" value={Number(os?.total_domains) || 0} icon={Search} color="purple"
+              change={`${Number(os?.vpc_domains) || 0} VPC · ${Number(os?.node_encrypted) || 0} encrypted`} />
+          </CardLink>
+          <CardLink href="/msk">
+            <StatsCard label="MSK" value={Number(msk?.total_clusters) || 0} icon={Radio} color="green"
+              change={`${Number(msk?.active_clusters) || 0} active`} />
           </CardLink>
         </div>
       </div>
