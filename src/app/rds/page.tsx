@@ -23,6 +23,7 @@ export default function RDSPage() {
   const [sgDetails, setSgDetails] = useState<any[]>([]);
   const [rdsMetrics, setRdsMetrics] = useState<Record<string, any[]>>({});
   const [searchText, setSearchText] = useState('');
+  const [instanceMetrics, setInstanceMetrics] = useState<Record<string, Record<string, number>>>({});
 
   const fetchData = useCallback(async (bustCache = false) => {
     setLoading(true);
@@ -40,6 +41,17 @@ export default function RDSPage() {
       });
       const result = await res.json();
       setData(result);
+
+      // CloudWatch 메트릭 조회 / Fetch CloudWatch metrics for all instances
+      const instanceList = result.list?.rows || [];
+      if (instanceList.length > 0) {
+        const ids = instanceList.map((r: any) => r.db_instance_identifier).filter(Boolean);
+        try {
+          const mRes = await fetch(`/awsops/api/rds?instanceIds=${encodeURIComponent(ids.join(','))}`);
+          const mData = await mRes.json();
+          setInstanceMetrics(mData.metrics || {});
+        } catch {}
+      }
     } catch {
     } finally {
       setLoading(false);
@@ -184,6 +196,101 @@ export default function RDSPage() {
         data={loading && !filteredList.length ? undefined : filteredList}
         onRowClick={(row) => fetchDetail(row.db_instance_identifier)}
       />
+
+      {/* Instance Metrics Table / 인스턴스 메트릭 테이블 */}
+      {!loading && filteredList.length > 0 && (
+        <div className="bg-navy-800 rounded-lg border border-navy-600 p-5">
+          <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+            <Database size={16} className="text-accent-cyan" />
+            Instance Metrics
+            <span className="text-xs text-gray-500 font-normal ml-1">({filteredList.length} instances · last 1h)</span>
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-navy-700">
+                  {['Identifier', 'Engine', 'Class', 'Status', 'CPU', 'Free Memory', 'Connections', 'Read IOPS', 'Write IOPS', 'Net In', 'Net Out', 'Free Storage'].map(h => (
+                    <th key={h} className="px-3 py-2 text-left text-xs font-mono font-semibold uppercase tracking-wider text-accent-cyan">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredList.map((inst: any) => {
+                  const m = instanceMetrics[inst.db_instance_identifier] || {};
+                  const cpu = m.cpu || 0;
+                  const freeMem = m.mem || 0;
+                  const conn = m.conn || 0;
+                  const riops = m.riops || 0;
+                  const wiops = m.wiops || 0;
+                  const netRx = m.net_rx || 0;
+                  const netTx = m.net_tx || 0;
+                  const freeStorage = m.storage || 0;
+                  return (
+                    <tr key={inst.db_instance_identifier} className="border-b border-navy-600 hover:bg-navy-700 transition-colors cursor-pointer"
+                      onClick={() => fetchDetail(inst.db_instance_identifier)}>
+                      <td className="px-3 py-2 text-sm text-white">{inst.db_instance_identifier}</td>
+                      <td className="px-3 py-2">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-cyan/10 text-accent-cyan">
+                          <span className="w-1.5 h-1.5 rounded-full bg-accent-cyan" />{inst.engine}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-xs font-mono text-accent-green">{inst.db_instance_class}</td>
+                      <td className="px-3 py-2">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                          inst.status === 'available' ? 'bg-accent-green/10 text-accent-green' : 'bg-accent-orange/10 text-accent-orange'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${inst.status === 'available' ? 'bg-accent-green' : 'bg-accent-orange'}`} />
+                          {inst.status}
+                        </span>
+                      </td>
+                      {/* CPU */}
+                      <td className="px-3 py-2">
+                        {cpu > 0 ? (
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-14 h-2 bg-navy-600 rounded-full overflow-hidden">
+                              <div className={`h-full rounded-full ${cpu > 80 ? 'bg-accent-red' : cpu > 50 ? 'bg-accent-orange' : 'bg-accent-cyan'}`}
+                                style={{ width: `${Math.min(cpu, 100)}%` }} />
+                            </div>
+                            <span className="text-xs font-mono text-gray-300">{cpu.toFixed(1)}%</span>
+                          </div>
+                        ) : <span className="text-xs text-gray-600">-</span>}
+                      </td>
+                      {/* Free Memory */}
+                      <td className="px-3 py-2 text-xs font-mono text-gray-300">
+                        {freeMem > 0 ? `${(freeMem / (1024 * 1024 * 1024)).toFixed(2)} GB` : '-'}
+                      </td>
+                      {/* Connections */}
+                      <td className="px-3 py-2 text-xs font-mono text-gray-300">
+                        {conn > 0 ? Math.round(conn).toLocaleString() : '-'}
+                      </td>
+                      {/* Read IOPS */}
+                      <td className="px-3 py-2 text-xs font-mono text-gray-300">
+                        {riops > 0 ? riops.toFixed(1) : '-'}
+                      </td>
+                      {/* Write IOPS */}
+                      <td className="px-3 py-2 text-xs font-mono text-gray-300">
+                        {wiops > 0 ? wiops.toFixed(1) : '-'}
+                      </td>
+                      {/* Net In */}
+                      <td className="px-3 py-2 text-xs font-mono text-gray-300">
+                        {netRx > 0 ? `${(netRx / 1024).toFixed(1)} KB/s` : '-'}
+                      </td>
+                      {/* Net Out */}
+                      <td className="px-3 py-2 text-xs font-mono text-gray-300">
+                        {netTx > 0 ? `${(netTx / 1024).toFixed(1)} KB/s` : '-'}
+                      </td>
+                      {/* Free Storage */}
+                      <td className="px-3 py-2 text-xs font-mono text-gray-300">
+                        {freeStorage > 0 ? `${(freeStorage / (1024 * 1024 * 1024)).toFixed(1)} GB` : '-'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Detail Panel */}
       {(selected || detailLoading) && (
