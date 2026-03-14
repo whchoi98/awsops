@@ -1,5 +1,6 @@
 import { Pool } from 'pg';
 import NodeCache from 'node-cache';
+import { getConfig } from '@/lib/app-config';
 
 const cache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
 
@@ -83,8 +84,6 @@ export function clearCache(): void {
 
 // Cost Explorer availability probe / Cost Explorer 가용성 확인
 // 설치 시 config로 MSP 판별 → 런타임에 Steampipe 쿼리 스킵
-import { getConfig } from '@/lib/app-config';
-
 const COST_CACHE_KEY = 'cost:available';
 const COST_CACHE_TTL = 3600; // 1시간
 

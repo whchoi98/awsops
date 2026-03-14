@@ -9,6 +9,10 @@
   (pg Pool connection: max 5, 120s timeout, batchQuery, node-cache 5 min TTL, checkCostAvailability)
 - `resource-inventory.ts` — 리소스 인벤토리 스냅샷 저장/조회/추이 계산 (data/inventory/, 추가 쿼리 0건)
   (Resource inventory snapshot save/load/trend calculation, zero additional queries)
+- `cost-snapshot.ts` — Cost Explorer 데이터 스냅샷 저장/조회 (data/cost/, 폴백용)
+  (Cost Explorer data snapshot save/load for fallback)
+- `app-config.ts` — 앱 설정 파일 읽기/쓰기 (data/config.json, costEnabled 등)
+  (App config file read/write, costEnabled etc.)
 - `queries/*.ts` — 19개 SQL 쿼리 파일 — AWS/K8s 서비스별 1개
   (19 SQL query files — one per AWS/K8s service)
 

@@ -89,9 +89,7 @@ export default function DashboardPage() {
       });
       setData(await res.json());
     } catch {} finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
+  }, [costAvailable]);
 
   // Cost Explorer 가용성 선 확인 / Pre-check cost availability
   useEffect(() => {
@@ -100,6 +98,12 @@ export default function DashboardPage() {
       .then(d => setCostAvailable(d.available !== false))
       .catch(() => setCostAvailable(false));
   }, []);
+
+  // cost-check 완료 후 fetchData 실행 / Run fetchData after cost-check resolves
+  useEffect(() => {
+    if (costAvailable === null) return;
+    fetchData();
+  }, [costAvailable, fetchData]);
 
   const get = (key: string) => data[key]?.rows || [];
   const getFirst = (key: string) => get(key)[0] || {};

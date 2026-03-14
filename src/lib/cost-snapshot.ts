@@ -72,31 +72,6 @@ export async function getLatestCostSnapshot(): Promise<CostSnapshot | null> {
   }
 }
 
-/**
- * Get cost snapshot history for the given number of days.
- */
-export async function getCostHistory(days: number = 90): Promise<CostSnapshot[]> {
-  ensureDir();
-
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - days);
-  const cutoffStr = dateStr(cutoff);
-
-  const files = readdirSync(DATA_DIR)
-    .filter(f => f.endsWith('.json'))
-    .sort();
-
-  const history: CostSnapshot[] = [];
-  for (const file of files) {
-    if (file.replace('.json', '') < cutoffStr) continue;
-    try {
-      const raw = readFileSync(join(DATA_DIR, file), 'utf-8');
-      history.push(JSON.parse(raw));
-    } catch { /* skip corrupt files */ }
-  }
-  return history;
-}
-
 function cleanOldSnapshots(maxDays: number): void {
   try {
     const cutoff = new Date();
