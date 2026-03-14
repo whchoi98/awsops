@@ -28,7 +28,8 @@ const RESOURCE_MAP: Record<string, Record<string, string>> = {
   cfSummary:     { total_distributions: 'CloudFront Distributions' },
   wafSummary:    { total_web_acls: 'WAF Web ACLs' },
   ecrSummary:    { total_repos: 'ECR Repositories' },
-  secSummary:    { public_buckets: 'Public S3 Buckets', open_sgs: 'Open Security Groups', unencrypted_volumes: 'Unencrypted EBS', total_volumes: 'EBS Volumes', total_snapshots: 'EBS Snapshots' },
+  ebsSummary:    { total_volumes: 'EBS Volumes', unencrypted_count: 'Unencrypted EBS' },
+  secSummary:    { public_buckets: 'Public S3 Buckets', open_sgs: 'Open Security Groups', total_snapshots: 'EBS Snapshots' },
 };
 
 export interface InventorySnapshot {

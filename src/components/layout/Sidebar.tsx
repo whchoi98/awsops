@@ -25,6 +25,7 @@ import {
   Shield,
   Package,
   BarChart3,
+  HardDrive,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -71,6 +72,7 @@ const navGroups: NavGroup[] = [
   {
     title: 'Storage & DB',
     items: [
+      { label: 'EBS', href: '/ebs', icon: HardDrive },
       { label: 'S3', href: '/s3', icon: Database },
       { label: 'RDS', href: '/rds', icon: Database },
       { label: 'DynamoDB', href: '/dynamodb', icon: Table },

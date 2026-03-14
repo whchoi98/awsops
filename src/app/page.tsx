@@ -9,7 +9,7 @@ import BarChartCard from '@/components/charts/BarChartCard';
 import {
   Server, Database, DollarSign, Box, Shield, Network,
   Bell, Container, ShieldCheck, AlertTriangle, Zap, Table,
-  FileSearch, Globe, Package,
+  FileSearch, Globe, Package, HardDrive,
 } from 'lucide-react';
 import { queries as ec2Q } from '@/lib/queries/ec2';
 import { queries as s3Q } from '@/lib/queries/s3';
@@ -28,6 +28,7 @@ import { queries as ctQ } from '@/lib/queries/cloudtrail';
 import { queries as cfQ } from '@/lib/queries/cloudfront';
 import { queries as wafQ } from '@/lib/queries/waf';
 import { queries as ecrQ } from '@/lib/queries/ecr';
+import { queries as ebsQ } from '@/lib/queries/ebs';
 
 interface DashboardData {
   [key: string]: { rows: Record<string, unknown>[]; error?: string };
@@ -83,6 +84,7 @@ export default function DashboardPage() {
             cfSummary: cfQ.summary,
             wafSummary: wafQ.summary,
             ecrSummary: ecrQ.summary,
+            ebsSummary: ebsQ.summary,
             k8sWarnings: k8sQ.warningEvents,
           },
         }),
@@ -129,6 +131,7 @@ export default function DashboardPage() {
   const cf = getFirst('cfSummary') as any;
   const waf = getFirst('wafSummary') as any;
   const ecrSum = getFirst('ecrSummary') as any;
+  const ebs = getFirst('ebsSummary') as any;
   const podSum = getFirst('k8sPods') as any;
   const totalPods = Number(podSum?.total_pods) || 0;
 
@@ -228,8 +231,8 @@ export default function DashboardPage() {
 
       {/* Row 2: Network & Data (6) / 네트워크 & 데이터 */}
       <div>
-        <h2 className="text-xs font-mono uppercase text-gray-400 tracking-wider mb-3">Network & Data</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <h2 className="text-xs font-mono uppercase text-gray-400 tracking-wider mb-3">Network & Storage</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
           <CardLink href="/vpc">
             <StatsCard label="VPCs" value={Number(vpc?.vpc_count) || 0} icon={Network} color="orange"
               change={`${vpc?.subnet_count || 0} Subnets · ${Number(vpc?.nat_gateway_count) || 0} NAT · ${Number(vpc?.tgw_count) || 0} TGW`} />
@@ -237,6 +240,10 @@ export default function DashboardPage() {
           <CardLink href="/waf">
             <StatsCard label="WAF" value={Number(waf?.total_web_acls) || 0} icon={Shield} color="purple"
               change={`${Number(waf?.total_rule_groups) || 0} rules · ${Number(waf?.total_ip_sets) || 0} IP sets`} />
+          </CardLink>
+          <CardLink href="/ebs">
+            <StatsCard label="EBS" value={Number(ebs?.total_volumes) || 0} icon={HardDrive} color="cyan"
+              change={`${Number(ebs?.total_size_gb) || 0} GB · ${Number(ebs?.unencrypted_count) || 0} unenc`} />
           </CardLink>
           <CardLink href="/s3">
             <StatsCard label="S3 Buckets" value={Number(s3?.total_buckets) || 0} icon={Database} color="green"

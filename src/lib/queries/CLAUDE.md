@@ -4,7 +4,8 @@
 Steampipe용 SQL 쿼리 정의. 각 파일은 특정 AWS/K8s 서비스에 대한 쿼리를 내보냄.
 (SQL query definitions for Steampipe. Each file exports queries for a specific AWS/K8s service.)
 
-## 주요 파일 (19 query files) / Key Files
+## 주요 파일 (20 query files) / Key Files
+- `ebs.ts` — EBS 볼륨/스냅샷 (Volumes, snapshots, attachments, encryption)
 - `ec2.ts` — EC2 인스턴스 (Instances)
 - `vpc.ts` — VPC, Subnet, SG, Route Table, TGW, ELB, NAT, IGW
 - `s3.ts` — S3 버킷, 버전 관리, 퍼블릭 접근 (Buckets, versioning, public access)
