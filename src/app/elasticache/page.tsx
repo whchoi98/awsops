@@ -19,6 +19,7 @@ export default function ElastiCachePage() {
   const [sgDetails, setSgDetails] = useState<any[]>([]);
   const [ecMetrics, setEcMetrics] = useState<Record<string, any[]>>({});
   const [searchText, setSearchText] = useState('');
+  const [nodeMetrics, setNodeMetrics] = useState<Record<string, Record<string, number>>>({});
 
   const fetchData = useCallback(async (bustCache = false) => {
     setLoading(true);
@@ -36,7 +37,19 @@ export default function ElastiCachePage() {
           },
         }),
       });
-      setData(await res.json());
+      const result = await res.json();
+      setData(result);
+
+      // CloudWatch 메트릭 조회 / Fetch CloudWatch metrics for all clusters
+      const clusterList = result.clusters?.rows || [];
+      if (clusterList.length > 0) {
+        const ids = clusterList.map((c: any) => c.cache_cluster_id).filter(Boolean);
+        try {
+          const mRes = await fetch(`/awsops/api/elasticache?clusterIds=${encodeURIComponent(ids.join(','))}`);
+          const mData = await mRes.json();
+          setNodeMetrics(mData.metrics || {});
+        } catch {}
+      }
     } catch {} finally { setLoading(false); }
   }, []);
 
@@ -193,7 +206,7 @@ export default function ElastiCachePage() {
             <table className="w-full">
               <thead>
                 <tr className="bg-navy-700">
-                  {['Cluster ID', 'Engine', 'Version', 'Node Type', 'Node ID', 'Status', 'AZ', 'Endpoint', 'Port', 'Created', 'Param Status'].map(h => (
+                  {['Cluster ID', 'Engine', 'Version', 'Node Type', 'Node ID', 'Status', 'CPU', 'Engine CPU', 'Memory', 'Net In', 'Net Out', 'Connections', 'AZ', 'Endpoint'].map(h => (
                     <th key={h} className="px-3 py-2 text-left text-xs font-mono font-semibold uppercase tracking-wider text-accent-cyan">{h}</th>
                   ))}
                 </tr>
@@ -209,6 +222,13 @@ export default function ElastiCachePage() {
                   })
                   .flatMap((cluster: any) => {
                     const nodes = (() => { try { return JSON.parse(cluster.cache_nodes || '[]'); } catch { return []; } })();
+                    const m = nodeMetrics[cluster.cache_cluster_id] || {};
+                    const cpu = m.cpu || 0;
+                    const ecpu = m.ecpu || 0;
+                    const freeMem = m.mem || 0;
+                    const netIn = m.net_in || 0;
+                    const netOut = m.net_out || 0;
+                    const conn = m.conn || 0;
                     return nodes.map((node: any, i: number) => (
                       <tr key={`${cluster.cache_cluster_id}-${i}`} className="border-b border-navy-600 hover:bg-navy-700 transition-colors">
                         <td className="px-3 py-2 text-sm text-white">{cluster.cache_cluster_id}</td>
@@ -238,15 +258,48 @@ export default function ElastiCachePage() {
                             {node.CacheNodeStatus}
                           </span>
                         </td>
-                        <td className="px-3 py-2 text-xs text-gray-400">{node.CustomerAvailabilityZone || '-'}</td>
-                        <td className="px-3 py-2 text-xs font-mono text-gray-400 max-w-[220px] truncate">{node.Endpoint?.Address || '-'}</td>
-                        <td className="px-3 py-2 text-xs font-mono text-gray-300">{node.Endpoint?.Port || '-'}</td>
-                        <td className="px-3 py-2 text-xs text-gray-500">{node.CacheNodeCreateTime ? new Date(node.CacheNodeCreateTime).toLocaleDateString() : '-'}</td>
+                        {/* CPU */}
                         <td className="px-3 py-2">
-                          <span className={`text-xs ${node.ParameterGroupStatus === 'in-sync' ? 'text-accent-green' : 'text-accent-orange'}`}>
-                            {node.ParameterGroupStatus || '-'}
-                          </span>
+                          {cpu > 0 ? (
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-14 h-2 bg-navy-600 rounded-full overflow-hidden">
+                                <div className={`h-full rounded-full ${cpu > 80 ? 'bg-accent-red' : cpu > 50 ? 'bg-accent-orange' : 'bg-accent-cyan'}`}
+                                  style={{ width: `${Math.min(cpu, 100)}%` }} />
+                              </div>
+                              <span className="text-xs font-mono text-gray-300">{cpu.toFixed(1)}%</span>
+                            </div>
+                          ) : <span className="text-xs text-gray-600">-</span>}
                         </td>
+                        {/* Engine CPU */}
+                        <td className="px-3 py-2">
+                          {ecpu > 0 ? (
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-14 h-2 bg-navy-600 rounded-full overflow-hidden">
+                                <div className={`h-full rounded-full ${ecpu > 80 ? 'bg-accent-red' : ecpu > 50 ? 'bg-accent-orange' : 'bg-accent-purple'}`}
+                                  style={{ width: `${Math.min(ecpu, 100)}%` }} />
+                              </div>
+                              <span className="text-xs font-mono text-gray-300">{ecpu.toFixed(1)}%</span>
+                            </div>
+                          ) : <span className="text-xs text-gray-600">-</span>}
+                        </td>
+                        {/* Freeable Memory */}
+                        <td className="px-3 py-2 text-xs font-mono text-gray-300">
+                          {freeMem > 0 ? `${(freeMem / (1024 * 1024 * 1024)).toFixed(2)} GB` : '-'}
+                        </td>
+                        {/* Network In */}
+                        <td className="px-3 py-2 text-xs font-mono text-gray-300">
+                          {netIn > 0 ? `${(netIn / 1024 / 1024).toFixed(1)} MB` : '-'}
+                        </td>
+                        {/* Network Out */}
+                        <td className="px-3 py-2 text-xs font-mono text-gray-300">
+                          {netOut > 0 ? `${(netOut / 1024 / 1024).toFixed(1)} MB` : '-'}
+                        </td>
+                        {/* Connections */}
+                        <td className="px-3 py-2 text-xs font-mono text-gray-300">
+                          {conn > 0 ? Math.round(conn).toLocaleString() : '-'}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-gray-400">{node.CustomerAvailabilityZone || '-'}</td>
+                        <td className="px-3 py-2 text-xs font-mono text-gray-400 max-w-[200px] truncate">{node.Endpoint?.Address || '-'}</td>
                       </tr>
                     ));
                   })}
