@@ -21,7 +21,7 @@ NC='\033[0m'
 
 REGION="${AWS_DEFAULT_REGION:-ap-northeast-2}"
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null)
-MEMORY_NAME="awsops-memory"
+MEMORY_NAME="awsops_memory"  # 하이픈 불가, 언더스코어만 / No hyphens, underscores only
 WORK_DIR="${HOME}/awsops"
 CONFIG_FILE="${WORK_DIR}/data/config.json"
 
@@ -53,9 +53,12 @@ if [ -n "$MEMORY_ID" ] && [ "$MEMORY_ID" != "" ]; then
     echo -e "  ${GREEN}기존 Memory 발견: ${MEMORY_ID}${NC}"
 else
     echo -e "  ${YELLOW}새 Memory Store 생성 중...${NC}"
+    # 이름: 하이픈 불가, 언더스코어만 / Name: no hyphens, underscores only
+    # eventExpiryDuration: 최대 365일 / max 365 days
     CREATE_RESULT=$(aws bedrock-agentcore-control create-memory \
       --name "$MEMORY_NAME" \
-      --description "AWSops AI Assistant 대화 이력 및 분석 결과 저장 / Conversation history and analysis results" \
+      --description "AWSops AI Assistant conversation history" \
+      --event-expiry-duration 365 \
       --region "$REGION" \
       --output json 2>&1)
 

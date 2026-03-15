@@ -116,6 +116,7 @@ Step 6a: 06a-setup-agentcore-runtime.sh  Runtime (IAM, ECR, Docker, Endpoint)
 Step 6b: 06b-setup-agentcore-gateway.sh  8 Gateway (MCP)
 Step 6c: 06c-setup-agentcore-tools.sh    19 Lambda + 8 Gateway, 125 도구
 Step 6d: 06d-setup-agentcore-interpreter.sh  Code Interpreter
+Step 6e: 06e-setup-agentcore-memory.sh   Memory Store (대화 이력, 365일 보관)
 Step 7:  07-setup-cloudfront-auth.sh     Lambda@Edge → CloudFront 연동
 ```
 
@@ -126,6 +127,7 @@ Step 7:  07-setup-cloudfront-auth.sh     Lambda@Edge → CloudFront 연동
 - Runtime 업데이트 시 `--role-arn` + `--network-configuration` 필수
 - agent.py GATEWAYS: 계정별 Gateway URL로 업데이트 후 Docker 재빌드 필요
 - AgentCore 응답: 최종 텍스트만 반환 → 응답 내용 키워드로 도구 추론
+- Memory 이름: 하이픈 불가, 언더스코어만 (`awsops_memory`). `eventExpiryDuration` 최대 365일.
 - Sign Out: HttpOnly 쿠키는 `document.cookie`로 삭제 불가 → `POST /api/auth`로 서버 사이드 삭제
 
 ## 새 페이지 추가
@@ -260,6 +262,7 @@ Step 6a: 06a-setup-agentcore-runtime.sh  Runtime (IAM, ECR, Docker, Endpoint)
 Step 6b: 06b-setup-agentcore-gateway.sh  8 Gateways (MCP)
 Step 6c: 06c-setup-agentcore-tools.sh    19 Lambda + 8 Gateways, 125 tools
 Step 6d: 06d-setup-agentcore-interpreter.sh  Code Interpreter
+Step 6e: 06e-setup-agentcore-memory.sh   Memory Store (conversation history, 365-day retention)
 Step 7:  07-setup-cloudfront-auth.sh     Lambda@Edge → CloudFront integration
 ```
 
@@ -270,6 +273,7 @@ Step 7:  07-setup-cloudfront-auth.sh     Lambda@Edge → CloudFront integration
 - Runtime update requires `--role-arn` + `--network-configuration`
 - agent.py GATEWAYS: update per-account gateway URLs then rebuild Docker
 - AgentCore response: final text only (no tool_call tags) → tools inferred from keywords
+- Memory name: no hyphens, underscores only (`awsops_memory`). `eventExpiryDuration` max 365 days.
 - Sign Out: HttpOnly cookie requires server-side deletion via `POST /api/auth`
 
 ## Adding New Pages
