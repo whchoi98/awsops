@@ -13,12 +13,22 @@ import {
   StopCodeInterpreterSessionCommand,
 } from '@aws-sdk/client-bedrock-agentcore';
 import { runQuery } from '@/lib/steampipe';
+import { getConfig } from '@/lib/app-config';
 
-// Service configuration / 서비스 설정
+// Service configuration — config 파일에서 읽거나 자동 감지
+// Service config — read from data/config.json or auto-detect
 const BEDROCK_REGION = 'ap-northeast-2';
 const AGENTCORE_REGION = 'ap-northeast-2';
-const AGENT_RUNTIME_ARN = 'arn:aws:bedrock-agentcore:ap-northeast-2:605134447633:runtime/awsops_agent-zMwFdo9X4Y';
-const CODE_INTERPRETER_ID = 'awsops_code_interpreter-pnEkzLpDfH';
+
+// 런타임에 config에서 AgentCore 설정 로드 / Load AgentCore config at runtime
+function getAgentRuntimeArn(): string {
+  const config = getConfig();
+  return config.agentRuntimeArn || '';
+}
+function getCodeInterpreterName(): string {
+  const config = getConfig();
+  return config.codeInterpreterName || '';
+}
 
 // Available Bedrock models / 사용 가능한 Bedrock 모델
 // Seoul region uses global.* prefix for cross-region inference / 서울 리전은 global.* 접두사 사용
@@ -377,14 +387,14 @@ async function executeCodeInterpreter(code: string): Promise<{ output: string; e
   let sessionId: string | undefined;
   try {
     const startResp = await agentCoreClient.send(
-      new StartCodeInterpreterSessionCommand({ codeInterpreterIdentifier: CODE_INTERPRETER_ID })
+      new StartCodeInterpreterSessionCommand({ codeInterpreterIdentifier: getCodeInterpreterName() })
     );
     sessionId = startResp.sessionId;
     if (!sessionId) throw new Error('No sessionId returned');
 
     const invokeResp = await agentCoreClient.send(
       new InvokeCodeInterpreterCommand({
-        codeInterpreterIdentifier: CODE_INTERPRETER_ID,
+        codeInterpreterIdentifier: getCodeInterpreterName(),
         sessionId,
         name: 'executeCode',
         arguments: { code, language: 'python' } as any,
@@ -406,13 +416,13 @@ async function executeCodeInterpreter(code: string): Promise<{ output: string; e
     }
 
     await agentCoreClient.send(
-      new StopCodeInterpreterSessionCommand({ codeInterpreterIdentifier: CODE_INTERPRETER_ID, sessionId })
+      new StopCodeInterpreterSessionCommand({ codeInterpreterIdentifier: getCodeInterpreterName(), sessionId })
     ).catch(() => {});
     return { output: output || '(no output)', exitCode };
   } catch (err: any) {
     if (sessionId) {
       await agentCoreClient.send(
-        new StopCodeInterpreterSessionCommand({ codeInterpreterIdentifier: CODE_INTERPRETER_ID, sessionId })
+        new StopCodeInterpreterSessionCommand({ codeInterpreterIdentifier: getCodeInterpreterName(), sessionId })
       ).catch(() => {});
     }
     return { output: `Code execution failed: ${err.message}`, exitCode: 1 };
@@ -431,7 +441,7 @@ async function invokeAgentCore(
   try {
     const recentMessages = messages.slice(-10);
     const command = new InvokeAgentRuntimeCommand({
-      agentRuntimeArn: AGENT_RUNTIME_ARN,
+      agentRuntimeArn: getAgentRuntimeArn(),
       qualifier: 'DEFAULT',
       payload: JSON.stringify({ messages: recentMessages, gateway }),
     });
@@ -448,7 +458,7 @@ async function invokeAgentCore(
       if (sessionId) {
         try {
           await agentCoreClient.send(new StopRuntimeSessionCommand({
-            agentRuntimeArn: AGENT_RUNTIME_ARN, runtimeSessionId: sessionId, qualifier: 'DEFAULT',
+            agentRuntimeArn: getAgentRuntimeArn(), runtimeSessionId: sessionId, qualifier: 'DEFAULT',
           }));
         } catch {}
       }

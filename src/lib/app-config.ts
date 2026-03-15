@@ -5,6 +5,8 @@ const CONFIG_PATH = resolve(process.cwd(), 'data/config.json');
 
 export interface AppConfig {
   costEnabled: boolean;
+  agentRuntimeArn?: string;
+  codeInterpreterName?: string;
 }
 
 const DEFAULT_CONFIG: AppConfig = { costEnabled: true };

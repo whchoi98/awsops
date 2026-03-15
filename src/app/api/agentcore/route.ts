@@ -3,10 +3,20 @@
 // Note: Uses execSync with fixed CLI commands only (no user input) / 고정 CLI 명령만 사용 (사용자 입력 없음)
 import { NextResponse } from 'next/server';
 import { execSync } from 'child_process';
+import { getConfig } from '@/lib/app-config';
 
 const REGION = 'ap-northeast-2';
-const RUNTIME_ID = 'awsops_agent-CicSMK8CTI';
-const CODE_INTERPRETER_ID = 'awsops_code_interpreter-9S5Hv5cS14';
+
+function getRuntimeId(): string {
+  const config = getConfig();
+  const arn = config.agentRuntimeArn || '';
+  // ARN에서 runtime ID 추출 / Extract runtime ID from ARN
+  const match = arn.match(/runtime\/(.+)$/);
+  return match ? match[1] : '';
+}
+function getCodeInterpreterName(): string {
+  return getConfig().codeInterpreterName || '';
+}
 
 function awsCli(cmd: string): any {
   try {
@@ -19,7 +29,7 @@ export async function GET() {
   try {
     // Parallel fetch via CLI / CLI로 병렬 조회
     const [runtimeRaw, gatewaysRaw] = await Promise.all([
-      Promise.resolve(awsCli(`bedrock-agentcore-control get-agent-runtime --agent-runtime-id ${RUNTIME_ID}`)),
+      Promise.resolve(awsCli(`bedrock-agentcore-control get-agent-runtime --agent-runtime-id ${getRuntimeId()}`)),
       Promise.resolve(awsCli('bedrock-agentcore-control list-gateways')),
     ]);
 
@@ -52,7 +62,7 @@ export async function GET() {
 
     return NextResponse.json({
       runtime, gateways,
-      codeInterpreter: { id: CODE_INTERPRETER_ID },
+      codeInterpreter: { id: getCodeInterpreterName() },
       region: REGION,
       timestamp: new Date().toISOString(),
     });
