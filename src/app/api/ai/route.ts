@@ -171,8 +171,10 @@ const ROUTE_REGISTRY: Record<string, RouteConfig> = {
       '"EC2 인스턴스 목록" → aws-data', '"S3 버킷 현황" → aws-data',
       '"Lambda 함수 목록" → aws-data', '"전체 리소스 요약" → aws-data',
       '"VPC 목록" → aws-data', '"VPC 현황" → aws-data',
+      '"VPC 네트워크 구성 분석" → aws-data', '"VPC 구성을 분석해줘" → aws-data',
       '"서브넷 리스트" → aws-data', '"보안그룹 목록" → aws-data',
       '"RDS 인스턴스 몇개" → aws-data', '"EKS 노드 목록" → aws-data',
+      '"네트워크 현황" → aws-data', '"인프라 구성 보여줘" → aws-data',
     ],
     handler: 'sql',
   },
@@ -220,8 +222,9 @@ Classification rules:
 - If the user asks a follow-up ("그중에서", "그건", "더 자세히"), use PREVIOUS context to determine the route.
 - Prefer specialized routes for ANALYSIS, TROUBLESHOOTING, and TOOL-based operations.
 - "aws-data" is for simple resource LISTING, COUNTING, STATUS queries (e.g. "VPC 목록", "EC2 현황", "S3 버킷 몇개", "서브넷 리스트").
-- Use "network" only for ANALYSIS, TROUBLESHOOTING, or specific tools (reachability, flow logs, TGW routes, firewall rules). NOT for simple VPC/Subnet/SG listing.
-- Use "container" only for ANALYSIS or specific tools (EKS troubleshooting, Istio config). NOT for simple EKS/ECS listing.
+- Use "network" ONLY for specific tool-based operations: reachability analyzer, flow log queries, TGW route analysis, firewall rule checks, VPN troubleshooting. NOT for "VPC 구성 분석", "네트워크 현황", or any resource listing.
+- Use "container" ONLY for specific tool operations: EKS troubleshooting, Istio mesh config, ECS task troubleshooting. NOT for simple EKS/ECS/Pod listing.
+- When user asks "XX 구성 분석해줘" or "XX 현황 분석" → use "aws-data" (Steampipe SQL gives real data, then Bedrock analyzes). "network"/"container" gateways are for specialized tool execution only.
 - "code" and "aws-data" should NOT be combined with other routes.
 - Keywords like "목록", "리스트", "현황", "몇개", "list", "count", "show" → prefer "aws-data"
 - Keywords like "분석", "진단", "문제", "확인해줘", "troubleshoot", "analyze" → prefer specialized route
@@ -344,7 +347,9 @@ kubernetes_pod:
 Examples:
 - "EC2 현황" → SELECT instance_id, tags ->> 'Name' AS name, instance_type, instance_state, placement_availability_zone AS az, private_ip_address, launch_time FROM aws_ec2_instance ORDER BY instance_state
 - "S3 버킷 목록" → SELECT name, region, versioning_enabled, bucket_policy_is_public FROM aws_s3_bucket ORDER BY name
-- "전체 리소스 요약" → SELECT 'EC2' AS resource, COUNT(*) AS count FROM aws_ec2_instance UNION ALL SELECT 'VPC', COUNT(*) FROM aws_vpc UNION ALL SELECT 'RDS', COUNT(*) FROM aws_rds_db_instance UNION ALL SELECT 'Lambda', COUNT(*) FROM aws_lambda_function UNION ALL SELECT 'S3', COUNT(*) FROM aws_s3_bucket`;
+- "전체 리소스 요약" → SELECT 'EC2' AS resource, COUNT(*) AS count FROM aws_ec2_instance UNION ALL SELECT 'VPC', COUNT(*) FROM aws_vpc UNION ALL SELECT 'RDS', COUNT(*) FROM aws_rds_db_instance UNION ALL SELECT 'Lambda', COUNT(*) FROM aws_lambda_function UNION ALL SELECT 'S3', COUNT(*) FROM aws_s3_bucket
+- "VPC 네트워크 구성 분석" → SELECT v.vpc_id, v.tags ->> 'Name' AS name, v.cidr_block, v.is_default, v.state, (SELECT COUNT(*) FROM aws_vpc_subnet s WHERE s.vpc_id = v.vpc_id) AS subnet_count, (SELECT COUNT(*) FROM aws_vpc_route_table r WHERE r.vpc_id = v.vpc_id) AS route_table_count, (SELECT COUNT(DISTINCT group_id) FROM aws_vpc_security_group sg WHERE sg.vpc_id = v.vpc_id) AS sg_count FROM aws_vpc v ORDER BY v.tags ->> 'Name'
+- "서브넷 구성" → SELECT subnet_id, tags ->> 'Name' AS name, vpc_id, cidr_block, availability_zone, map_public_ip_on_launch, available_ip_address_count FROM aws_vpc_subnet ORDER BY vpc_id, availability_zone`;
 
 async function generateSQL(messages: Array<{role: string; content: string}>): Promise<string | null> {
   try {
