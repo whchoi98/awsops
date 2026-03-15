@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Send, Bot, User, Loader2, Sparkles, Database, Copy, Check, Activity } from 'lucide-react';
+import { Send, Bot, User, Loader2, Sparkles, Database, Copy, Check, Activity, History, ChevronDown, ChevronUp } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -23,12 +23,24 @@ export default function AIPage() {
   const [loading, setLoading] = useState(false);
   const [model, setModel] = useState<'sonnet-4.6' | 'opus-4.6'>('sonnet-4.6');
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyData, setHistoryData] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // 대화 이력 로드 / Load conversation history
+  const loadHistory = () => {
+    fetch('/awsops/api/agentcore?action=conversations&limit=30')
+      .then(r => r.json())
+      .then(d => setHistoryData(d.conversations || []))
+      .catch(() => {});
+  };
+
+  useEffect(() => { loadHistory(); }, []);
 
   // Session stats from chat messages / 채팅 메시지에서 세션 통계
   const sessionStats = useMemo(() => {
@@ -397,6 +409,45 @@ export default function AIPage() {
           ))}
         </div>
       )}
+
+      {/* 대화 이력 토글 / Conversation History Toggle */}
+      <div className="border-t border-navy-600">
+        <button
+          onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadHistory(); }}
+          className="w-full px-6 py-2 flex items-center justify-between bg-navy-900/30 hover:bg-navy-900/60 transition-colors"
+        >
+          <span className="flex items-center gap-2 text-xs text-gray-400">
+            <History size={12} />
+            대화 이력 ({historyData.length}건)
+          </span>
+          {showHistory ? <ChevronDown size={14} className="text-gray-500" /> : <ChevronUp size={14} className="text-gray-500" />}
+        </button>
+
+        {showHistory && (
+          <div className="px-6 py-3 bg-navy-900/20 max-h-60 overflow-y-auto space-y-1.5">
+            {historyData.length === 0 ? (
+              <p className="text-xs text-gray-600 text-center py-3">아직 대화 이력이 없습니다</p>
+            ) : (
+              historyData.map((conv: any, i: number) => (
+                <div key={conv.id || i}
+                  onClick={() => { setInput(conv.question); setShowHistory(false); inputRef.current?.focus(); }}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg bg-navy-800/50 hover:bg-navy-700/50 cursor-pointer transition-colors group"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-300 truncate group-hover:text-white">{conv.question}</p>
+                    <p className="text-[10px] text-gray-600 truncate mt-0.5">{conv.summary?.slice(0, 80)}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="px-1.5 py-0.5 rounded bg-accent-cyan/10 text-accent-cyan text-[9px] font-mono">{conv.route}</span>
+                    <span className="text-[9px] font-mono text-gray-600">{(conv.responseTimeMs / 1000).toFixed(1)}s</span>
+                    <span className="text-[9px] text-gray-700">{conv.timestamp ? new Date(conv.timestamp).toLocaleDateString() : ''}</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
