@@ -53,7 +53,10 @@ export default function Header({ title, subtitle, onRefresh }: HeaderProps) {
         </span>
 
         <button
-          onClick={() => { document.cookie = 'awsops_token=; Path=/; Max-Age=0; Secure'; window.location.href = '/awsops'; }}
+          onClick={async () => {
+            await fetch('/awsops/api/auth', { method: 'POST' });
+            window.location.href = '/awsops';
+          }}
           className="p-2 rounded-lg bg-navy-700 border border-navy-600 text-gray-400 hover:text-accent-red hover:border-accent-red/50 transition-colors"
           title="Sign Out"
         >
