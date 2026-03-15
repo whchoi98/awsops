@@ -43,8 +43,8 @@
 │  │  (4 APIs)       │  │  aws / k8s / trivy│  │                           │  │
 │  └─────────────────┘  └──────────────────┘  └────────────────────────────┘  │
 │  ┌─────────────────┐  ┌──────────────────────────────────────────────────┐  │
-│  │  Powerpipe      │  │  Docker: awsops-agent (Strands, arm64)          │  │
-│  │  CIS Benchmark  │  │  -> ECR -> AgentCore Runtime                    │  │
+│  │  Powerpipe      │  │  Docker (빌드 전용, 실행은 AgentCore 서비스)   │  │
+│  │  CIS Benchmark  │  │  awsops-agent 이미지 빌드 → ECR 푸시          │  │
 │  └─────────────────┘  └──────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────────────────────┘
                                   │
@@ -291,10 +291,10 @@ awsops/
 │   ├── lib/app-config.ts         # 앱 설정 (app config: costEnabled)
 │   ├── lib/queries/              # 22 SQL query files (ec2, ebs, msk, opensearch, vpc, s3, rds, k8s...)
 │   └── types/aws.ts              # TypeScript type definitions
-├── agent/                        # Strands Agent (Docker, arm64)
+├── agent/                        # Strands Agent 소스 (EC2에서 빌드 → ECR → AgentCore에서 실행)
 │   ├── agent.py                  # Main entrypoint with dynamic gateway selection
 │   ├── streamable_http_sigv4.py  # MCP StreamableHTTP with SigV4
-│   ├── Dockerfile                # Python 3.11-slim, arm64
+│   ├── Dockerfile                # Python 3.11-slim, arm64 (EC2에서 빌드, AgentCore Runtime에서 실행)
 │   └── lambda/                   # 19 Lambda source files + create_targets.py
 ├── powerpipe/                    # CIS Benchmark mod
 ├── infra-cdk/                    # CDK TypeScript (AwsopsStack, CognitoStack)

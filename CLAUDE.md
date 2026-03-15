@@ -91,8 +91,9 @@ Steampipe, Next.js 14, Amazon Bedrock AgentCore로 구축.
 ### 인프라
 - `infra-cdk/lib/awsops-stack.ts` — CDK 인프라 (VPC, EC2, ALB, CloudFront)
 - `infra-cdk/lib/cognito-stack.ts` — CDK Cognito (User Pool, Lambda@Edge)
-- `agent/agent.py` — Strands Agent (동적 Gateway 선택, 8 Gateway URL)
+- `agent/agent.py` — Strands Agent 소스 (EC2에서 Docker 빌드 → ECR 푸시 → AgentCore Runtime에서 실행)
 - `agent/lambda/*.py` — 19개 Lambda 소스 + `create_targets.py`
+- ※ EC2에서는 Docker 이미지 **빌드만** 수행. 실행은 AgentCore 관리형 서비스에서 컨테이너로 실행됨.
 
 ### 설정 파일 (`data/config.json`)
 ```json
@@ -234,7 +235,8 @@ AWS + Kubernetes operations dashboard with real-time resource monitoring, networ
 ### Infrastructure
 - `infra-cdk/lib/awsops-stack.ts` — CDK infra (VPC, EC2, ALB, CloudFront)
 - `infra-cdk/lib/cognito-stack.ts` — CDK Cognito (User Pool, Lambda@Edge)
-- `agent/agent.py` — Strands Agent (dynamic gateway selection, 8 gateway URLs)
+- `agent/agent.py` — Strands Agent source (Docker build on EC2 → ECR push → runs on AgentCore Runtime)
+- Note: EC2 only **builds** the Docker image. Execution happens on AgentCore managed service.
 - `agent/lambda/*.py` — 19 Lambda sources + `create_targets.py`
 
 ### Config File (`data/config.json`)
