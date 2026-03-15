@@ -16,6 +16,7 @@ import { runQuery } from '@/lib/steampipe';
 import { getConfig } from '@/lib/app-config';
 import { recordCall } from '@/lib/agentcore-stats';
 import { saveConversation } from '@/lib/agentcore-memory';
+import { getUserFromRequest } from '@/lib/auth-utils';
 
 // Service configuration — config 파일에서 읽거나 자동 감지
 // Service config — read from data/config.json or auto-detect
@@ -642,6 +643,9 @@ export async function POST(request: NextRequest) {
   if (!messages || !Array.isArray(messages) || messages.length === 0)
     return NextResponse.json({ error: 'Messages required' }, { status: 400 });
 
+  // Cognito 사용자 정보 추출 / Extract Cognito user from JWT
+  const currentUser = getUserFromRequest(request);
+
   // Non-streaming mode: return JSON (backward compatible for test scripts)
   // 비스트리밍 모드: JSON 반환 (테스트 스크립트 하위 호환)
   if (!useStream) {
@@ -745,7 +749,7 @@ export async function POST(request: NextRequest) {
             if (sql) sqlTools.push(`steampipe: ${sql.match(/FROM\s+(\w+)/i)?.[1] || 'query'}`);
             const sqlTimeMs = Date.now() - callStartTime;
             recordCall({ timestamp: new Date().toISOString(), route, gateway: 'steampipe', responseTimeMs: sqlTimeMs, usedTools: sqlTools, success: true, via: `${config.display} (${queryResult.rowCount} rows)` });
-            saveConversation({ id: `${Date.now()}`, timestamp: new Date().toISOString(), route, gateway: 'steampipe', question: lastMessage.slice(0, 100), summary: sqlContent.slice(0, 200), usedTools: sqlTools, responseTimeMs: sqlTimeMs, via: `${config.display} (${queryResult.rowCount} rows)` }).catch(() => {});
+            saveConversation({ id: `${Date.now()}`, userId: currentUser.email, timestamp: new Date().toISOString(), route, gateway: 'steampipe', question: lastMessage.slice(0, 100), summary: sqlContent.slice(0, 200), usedTools: sqlTools, responseTimeMs: sqlTimeMs, via: `${config.display} (${queryResult.rowCount} rows)` }).catch(() => {});
             send('done', {
               content: sqlContent, model: modelKey || 'sonnet-4.6',
               via: `${config.display} (${queryResult.rowCount} rows)`, queriedResources: ['steampipe'], route,
@@ -787,7 +791,7 @@ export async function POST(request: NextRequest) {
             const viaList = successful.map(s => s.via).join(' + ');
             const multiTimeMs = Date.now() - callStartTime;
             recordCall({ timestamp: new Date().toISOString(), route, gateway: `multi:${routes.join('+')}`, responseTimeMs: multiTimeMs, usedTools: finalTools, success: true, via: `Multi-Route: ${viaList}` });
-            saveConversation({ id: `${Date.now()}`, timestamp: new Date().toISOString(), route, gateway: `multi:${routes.join('+')}`, question: lastMsg.slice(0, 100), summary: synthesized.slice(0, 200), usedTools: finalTools, responseTimeMs: multiTimeMs, via: `Multi-Route: ${viaList}` }).catch(() => {});
+            saveConversation({ id: `${Date.now()}`, userId: currentUser.email, timestamp: new Date().toISOString(), route, gateway: `multi:${routes.join('+')}`, question: lastMsg.slice(0, 100), summary: synthesized.slice(0, 200), usedTools: finalTools, responseTimeMs: multiTimeMs, via: `Multi-Route: ${viaList}` }).catch(() => {});
             send('done', {
               content: synthesized, model: modelKey || 'sonnet-4.6',
               via: `Multi-Route: ${viaList}`, queriedResources: allResources, route, routes,
@@ -842,7 +846,7 @@ export async function POST(request: NextRequest) {
           const responseTimeMs = Date.now() - callStartTime;
           const finalContent = cleanedResponse || agentResponse;
           recordCall({ timestamp: new Date().toISOString(), route, gateway, responseTimeMs, usedTools, success: true, via: `AgentCore → ${config.display}` });
-          saveConversation({ id: `${Date.now()}`, timestamp: new Date().toISOString(), route, gateway, question: lastMessage.slice(0, 100), summary: finalContent.slice(0, 200), usedTools, responseTimeMs, via: `AgentCore → ${config.display}` }).catch(() => {});
+          saveConversation({ id: `${Date.now()}`, userId: currentUser.email, timestamp: new Date().toISOString(), route, gateway, question: lastMessage.slice(0, 100), summary: finalContent.slice(0, 200), usedTools, responseTimeMs, via: `AgentCore → ${config.display}` }).catch(() => {});
           send('done', {
             content: finalContent, model: 'sonnet-4.6',
             via: `AgentCore → ${config.display}`, queriedResources: [`${gateway}-gateway`], route, routes,
@@ -867,7 +871,7 @@ export async function POST(request: NextRequest) {
         const fallbackTools = extractUsedTools(fallbackContent);
         const fbTimeMs = Date.now() - callStartTime;
         recordCall({ timestamp: new Date().toISOString(), route, gateway: 'bedrock-fallback', responseTimeMs: fbTimeMs, usedTools: fallbackTools, success: false, via: `Bedrock Direct (fallback from ${config.display})` });
-        saveConversation({ id: `${Date.now()}`, timestamp: new Date().toISOString(), route, gateway: 'bedrock-fallback', question: lastMessage.slice(0, 100), summary: fallbackContent.slice(0, 200), usedTools: fallbackTools, responseTimeMs: fbTimeMs, via: `Bedrock Direct (fallback)` }).catch(() => {});
+        saveConversation({ id: `${Date.now()}`, userId: currentUser.email, timestamp: new Date().toISOString(), route, gateway: 'bedrock-fallback', question: lastMessage.slice(0, 100), summary: fallbackContent.slice(0, 200), usedTools: fallbackTools, responseTimeMs: fbTimeMs, via: `Bedrock Direct (fallback)` }).catch(() => {});
         send('done', {
           content: fallbackContent, model: modelKey || 'sonnet-4.6',
           via: `Bedrock Direct (fallback from ${config.display})`, queriedResources: [], route,

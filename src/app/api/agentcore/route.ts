@@ -6,6 +6,7 @@ import { execSync } from 'child_process';
 import { getConfig } from '@/lib/app-config';
 import { getStats } from '@/lib/agentcore-stats';
 import { getConversations, searchConversations, getMemoryStats } from '@/lib/agentcore-memory';
+import { getUserFromRequest } from '@/lib/auth-utils';
 
 const REGION = 'ap-northeast-2';
 
@@ -36,18 +37,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(getStats());
   }
 
-  // 대화 이력 조회 / Conversation history
+  // 대화 이력 조회 (사용자별) / Conversation history (per user)
   if (action === 'conversations') {
     const limit = parseInt(searchParams.get('limit') || '20');
-    const conversations = await getConversations(limit);
-    return NextResponse.json({ conversations });
+    const user = getUserFromRequest(request);
+    const conversations = await getConversations(limit, user.email);
+    return NextResponse.json({ conversations, user: user.email });
   }
 
-  // 대화 검색 / Search conversations
+  // 대화 검색 (사용자별) / Search conversations (per user)
   if (action === 'search') {
     const query = searchParams.get('q') || '';
-    const conversations = await searchConversations(query);
-    return NextResponse.json({ conversations });
+    const user = getUserFromRequest(request);
+    const conversations = await searchConversations(query, 10, user.email);
+    return NextResponse.json({ conversations, user: user.email });
   }
 
   // 메모리 통계 / Memory stats

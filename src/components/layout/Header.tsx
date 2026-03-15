@@ -1,6 +1,6 @@
 'use client';
 
-import { RefreshCw, LogOut } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 
 interface HeaderProps {
@@ -51,17 +51,6 @@ export default function Header({ title, subtitle, onRefresh }: HeaderProps) {
           <span className="w-1.5 h-1.5 rounded-full bg-accent-green animate-pulse" />
           ONLINE
         </span>
-
-        <button
-          onClick={async () => {
-            await fetch('/awsops/api/auth', { method: 'POST' });
-            window.location.href = '/awsops';
-          }}
-          className="p-2 rounded-lg bg-navy-700 border border-navy-600 text-gray-400 hover:text-accent-red hover:border-accent-red/50 transition-colors"
-          title="Sign Out"
-        >
-          <LogOut size={16} />
-        </button>
       </div>
     </header>
   );

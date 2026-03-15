@@ -28,6 +28,7 @@ import {
   HardDrive,
   Radio,
   Search,
+  LogOut,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -145,12 +146,22 @@ export default function Sidebar() {
 
   return (
     <aside className="w-60 min-w-[240px] h-screen bg-navy-800 border-r border-navy-600 flex flex-col shrink-0">
-      {/* Logo */}
-      <div className="px-5 py-4 border-b border-navy-600">
-        <h1 className="text-2xl font-bold text-accent-cyan tracking-tight">
-          AWSops
-        </h1>
-        <p className="text-xs text-gray-500 mt-0.5">Cloud Operations Dashboard</p>
+      {/* Logo + Sign Out */}
+      <div className="px-5 py-4 border-b border-navy-600 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-accent-cyan tracking-tight">AWSops</h1>
+          <p className="text-xs text-gray-500 mt-0.5">Cloud Operations Dashboard</p>
+        </div>
+        <button
+          onClick={async () => {
+            await fetch('/awsops/api/auth', { method: 'POST' });
+            window.location.href = '/awsops';
+          }}
+          className="p-2 rounded-lg text-gray-500 hover:text-accent-red hover:bg-navy-700 transition-colors"
+          title="Sign Out"
+        >
+          <LogOut size={16} />
+        </button>
       </div>
 
       {/* Navigation */}

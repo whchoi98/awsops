@@ -13,6 +13,7 @@ const MAX_CONVERSATIONS = 100; // 최대 대화 수 / Max conversations stored
 
 export interface ConversationRecord {
   id: string;
+  userId: string;          // Cognito 사용자 ID (email) / Cognito user ID (email)
   timestamp: string;
   route: string;
   gateway: string;
@@ -68,20 +69,23 @@ export async function saveConversation(record: ConversationRecord): Promise<void
   }
 }
 
-// 대화 이력 조회 / Get conversation history
-export async function getConversations(limit = 20): Promise<ConversationRecord[]> {
-  return getLocalConversations(limit);
+// 대화 이력 조회 (사용자별) / Get conversation history (per user)
+export async function getConversations(limit = 20, userId?: string): Promise<ConversationRecord[]> {
+  const all = getLocalConversations(MAX_CONVERSATIONS);
+  const filtered = userId ? all.filter(c => c.userId === userId) : all;
+  return filtered.slice(0, limit);
 }
 
-// 키워드 검색 / Search by keyword
-export async function searchConversations(query: string, limit = 10): Promise<ConversationRecord[]> {
+// 키워드 검색 (사용자별) / Search by keyword (per user)
+export async function searchConversations(query: string, limit = 10, userId?: string): Promise<ConversationRecord[]> {
   const all = getLocalConversations(MAX_CONVERSATIONS);
   const q = query.toLowerCase();
   return all.filter(c =>
-    c.question.toLowerCase().includes(q) ||
+    (!userId || c.userId === userId) &&
+    (c.question.toLowerCase().includes(q) ||
     c.summary.toLowerCase().includes(q) ||
     c.route.includes(q) ||
-    c.usedTools.some(t => t.toLowerCase().includes(q))
+    c.usedTools.some(t => t.toLowerCase().includes(q)))
   ).slice(0, limit);
 }
 
