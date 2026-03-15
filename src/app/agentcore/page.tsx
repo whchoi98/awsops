@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Header from '@/components/layout/Header';
 import StatsCard from '@/components/dashboard/StatsCard';
-import { Activity, Cpu, Wifi, Box, Shield, DollarSign, Database, Network, Terminal, Zap, BarChart3, Clock, Wrench } from 'lucide-react';
+import { Activity, Cpu, Wifi, Box, Shield, DollarSign, Database, Network, Terminal, Zap, BarChart3, Clock, Wrench, MessageSquare, Search } from 'lucide-react';
 
 const GATEWAY_ICONS: Record<string, any> = {
   network: Network, container: Box, iac: Terminal, data: Database,
@@ -18,6 +18,8 @@ const GATEWAY_TOOLS: Record<string, number> = {
 export default function AgentCorePage() {
   const [status, setStatus] = useState<any>(null);
   const [stats, setStats] = useState<any>(null);
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [memorySearch, setMemorySearch] = useState('');
   const [loading, setLoading] = useState(true);
 
   const fetchStatus = () => {
@@ -25,10 +27,24 @@ export default function AgentCorePage() {
     Promise.all([
       fetch('/awsops/api/agentcore').then(r => r.json()),
       fetch('/awsops/api/agentcore?action=stats').then(r => r.json()),
-    ]).then(([statusData, statsData]) => {
+      fetch('/awsops/api/agentcore?action=conversations&limit=20').then(r => r.json()),
+    ]).then(([statusData, statsData, convData]) => {
       if (!statusData.error) setStatus(statusData);
       setStats(statsData);
+      setConversations(convData.conversations || []);
     }).catch(() => {}).finally(() => setLoading(false));
+  };
+
+  const searchMemory = async () => {
+    if (!memorySearch.trim()) {
+      const res = await fetch('/awsops/api/agentcore?action=conversations&limit=20');
+      const data = await res.json();
+      setConversations(data.conversations || []);
+      return;
+    }
+    const res = await fetch(`/awsops/api/agentcore?action=search&q=${encodeURIComponent(memorySearch)}`);
+    const data = await res.json();
+    setConversations(data.conversations || []);
   };
 
   useEffect(() => { fetchStatus(); }, []);
@@ -182,6 +198,62 @@ export default function AgentCorePage() {
             );
           })}
         </div>
+      </div>
+
+      {/* 대화 이력 / Conversation History (Memory) */}
+      <div className="bg-navy-800 rounded-lg border border-navy-600 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+            <MessageSquare size={16} className="text-accent-cyan" /> 대화 이력 ({conversations.length}건)
+          </h3>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
+              <input type="text" placeholder="검색..." value={memorySearch}
+                onChange={e => setMemorySearch(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && searchMemory()}
+                className="pl-8 pr-3 py-1.5 bg-navy-900 border border-navy-600 rounded-lg text-xs text-gray-300 placeholder-gray-600 w-48 focus:outline-none focus:border-accent-cyan/50" />
+            </div>
+            <button onClick={searchMemory}
+              className="px-3 py-1.5 text-xs bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20 rounded-lg hover:bg-accent-cyan/20 transition-colors">
+              검색
+            </button>
+          </div>
+        </div>
+
+        {conversations.length === 0 ? (
+          <p className="text-gray-500 text-sm text-center py-6">아직 대화 이력이 없습니다. AI Assistant에서 질문해보세요.</p>
+        ) : (
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {conversations.map((conv: any, i: number) => (
+              <div key={conv.id || i} className="bg-navy-900 rounded-lg p-3 border border-navy-700 hover:border-navy-500 transition-colors">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-white font-medium truncate">{conv.question}</p>
+                    <p className="text-xs text-gray-400 mt-1 line-clamp-2">{conv.summary}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className="text-[10px] font-mono text-gray-500">
+                      {conv.timestamp ? new Date(conv.timestamp).toLocaleString() : ''}
+                    </span>
+                    <span className="text-[10px] font-mono text-accent-cyan">
+                      {(conv.responseTimeMs / 1000).toFixed(1)}s
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="px-1.5 py-0.5 rounded bg-accent-cyan/10 text-accent-cyan text-[10px] font-mono border border-accent-cyan/20">
+                    {conv.route}
+                  </span>
+                  <span className="text-[10px] text-gray-500">{conv.via}</span>
+                  {conv.usedTools?.length > 0 && (
+                    <span className="text-[10px] text-gray-600">{conv.usedTools.length} tools</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Gateway Tools / 게이트웨이 도구 목록 */}

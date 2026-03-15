@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { execSync } from 'child_process';
 import { getConfig } from '@/lib/app-config';
 import { getStats } from '@/lib/agentcore-stats';
+import { getConversations, searchConversations, getMemoryStats } from '@/lib/agentcore-memory';
 
 const REGION = 'ap-northeast-2';
 
@@ -27,10 +28,31 @@ function awsCli(cmd: string): any {
 }
 
 export async function GET(request: NextRequest) {
-  // 통계 조회 / Stats query
   const { searchParams } = new URL(request.url);
-  if (searchParams.get('action') === 'stats') {
+  const action = searchParams.get('action');
+
+  // 통계 조회 / Stats query
+  if (action === 'stats') {
     return NextResponse.json(getStats());
+  }
+
+  // 대화 이력 조회 / Conversation history
+  if (action === 'conversations') {
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const conversations = await getConversations(limit);
+    return NextResponse.json({ conversations });
+  }
+
+  // 대화 검색 / Search conversations
+  if (action === 'search') {
+    const query = searchParams.get('q') || '';
+    const conversations = await searchConversations(query);
+    return NextResponse.json({ conversations });
+  }
+
+  // 메모리 통계 / Memory stats
+  if (action === 'memory-stats') {
+    return NextResponse.json(getMemoryStats());
   }
 
   try {

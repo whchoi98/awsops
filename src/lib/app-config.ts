@@ -7,6 +7,8 @@ export interface AppConfig {
   costEnabled: boolean;
   agentRuntimeArn?: string;
   codeInterpreterName?: string;
+  memoryId?: string;
+  memoryName?: string;
 }
 
 const DEFAULT_CONFIG: AppConfig = { costEnabled: true };
