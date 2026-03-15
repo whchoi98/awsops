@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Header from '@/components/layout/Header';
 import StatsCard from '@/components/dashboard/StatsCard';
-import { Activity, Cpu, Wifi, Box, Shield, DollarSign, Database, Network, Terminal, Zap } from 'lucide-react';
+import { Activity, Cpu, Wifi, Box, Shield, DollarSign, Database, Network, Terminal, Zap, BarChart3, Clock, Wrench } from 'lucide-react';
 
 const GATEWAY_ICONS: Record<string, any> = {
   network: Network, container: Box, iac: Terminal, data: Database,
@@ -17,15 +17,18 @@ const GATEWAY_TOOLS: Record<string, number> = {
 
 export default function AgentCorePage() {
   const [status, setStatus] = useState<any>(null);
+  const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchStatus = () => {
     setLoading(true);
-    fetch('/awsops/api/agentcore')
-      .then(r => r.json())
-      .then(d => { if (!d.error) setStatus(d); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    Promise.all([
+      fetch('/awsops/api/agentcore').then(r => r.json()),
+      fetch('/awsops/api/agentcore?action=stats').then(r => r.json()),
+    ]).then(([statusData, statsData]) => {
+      if (!statusData.error) setStatus(statusData);
+      setStats(statsData);
+    }).catch(() => {}).finally(() => setLoading(false));
   };
 
   useEffect(() => { fetchStatus(); }, []);
@@ -57,6 +60,77 @@ export default function AgentCorePage() {
         <StatsCard label="Code Interpreter" value="Active" icon={Terminal} color="purple"
           change={status?.codeInterpreter?.id?.slice(-10) || ''} />
       </div>
+
+      {/* AI 사용 통계 / AI Usage Stats */}
+      {stats && stats.totalCalls > 0 && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <StatsCard label="총 호출" value={stats.totalCalls} icon={BarChart3} color="cyan"
+              change={`${stats.successCalls} 성공 · ${stats.failedCalls} 실패`} />
+            <StatsCard label="평균 응답 시간" value={`${(stats.avgResponseTimeMs / 1000).toFixed(1)}s`} icon={Clock} color="purple"
+              change={stats.totalCalls > 0 ? `${stats.totalCalls}건 평균` : ''} />
+            <StatsCard label="사용된 도구" value={stats.uniqueToolsUsed?.length || 0} icon={Wrench} color="green"
+              change={`총 ${stats.totalToolsUsed || 0}회 호출`} />
+            <StatsCard label="성공률" value={`${stats.totalCalls > 0 ? ((stats.successCalls / stats.totalCalls) * 100).toFixed(0) : 0}%`} icon={Activity}
+              color={stats.successCalls / stats.totalCalls >= 0.8 ? 'green' : 'orange'}
+              change={`${stats.successCalls}/${stats.totalCalls}`} />
+            <StatsCard label="멀티 라우트" value={Object.keys(stats.callsByGateway || {}).filter(k => k.startsWith('multi:')).length > 0 ? Object.entries(stats.callsByGateway || {}).filter(([k]) => k.startsWith('multi:')).reduce((s, [, v]) => s + (v as number), 0) : 0} icon={Wifi} color="orange"
+              change="병렬 Gateway 호출" />
+            <StatsCard label="Steampipe SQL" value={stats.callsByGateway?.steampipe || 0} icon={Database} color="cyan"
+              change="aws-data 라우트" />
+          </div>
+
+          {/* 라우트별 호출 분포 / Calls by route */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="bg-navy-800 rounded-lg border border-navy-600 p-5">
+              <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                <BarChart3 size={16} className="text-accent-cyan" /> 라우트별 호출 수
+              </h3>
+              <div className="space-y-2">
+                {Object.entries(stats.callsByRoute || {}).sort(([, a], [, b]) => (b as number) - (a as number)).map(([route, count]) => {
+                  const pct = stats.totalCalls > 0 ? ((count as number) / stats.totalCalls) * 100 : 0;
+                  return (
+                    <div key={route} className="flex items-center gap-3">
+                      <span className="text-xs text-gray-400 w-20 truncate">{route}</span>
+                      <div className="flex-1 h-2 bg-navy-600 rounded-full overflow-hidden">
+                        <div className="h-full bg-accent-cyan rounded-full" style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="text-xs font-mono text-white w-8 text-right">{count as number}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 최근 호출 / Recent calls */}
+            <div className="bg-navy-800 rounded-lg border border-navy-600 p-5">
+              <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                <Clock size={16} className="text-accent-cyan" /> 최근 호출 (최대 10건)
+              </h3>
+              <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                {(stats.recentCalls || []).slice(0, 10).map((call: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between bg-navy-900 rounded p-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-1.5 h-1.5 rounded-full ${call.success ? 'bg-accent-green' : 'bg-accent-red'}`} />
+                      <span className="text-gray-300">{call.route}</span>
+                      {call.usedTools?.length > 0 && (
+                        <span className="text-gray-500">({call.usedTools.length} tools)</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-gray-400">{(call.responseTimeMs / 1000).toFixed(1)}s</span>
+                      <span className="text-gray-600 text-[10px]">{new Date(call.timestamp).toLocaleTimeString()}</span>
+                    </div>
+                  </div>
+                ))}
+                {(!stats.recentCalls || stats.recentCalls.length === 0) && (
+                  <p className="text-gray-500 text-center py-3">아직 호출 기록이 없습니다</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Runtime Detail / 런타임 상세 */}
       {status?.runtime && (

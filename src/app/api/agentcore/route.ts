@@ -1,9 +1,10 @@
 // AgentCore Status API — Runtime, Gateways, Code Interpreter status
 // AgentCore 상태 API — 런타임, 게이트웨이, 코드 인터프리터 상태
 // Note: Uses execSync with fixed CLI commands only (no user input) / 고정 CLI 명령만 사용 (사용자 입력 없음)
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { execSync } from 'child_process';
 import { getConfig } from '@/lib/app-config';
+import { getStats } from '@/lib/agentcore-stats';
 
 const REGION = 'ap-northeast-2';
 
@@ -25,7 +26,13 @@ function awsCli(cmd: string): any {
   } catch { return null; }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // 통계 조회 / Stats query
+  const { searchParams } = new URL(request.url);
+  if (searchParams.get('action') === 'stats') {
+    return NextResponse.json(getStats());
+  }
+
   try {
     // Parallel fetch via CLI / CLI로 병렬 조회
     const [runtimeRaw, gatewaysRaw] = await Promise.all([

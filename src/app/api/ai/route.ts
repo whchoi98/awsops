@@ -14,6 +14,7 @@ import {
 } from '@aws-sdk/client-bedrock-agentcore';
 import { runQuery } from '@/lib/steampipe';
 import { getConfig } from '@/lib/app-config';
+import { recordCall } from '@/lib/agentcore-stats';
 
 // Service configuration — config 파일에서 읽거나 자동 감지
 // Service config — read from data/config.json or auto-detect
@@ -653,6 +654,7 @@ export async function POST(request: NextRequest) {
       const send = (event: string, data: any) => {
         controller.enqueue(encoder.encode(sseEvent(event, data)));
       };
+      const callStartTime = Date.now();
 
       try {
         // Step 1: Classify intent (multi-route) / 1단계: 의도 분류 (멀티 라우트)
@@ -739,8 +741,9 @@ export async function POST(request: NextRequest) {
             const result = JSON.parse(new TextDecoder().decode(response.body));
             const sqlContent = result.content?.[0]?.text || 'No response';
             const sqlTools = extractUsedTools(sqlContent);
-            // SQL 쿼리에서 테이블명도 도구로 추가 / Add table name from SQL as tool
             if (sql) sqlTools.push(`steampipe: ${sql.match(/FROM\s+(\w+)/i)?.[1] || 'query'}`);
+            const sqlTimeMs = Date.now() - callStartTime;
+            recordCall({ timestamp: new Date().toISOString(), route, gateway: 'steampipe', responseTimeMs: sqlTimeMs, usedTools: sqlTools, success: true, via: `${config.display} (${queryResult.rowCount} rows)` });
             send('done', {
               content: sqlContent, model: modelKey || 'sonnet-4.6',
               via: `${config.display} (${queryResult.rowCount} rows)`, queriedResources: ['steampipe'], route,
@@ -780,6 +783,8 @@ export async function POST(request: NextRequest) {
             const synthesizedTools = extractUsedTools(synthesized);
             const finalTools = Array.from(new Set([...dedupedTools, ...synthesizedTools]));
             const viaList = successful.map(s => s.via).join(' + ');
+            const multiTimeMs = Date.now() - callStartTime;
+            recordCall({ timestamp: new Date().toISOString(), route, gateway: `multi:${routes.join('+')}`, responseTimeMs: multiTimeMs, usedTools: finalTools, success: true, via: `Multi-Route: ${viaList}` });
             send('done', {
               content: synthesized, model: modelKey || 'sonnet-4.6',
               via: `Multi-Route: ${viaList}`, queriedResources: allResources, route, routes,
@@ -831,6 +836,8 @@ export async function POST(request: NextRequest) {
             .replace(/<tool_call>[\s\S]*?<\/tool_call>\s*/g, '')
             .replace(/<tool_response>[\s\S]*?<\/tool_response>\s*/g, '')
             .trim();
+          const responseTimeMs = Date.now() - callStartTime;
+          recordCall({ timestamp: new Date().toISOString(), route, gateway, responseTimeMs, usedTools, success: true, via: `AgentCore → ${config.display}` });
           send('done', {
             content: cleanedResponse || agentResponse, model: 'sonnet-4.6',
             via: `AgentCore → ${config.display}`, queriedResources: [`${gateway}-gateway`], route, routes,
@@ -853,6 +860,8 @@ export async function POST(request: NextRequest) {
         const result = JSON.parse(new TextDecoder().decode(response.body));
         const fallbackContent = result.content?.[0]?.text || 'No response';
         const fallbackTools = extractUsedTools(fallbackContent);
+        const fbTimeMs = Date.now() - callStartTime;
+        recordCall({ timestamp: new Date().toISOString(), route, gateway: 'bedrock-fallback', responseTimeMs: fbTimeMs, usedTools: fallbackTools, success: false, via: `Bedrock Direct (fallback from ${config.display})` });
         send('done', {
           content: fallbackContent, model: modelKey || 'sonnet-4.6',
           via: `Bedrock Direct (fallback from ${config.display})`, queriedResources: [], route,
