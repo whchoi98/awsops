@@ -506,20 +506,65 @@ async function streamToString(stream: any): Promise<string> {
 // ============================================================================
 // Tool usage extraction / 사용된 도구 추출
 // ============================================================================
+// 알려진 MCP 도구 이름 (125개 중 주요 도구) / Known MCP tool names for matching
+const KNOWN_TOOLS = new Set([
+  // Network (17)
+  'get_path_trace_methodology', 'find_ip_address', 'get_eni_details', 'list_vpcs',
+  'get_vpc_network_details', 'get_vpc_flow_logs', 'describe_network', 'list_transit_gateways',
+  'get_tgw_details', 'get_tgw_routes', 'get_all_tgw_routes', 'list_tgw_peerings',
+  'list_vpn_connections', 'list_network_firewalls', 'get_firewall_rules',
+  'analyze_reachability', 'query_flow_logs',
+  // Container (24)
+  'list_eks_clusters', 'get_eks_vpc_config', 'get_eks_insights', 'get_cloudwatch_logs',
+  'get_cloudwatch_metrics', 'get_eks_metrics_guidance', 'get_policies_for_role',
+  'search_eks_troubleshoot_guide', 'generate_app_manifest',
+  'ecs_resource_management', 'ecs_troubleshooting_tool', 'wait_for_service_ready',
+  'istio_overview', 'list_virtual_services', 'list_destination_rules', 'list_istio_gateways',
+  'list_service_entries', 'list_authorization_policies', 'list_peer_authentications',
+  'check_sidecar_injection', 'list_envoy_filters', 'list_istio_crds', 'istio_troubleshooting', 'query_istio_resource',
+  // IaC (12)
+  'validate_cloudformation_template', 'check_cloudformation_template_compliance',
+  'troubleshoot_cloudformation_deployment', 'search_cdk_documentation',
+  'search_cloudformation_documentation', 'cdk_best_practices', 'read_iac_documentation_page',
+  'SearchAwsProviderDocs', 'SearchAwsccProviderDocs', 'SearchSpecificAwsIaModules',
+  'SearchUserProvidedModule', 'terraform_best_practices',
+  // Data (24)
+  'list_tables', 'describe_table', 'query_table', 'get_item', 'dynamodb_data_modeling', 'compute_performances_and_costs',
+  'list_db_instances', 'list_db_clusters', 'describe_db_instance', 'describe_db_cluster', 'execute_sql', 'list_snapshots',
+  'list_cache_clusters', 'describe_cache_cluster', 'list_replication_groups', 'describe_replication_group',
+  'list_serverless_caches', 'elasticache_best_practices',
+  'list_clusters', 'get_cluster_info', 'get_configuration_info', 'get_bootstrap_brokers', 'list_nodes', 'msk_best_practices',
+  // Security (14)
+  'list_users', 'get_user', 'list_roles', 'get_role_details', 'list_groups', 'get_group',
+  'list_policies', 'list_user_policies', 'list_role_policies', 'get_user_policy', 'get_role_policy',
+  'list_access_keys', 'simulate_principal_policy', 'get_account_security_summary',
+  // Monitoring (16)
+  'get_metric_data', 'get_metric_metadata', 'analyze_metric', 'get_recommended_metric_alarms',
+  'get_active_alarms', 'get_alarm_history', 'describe_log_groups', 'analyze_log_group',
+  'execute_log_insights_query', 'get_logs_insight_query_results', 'cancel_logs_insight_query',
+  'lookup_events', 'list_event_data_stores', 'lake_query', 'get_query_status', 'get_query_results',
+  // Cost (9)
+  'get_today_date', 'get_cost_and_usage', 'get_cost_and_usage_comparisons',
+  'get_cost_comparison_drivers', 'get_cost_forecast', 'get_dimension_values',
+  'get_tag_values', 'get_pricing', 'list_budgets',
+  // Ops (9)
+  'search_documentation', 'read_documentation', 'recommend', 'list_regions',
+  'get_regional_availability', 'prompt_understanding', 'call_aws', 'suggest_aws_commands', 'run_steampipe_query',
+]);
+
 function extractUsedTools(rawResponse: string): string[] {
   const tools = new Set<string>();
   let m: RegExpExecArray | null;
-  // <tool_call> 태그에서 도구 이름 추출 / Extract tool names from <tool_call> tags
+  // 1. <tool_call> 태그 / <tool_call> tags
   const callRegex = /<tool_call>\s*\{[^}]*"name"\s*:\s*"([^"]+)"/g;
   while ((m = callRegex.exec(rawResponse)) !== null) tools.add(m[1]);
-  // tool_name 형식에서도 추출 / Also extract from tool_name format
+  // 2. "tool_name" 필드 / "tool_name" field
   const useRegex = /"tool_name"\s*:\s*"([^"]+)"/g;
   while ((m = useRegex.exec(rawResponse)) !== null) tools.add(m[1]);
-  // 단순 함수 호출 패턴 / Simple function call patterns
-  const funcRegex = /(?:calling|using|called)\s+['"]?([a-z][a-z0-9_]+)['"]?/gi;
-  while ((m = funcRegex.exec(rawResponse)) !== null) {
-    const name = m[1].toLowerCase();
-    if (name.length > 3 && !['true', 'false', 'null', 'none', 'this', 'that', 'with'].includes(name)) tools.add(name);
+  // 3. 백틱으로 감싼 도구 이름 (응답 텍스트에서) / Backtick-wrapped tool names in response text
+  const backtickRegex = /`([a-z][a-z0-9_]+)`/g;
+  while ((m = backtickRegex.exec(rawResponse)) !== null) {
+    if (KNOWN_TOOLS.has(m[1])) tools.add(m[1]);
   }
   return Array.from(tools);
 }
@@ -805,11 +850,6 @@ async function handleSingleRoute(
   const agentResponse = await invokeAgentCore(messages, gateway);
   if (agentResponse) {
     const usedTools = extractUsedTools(agentResponse);
-    // 디버그: raw 응답에서 도구 패턴 로깅 / Debug: log tool patterns in raw response
-    console.log(`[Tools Debug] gateway=${gateway}, extracted=${usedTools.length}, raw_length=${agentResponse.length}`);
-    console.log(`[Tools Debug] has_tool_call=${agentResponse.includes('<tool_call>')}, has_tool_use=${agentResponse.includes('tool_use')}, has_tool_name=${agentResponse.includes('tool_name')}`);
-    // raw에서 첫 500자 출력 / Print first 500 chars of raw
-    console.log(`[Tools Debug] raw_start: ${agentResponse.substring(0, 500).replace(/\n/g, '\\n')}`);
     const cleaned = agentResponse.replace(/<tool_call>[\s\S]*?<\/tool_call>\s*/g, '').replace(/<tool_response>[\s\S]*?<\/tool_response>\s*/g, '').trim();
     return { content: cleaned || agentResponse, via: `AgentCore → ${config.display}`, queriedResources: [`${gateway}-gateway`], usedTools };
   }
