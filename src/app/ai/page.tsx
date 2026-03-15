@@ -414,13 +414,14 @@ export default function AIPage() {
       <div className="border-t border-navy-600">
         <button
           onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadHistory(); }}
-          className="w-full px-6 py-2 flex items-center justify-between bg-navy-900/30 hover:bg-navy-900/60 transition-colors"
+          className="w-full px-6 py-3.5 flex items-center justify-between bg-navy-800/80 hover:bg-navy-700/80 transition-colors"
         >
-          <span className="flex items-center gap-2 text-xs text-gray-400">
-            <History size={12} />
-            대화 이력 ({historyData.length}건)
+          <span className="flex items-center gap-3 text-sm font-medium text-gray-300">
+            <History size={16} className="text-accent-cyan" />
+            대화 이력
+            <span className="px-2 py-0.5 rounded-full bg-accent-cyan/15 text-accent-cyan text-xs font-mono">{historyData.length}건</span>
           </span>
-          {showHistory ? <ChevronDown size={14} className="text-gray-500" /> : <ChevronUp size={14} className="text-gray-500" />}
+          {showHistory ? <ChevronDown size={18} className="text-gray-400" /> : <ChevronUp size={18} className="text-gray-400" />}
         </button>
 
         {showHistory && (
