@@ -10,12 +10,14 @@ import DataTable from '@/components/table/DataTable';
 import { Database, X, HardDrive, Network, Shield, Tag, Activity, Search } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
 import { queries as rdsQ } from '@/lib/queries/rds';
+import { useAccountContext } from '@/contexts/AccountContext';
 
 interface PageData {
   [key: string]: { rows: Record<string, unknown>[]; error?: string };
 }
 
 export default function RDSPage() {
+  const { currentAccountId, isMultiAccount } = useAccountContext();
   const [data, setData] = useState<PageData>({});
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<any>(null);
@@ -32,6 +34,7 @@ export default function RDSPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          accountId: currentAccountId,
           queries: {
             summary: rdsQ.summary,
             engineDistribution: rdsQ.engineDistribution,
@@ -56,7 +59,7 @@ export default function RDSPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentAccountId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -327,6 +330,9 @@ export default function RDSPage() {
                 </div>
 
                 <Section title="Instance" icon={Database}>
+                  {selected.account_id && isMultiAccount && (
+                    <Row label="Account" value={selected.account_id} />
+                  )}
                   <Row label="Identifier" value={selected.db_instance_identifier} />
                   <Row label="Engine" value={selected.engine} />
                   <Row label="Version" value={selected.engine_version} />

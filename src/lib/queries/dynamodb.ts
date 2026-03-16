@@ -11,6 +11,7 @@ export const queries = {
 
   detail: `
     SELECT
+      account_id,
       name,
       arn,
       table_status,
@@ -33,6 +34,7 @@ export const queries = {
 
   tableList: `
     SELECT
+      account_id,
       name,
       table_status,
       billing_mode,

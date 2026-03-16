@@ -3,6 +3,21 @@ import { resolve, dirname } from 'path';
 
 const CONFIG_PATH = resolve(process.cwd(), 'data/config.json');
 
+export interface AccountFeatures {
+  costEnabled: boolean;
+  eksEnabled: boolean;
+  k8sEnabled: boolean;
+}
+
+export interface AccountConfig {
+  accountId: string;
+  alias: string;
+  connectionName: string;
+  profile?: string;
+  region: string;
+  features: AccountFeatures;
+}
+
 export interface AppConfig {
   costEnabled: boolean;
   agentRuntimeArn?: string;
@@ -10,6 +25,7 @@ export interface AppConfig {
   memoryId?: string;
   memoryName?: string;
   steampipePassword?: string;
+  accounts?: AccountConfig[];
 }
 
 const DEFAULT_CONFIG: AppConfig = { costEnabled: true };
@@ -31,6 +47,32 @@ export function getConfig(): AppConfig {
   } catch {
     return DEFAULT_CONFIG;
   }
+}
+
+export const ALL_ACCOUNTS = '__all__';
+
+export function getAccounts(): AccountConfig[] {
+  return getConfig().accounts || [];
+}
+
+export function isMultiAccount(): boolean {
+  return getAccounts().length > 1;
+}
+
+export function getAccountFeatures(accountId: string): AccountFeatures {
+  const accounts = getAccounts();
+  if (!accounts.length) {
+    return { costEnabled: getConfig().costEnabled, eksEnabled: true, k8sEnabled: true };
+  }
+  if (accountId === ALL_ACCOUNTS) {
+    return {
+      costEnabled: accounts.some(a => a.features.costEnabled),
+      eksEnabled: accounts.some(a => a.features.eksEnabled),
+      k8sEnabled: accounts.some(a => a.features.k8sEnabled),
+    };
+  }
+  const account = accounts.find(a => a.accountId === accountId);
+  return account?.features || { costEnabled: false, eksEnabled: false, k8sEnabled: false };
 }
 
 export function saveConfig(config: Partial<AppConfig>): void {

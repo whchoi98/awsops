@@ -7,6 +7,7 @@ import boto3
 import urllib.request
 import re
 import html
+from cross_account import get_client
 
 
 # Static content tools / 정적 콘텐츠 도구
@@ -56,10 +57,10 @@ PRE_DEPLOY_VALIDATION = """# CloudFormation Pre-Deploy Validation
 """
 
 
-def validate_cfn_template(template_content, region='ap-northeast-2'):
+def validate_cfn_template(template_content, region='ap-northeast-2', role_arn=None):
     """Validate CloudFormation template using AWS API. / AWS API를 사용하여 CloudFormation 템플릿을 검증합니다."""
     # Create CloudFormation client / CloudFormation 클라이언트 생성
-    cfn = boto3.client('cloudformation', region_name=region)
+    cfn = get_client('cloudformation', region, role_arn)
     try:
         # Call AWS CloudFormation validate API / AWS CloudFormation 검증 API 호출
         resp = cfn.validate_template(TemplateBody=template_content)
@@ -76,9 +77,9 @@ def validate_cfn_template(template_content, region='ap-northeast-2'):
         return {'valid': False, 'error': str(e)}
 
 
-def troubleshoot_cfn_deployment(stack_name, region='ap-northeast-2'):
+def troubleshoot_cfn_deployment(stack_name, region='ap-northeast-2', role_arn=None):
     """Troubleshoot CloudFormation deployment failures. / CloudFormation 배포 실패를 진단합니다."""
-    cfn = boto3.client('cloudformation', region_name=region)
+    cfn = get_client('cloudformation', region, role_arn)
     try:
         # Get stack info / 스택 정보 조회
         stack = cfn.describe_stacks(StackName=stack_name)['Stacks'][0]
@@ -182,6 +183,9 @@ def lambda_handler(event, context):
     params = event if isinstance(event, dict) else json.loads(event)
     tool_name = params.get("tool_name", "")
     args = params.get("arguments", params)
+    region = args.get("region", "ap-northeast-2")
+    target_account_id = args.get('target_account_id')
+    role_arn = f'arn:aws:iam::{target_account_id}:role/AWSopsReadOnlyRole' if target_account_id else None
 
     # Infer tool from parameters if not specified / 도구명이 없으면 파라미터로 추론
     if not tool_name:
@@ -201,7 +205,7 @@ def lambda_handler(event, context):
 
     # Tool handler: validate CloudFormation template / 도구 핸들러: CloudFormation 템플릿 검증
     if tool_name == "validate_cloudformation_template":
-        result = validate_cfn_template(args.get("template_content", ""), args.get("region", "ap-northeast-2"))
+        result = validate_cfn_template(args.get("template_content", ""), region, role_arn)
         return {"statusCode": 200, "body": json.dumps(result, default=str)}
 
     # Tool handler: check template compliance / 도구 핸들러: 템플릿 규정 준수 확인
@@ -215,12 +219,12 @@ def lambda_handler(event, context):
             issues.append({"severity": "HIGH", "rule": "no-public-access", "message": "PubliclyAccessible is true"})
         if "Encrypted" not in tmpl and ("AWS::RDS" in tmpl or "AWS::EBS" in tmpl):
             issues.append({"severity": "MEDIUM", "rule": "encryption-required", "message": "Encryption not explicitly enabled"})
-        validation = validate_cfn_template(tmpl)
+        validation = validate_cfn_template(tmpl, region, role_arn)
         return {"statusCode": 200, "body": json.dumps({"validation": validation, "compliance_issues": issues}, default=str)}
 
     # Tool handler: troubleshoot deployment failures / 도구 핸들러: 배포 실패 문제 해결
     elif tool_name == "troubleshoot_cloudformation_deployment":
-        result = troubleshoot_cfn_deployment(args.get("stack_name", ""), args.get("region", "ap-northeast-2"))
+        result = troubleshoot_cfn_deployment(args.get("stack_name", ""), region, role_arn)
         return {"statusCode": 200, "body": json.dumps(result, default=str)}
 
     # Tool handler: pre-deploy validation instructions / 도구 핸들러: 배포 전 검증 안내

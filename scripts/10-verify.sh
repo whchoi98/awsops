@@ -5,11 +5,13 @@ set -e
 #   Step 9: Verification & Health Check                                        #
 #                                                                              #
 #   Checks:                                                                    #
-#     [1/5] Services   - Steampipe, Next.js                                    #
-#     [2/5] Queries    - 18 Steampipe tables via API                           #
-#     [3/5] Pages      - 20+ dashboard pages (HTTP 200)                        #
-#     [4/5] APIs       - steampipe, benchmark, ai, code                        #
-#     [5/5] Config     - basePath, eslint, aws.spc, fetch URLs                 #
+#     [1/7] Services   - Steampipe, Next.js                                    #
+#     [2/7] Queries    - 18 Steampipe tables via API                           #
+#     [3/7] Pages      - 20+ dashboard pages (HTTP 200)                        #
+#     [4/7] APIs       - steampipe, benchmark, ai, code                        #
+#     [5/7] Config     - basePath, eslint, aws.spc, fetch URLs                 #
+#     [6/7] Multi-Acct - aggregator, accounts[], API endpoint                  #
+#     [7/7] IAM        - Lambda role sts:AssumeRole                            #
 #                                                                              #
 #   Summary: N passed, N failed, N warnings                                    #
 #                                                                              #
@@ -46,8 +48,8 @@ check() {
     fi
 }
 
-# -- [1/5] Services ------------------------------------------------------------
-echo -e "${CYAN}[1/5] Services${NC}"
+# -- [1/7] Services ------------------------------------------------------------
+echo -e "${CYAN}[1/7] Services${NC}"
 
 # Steampipe
 SP=$(steampipe service status 2>&1 | grep -q "running" && echo "OK" || echo "NOT RUNNING")
@@ -57,9 +59,9 @@ check "Steampipe service (port 9193)" "$SP"
 NJ=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/awsops 2>/dev/null)
 check "Next.js server (port 3000)" "$([ "$NJ" = "200" ] && echo OK || echo "HTTP $NJ")"
 
-# -- [2/5] Steampipe Queries --------------------------------------------------
+# -- [2/7] Steampipe Queries --------------------------------------------------
 echo ""
-echo -e "${CYAN}[2/5] Steampipe Queries (18 tables)${NC}"
+echo -e "${CYAN}[2/7] Steampipe Queries (18 tables)${NC}"
 
 test_query() {
     local name="$1" sql="$2"
@@ -107,9 +109,9 @@ test_query "K8s Nodes"    "SELECT COUNT(*) as c FROM kubernetes_node"
 test_query "K8s Pods"     "SELECT COUNT(*) as c FROM kubernetes_pod"
 test_query "Trivy CVE"    "SELECT COUNT(*) as c FROM trivy_scan_vulnerability"
 
-# -- [3/5] Pages ---------------------------------------------------------------
+# -- [3/7] Pages ---------------------------------------------------------------
 echo ""
-echo -e "${CYAN}[3/5] Pages (20+ dashboard pages)${NC}"
+echo -e "${CYAN}[3/7] Pages (20+ dashboard pages)${NC}"
 
 # Auto-discover pages from src/app/*/page.tsx
 PAGES=("")
@@ -125,9 +127,9 @@ for page in "${PAGES[@]}"; do
     check "$LABEL" "$([ "$HTTP" = "200" ] && echo OK || echo "HTTP $HTTP")"
 done
 
-# -- [4/5] API Endpoints ------------------------------------------------------
+# -- [4/7] API Endpoints ------------------------------------------------------
 echo ""
-echo -e "${CYAN}[4/5] API Endpoints${NC}"
+echo -e "${CYAN}[4/7] API Endpoints${NC}"
 
 # Auto-discover API routes and test each
 while IFS= read -r api_route; do
@@ -150,9 +152,9 @@ while IFS= read -r api_route; do
     fi
 done < <(find "$WORK_DIR/src/app/api" -name "route.ts" 2>/dev/null | sort)
 
-# -- [5/5] Configuration ------------------------------------------------------
+# -- [5/7] Configuration ------------------------------------------------------
 echo ""
-echo -e "${CYAN}[5/5] Configuration${NC}"
+echo -e "${CYAN}[5/7] Configuration${NC}"
 
 # basePath
 BP=$(grep -q "basePath.*awsops" "$WORK_DIR/next.config.mjs" 2>/dev/null && echo "OK" || echo "MISSING")
@@ -169,6 +171,70 @@ check "aws.spc ignore_error_codes (SCP fix)" "$SC"
 # fetch URLs with /awsops prefix
 BF=$(grep -r "'/api/steampipe" "$WORK_DIR/src/app/" 2>/dev/null | grep -v "/awsops/api" | wc -l)
 check "fetch URLs all use /awsops prefix" "$([ "$BF" = "0" ] && echo OK || echo "$BF BAD")"
+
+# -- [6/7] Multi-Account Configuration ----------------------------------------
+echo ""
+echo -e "${CYAN}[6/7] Multi-Account Configuration${NC}"
+
+# Check aggregator in aws.spc
+AGG=$(grep -q 'type\s*=\s*"aggregator"' ~/.steampipe/config/aws.spc 2>/dev/null && echo "OK" || echo "MISSING")
+check "aws.spc aggregator connection" "$AGG"
+
+# Check host account connection (aws_XXXXXXXX)
+HOST_CONN=$(grep -q "connection \"aws_${ACCOUNT_ID}\"" ~/.steampipe/config/aws.spc 2>/dev/null && echo "OK" || echo "MISSING")
+check "aws.spc host connection (aws_${ACCOUNT_ID})" "$HOST_CONN"
+
+# Check accounts array in config.json
+CONFIG_FILE="$WORK_DIR/data/config.json"
+if [ -f "$CONFIG_FILE" ]; then
+    ACCT_COUNT=$(python3 -c "
+import json
+try:
+    cfg = json.load(open('${CONFIG_FILE}'))
+    accts = cfg.get('accounts', [])
+    print(len(accts))
+except:
+    print(0)
+" 2>/dev/null)
+    check "config.json accounts[] (${ACCT_COUNT} entries)" "$([ "$ACCT_COUNT" -gt 0 ] 2>/dev/null && echo OK || echo "EMPTY")"
+
+    # Check host account in accounts array
+    HOST_IN_ACCTS=$(python3 -c "
+import json
+try:
+    cfg = json.load(open('${CONFIG_FILE}'))
+    found = any(a.get('accountId') == '${ACCOUNT_ID}' for a in cfg.get('accounts', []))
+    print('OK' if found else 'MISSING')
+except:
+    print('MISSING')
+" 2>/dev/null)
+    check "config.json host account (${ACCOUNT_ID}) in accounts[]" "$HOST_IN_ACCTS"
+else
+    check "config.json exists" "MISSING"
+fi
+
+# Test accounts API endpoint (if Next.js is running)
+if [ "$NJ" = "200" ] 2>/dev/null; then
+    ACCT_API=$(curl -s --max-time 5 "http://localhost:3000/awsops/api/steampipe?action=accounts" 2>/dev/null)
+    if echo "$ACCT_API" | python3 -c "import json,sys;d=json.load(sys.stdin);assert 'accounts' in d or isinstance(d, list)" 2>/dev/null; then
+        check "GET /api/steampipe?action=accounts" "OK"
+    elif [ -n "$ACCT_API" ]; then
+        check "GET /api/steampipe?action=accounts" "WARN"
+    else
+        check "GET /api/steampipe?action=accounts" "TIMEOUT"
+    fi
+else
+    check "GET /api/steampipe?action=accounts (Next.js not running)" "WARN"
+fi
+
+# -- [7/7] IAM Permissions (Multi-Account) ------------------------------------
+echo ""
+echo -e "${CYAN}[7/7] IAM Permissions (Multi-Account)${NC}"
+
+# Check Lambda role has sts:AssumeRole
+STS_PERM=$(aws iam get-role-policy --role-name AWSopsLambdaNetworkRole --policy-name FullServiceAccess \
+    --query "PolicyDocument.Statement[*].Action" --output text 2>/dev/null | grep -q "sts:AssumeRole" && echo "OK" || echo "MISSING")
+check "AWSopsLambdaNetworkRole sts:AssumeRole" "$STS_PERM"
 
 # -- Summary -------------------------------------------------------------------
 echo ""

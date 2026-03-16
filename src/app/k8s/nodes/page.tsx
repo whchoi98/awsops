@@ -8,6 +8,7 @@ import BarChartCard from '@/components/charts/BarChartCard';
 import DataTable from '@/components/table/DataTable';
 import { Server, CheckCircle, Cpu, HardDrive } from 'lucide-react';
 import { queries as k8sQ } from '@/lib/queries/k8s';
+import { useAccountContext } from '@/contexts/AccountContext';
 
 interface DashboardData {
   [key: string]: { rows: Record<string, unknown>[]; error?: string };
@@ -80,6 +81,7 @@ function parseMiB(mem: any): number {
 }
 
 export default function K8sNodesPage() {
+  const { currentAccountId } = useAccountContext();
   const [data, setData] = useState<DashboardData>({});
   const [_loading, setLoading] = useState(true);
 
@@ -90,6 +92,7 @@ export default function K8sNodesPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          accountId: currentAccountId,
           queries: {
             nodeSummary: k8sQ.nodeSummary,
             nodeList: NODE_DETAIL_QUERY,
@@ -103,7 +106,7 @@ export default function K8sNodesPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentAccountId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

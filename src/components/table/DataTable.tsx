@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
+import { useAccountContext } from '@/contexts/AccountContext';
+import AccountBadge from '@/components/dashboard/AccountBadge';
 
 interface Column {
   key: string;
@@ -16,8 +18,20 @@ interface DataTableProps {
 }
 
 export default function DataTable({ columns, data, onRowClick }: DataTableProps) {
+  const { isMultiAccount } = useAccountContext();
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  // Auto-add Account column when multi-account and data has account_id
+  const effectiveColumns = useMemo(() => {
+    if (!isMultiAccount || !data?.[0]?.account_id) return columns;
+    const accountCol: Column = {
+      key: 'account_id',
+      label: 'Account',
+      render: (v: string) => <AccountBadge id={v} />,
+    };
+    return [accountCol, ...columns];
+  }, [columns, data, isMultiAccount]);
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
@@ -52,7 +66,7 @@ export default function DataTable({ columns, data, onRowClick }: DataTableProps)
           <table className="w-full">
             <thead>
               <tr className="bg-navy-700">
-                {columns.map((col) => (
+                {effectiveColumns.map((col) => (
                   <th
                     key={col.key}
                     className="px-4 py-3 text-left text-xs font-mono font-semibold uppercase tracking-wider text-accent-cyan"
@@ -65,7 +79,7 @@ export default function DataTable({ columns, data, onRowClick }: DataTableProps)
             <tbody>
               {Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} className="border-b border-navy-600">
-                  {columns.map((col) => (
+                  {effectiveColumns.map((col) => (
                     <td key={col.key} className="px-4 py-3">
                       <div className="h-4 bg-navy-700 rounded animate-pulse w-3/4" />
                     </td>
@@ -87,7 +101,7 @@ export default function DataTable({ columns, data, onRowClick }: DataTableProps)
           <table className="w-full">
             <thead>
               <tr className="bg-navy-700">
-                {columns.map((col) => (
+                {effectiveColumns.map((col) => (
                   <th
                     key={col.key}
                     className="px-4 py-3 text-left text-xs font-mono font-semibold uppercase tracking-wider text-accent-cyan"
@@ -112,7 +126,7 @@ export default function DataTable({ columns, data, onRowClick }: DataTableProps)
         <table className="w-full">
           <thead>
             <tr className="bg-navy-700">
-              {columns.map((col) => (
+              {effectiveColumns.map((col) => (
                 <th
                   key={col.key}
                   onClick={() => handleSort(col.key)}
@@ -137,7 +151,7 @@ export default function DataTable({ columns, data, onRowClick }: DataTableProps)
                   onRowClick ? 'cursor-pointer' : ''
                 }`}
               >
-                {columns.map((col) => (
+                {effectiveColumns.map((col) => (
                   <td key={col.key} className="px-4 py-3 text-sm text-gray-300">
                     {col.render ? col.render(row[col.key], row) : row[col.key]}
                   </td>

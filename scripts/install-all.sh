@@ -54,6 +54,7 @@ echo "  운영 스크립트 / Operations:"
 echo "    bash scripts/08-start-all.sh       # 서비스 시작 / Start services"
 echo "    bash scripts/09-stop-all.sh        # 서비스 중지 / Stop services"
 echo "    bash scripts/10-verify.sh          # 검증 (46항목) / Health check"
+echo "    /accounts 페이지에서 멀티 어카운트 추가  # Add accounts via UI (/accounts)"
 echo ""
 
 # -- Detect environment --------------------------------------------------------

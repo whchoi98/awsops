@@ -4,6 +4,7 @@ AWS RDS MCP 람다 - MySQL/PostgreSQL 인스턴스 관리, RDS Data API를 통�
 """
 import json
 import boto3
+from cross_account import get_client
 
 
 def lambda_handler(event, context):
@@ -12,6 +13,8 @@ def lambda_handler(event, context):
     t = params.get("tool_name", "")
     args = params.get("arguments", params)
     region = args.get("region", "ap-northeast-2")
+    target_account_id = args.get('target_account_id')
+    role_arn = f'arn:aws:iam::{target_account_id}:role/AWSopsReadOnlyRole' if target_account_id else None
 
     # Auto-detect tool from parameters if not specified / tool_name 미지정 시 파라미터로 도구 자동 감지
     if not t:
@@ -22,7 +25,7 @@ def lambda_handler(event, context):
         args = params
 
     try:
-        rds = boto3.client('rds', region_name=region)
+        rds = get_client('rds', region, role_arn)
 
         # List all RDS instances with basic info / 모든 RDS 인스턴스 기본 정보 조회
         if t == "list_db_instances":
@@ -73,7 +76,7 @@ def lambda_handler(event, context):
 
         # Execute read-only SQL via RDS Data API / RDS Data API를 통한 읽기 전용 SQL 실행
         elif t == "execute_sql":
-            rds_data = boto3.client('rds-data', region_name=region)
+            rds_data = get_client('rds-data', region, role_arn)
             # Block write operations (read-only enforcement) / 쓰기 작업 차단 (읽기 전용 강제)
             sql = args["sql"].strip()
             for kw in ["drop", "delete", "update", "insert", "alter", "create", "truncate"]:

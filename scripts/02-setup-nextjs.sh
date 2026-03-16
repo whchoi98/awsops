@@ -98,23 +98,25 @@ else
     echo -e "  ${GREEN}Created config.json with steampipePassword${NC}"
 fi
 
-# -- [4/4] Detect account type: Direct Payer vs MSP Payer --------------------
+# -- [4/4] Detect account type + initialize multi-account config -------------
 #   MSP/Payer 관리 계정에서는 Cost Explorer API가 SCP로 차단됨
 #   설치 시 한 번 판별하여 data/config.json에 저장 → 런타임에 불필요한 쿼리 스킵
+#   MULTI-ACCOUNT: 호스트 계정을 accounts 배열에 초기 등록
 echo ""
-echo -e "${CYAN}[4/4] Detecting account type (Direct Payer vs MSP Payer)...${NC}"
+echo -e "${CYAN}[4/4] Detecting account type + initializing multi-account config...${NC}"
 
 mkdir -p "$WORK_DIR/data"
 CONFIG_FILE="$WORK_DIR/data/config.json"
 
+# Detect Cost Explorer availability
 COST_RESULT=$(PGPASSWORD="$SP_PASSWORD" psql -h localhost -p 9193 -U steampipe -d steampipe \
   -c "SELECT 1 FROM aws_cost_by_service_monthly LIMIT 1" -t -A 2>&1 || echo "COST_FAIL")
 
 if echo "$COST_RESULT" | grep -q "^1$"; then
-    echo '{"costEnabled": true}' > "$CONFIG_FILE"
+    COST_ENABLED=true
     echo -e "  ${GREEN}Direct Payer — Cost Explorer enabled${NC}"
 else
-    echo '{"costEnabled": false}' > "$CONFIG_FILE"
+    COST_ENABLED=false
     echo -e "  ${YELLOW}MSP/Payer account — Cost Explorer disabled${NC}"
     echo -e "  ${YELLOW}Cost menu and queries will be hidden at runtime${NC}"
     if echo "$COST_RESULT" | grep -qi "permission denied\|AccessDenied\|not authorized"; then
@@ -125,6 +127,64 @@ else
         echo "  Reason: $COST_RESULT"
     fi
 fi
+
+# Detect EKS availability
+EKS_ENABLED=false
+if aws eks list-clusters --query 'clusters[0]' --output text 2>/dev/null | grep -qv "None"; then
+    EKS_ENABLED=true
+    echo -e "  ${GREEN}EKS clusters detected${NC}"
+else
+    echo -e "  ${YELLOW}No EKS clusters found${NC}"
+fi
+
+# Update config.json (preserve existing fields, add costEnabled + accounts)
+python3 -c "
+import json, os
+cfg_path = '${CONFIG_FILE}'
+cfg = {}
+if os.path.exists(cfg_path):
+    try:
+        cfg = json.load(open(cfg_path))
+    except:
+        cfg = {}
+
+cost_enabled = '${COST_ENABLED}' == 'true'
+eks_enabled = '${EKS_ENABLED}' == 'true'
+
+# Global costEnabled flag (backward compatible)
+cfg['costEnabled'] = cost_enabled
+
+# Initialize accounts array with host account
+account_id = '${ACCOUNT_ID}'
+region = '${REGION}'
+host_entry = {
+    'accountId': account_id,
+    'alias': 'Host',
+    'connectionName': 'aws_' + account_id,
+    'region': region,
+    'isHost': True,
+    'features': {
+        'costEnabled': cost_enabled,
+        'eksEnabled': eks_enabled,
+        'k8sEnabled': eks_enabled
+    }
+}
+
+if 'accounts' not in cfg:
+    cfg['accounts'] = []
+
+# Update or add host account entry
+host_idx = next((i for i, a in enumerate(cfg['accounts']) if a.get('accountId') == account_id), -1)
+if host_idx >= 0:
+    cfg['accounts'][host_idx] = host_entry
+else:
+    cfg['accounts'].insert(0, host_entry)
+
+json.dump(cfg, open(cfg_path, 'w'), indent=2)
+print(f'  Config updated: costEnabled={cost_enabled}, accounts=[{len(cfg[\"accounts\"])} entries]')
+"
+
+echo -e "  ${GREEN}Host account ${ACCOUNT_ID} registered in config.json accounts[]${NC}"
 
 # -- Summary -------------------------------------------------------------------
 echo ""

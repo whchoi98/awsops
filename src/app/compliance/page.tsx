@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Header from '@/components/layout/Header';
+import { useAccountContext } from '@/contexts/AccountContext';
 import StatsCard from '@/components/dashboard/StatsCard';
 import PieChartCard from '@/components/charts/PieChartCard';
 import BarChartCard from '@/components/charts/BarChartCard';
@@ -20,6 +21,7 @@ interface BenchmarkGroup {
 }
 
 export default function CompliancePage() {
+  const { currentAccountId } = useAccountContext();
   const [benchmarkId, setBenchmarkId] = useState('cis_v300');
   const [status, setStatus] = useState<string>('none');
   const [data, setData] = useState<any>(null);
@@ -30,27 +32,27 @@ export default function CompliancePage() {
   const BASE = '/awsops/api/benchmark';
 
   const checkStatus = useCallback(async () => {
-    const res = await fetch(`${BASE}?benchmark=${benchmarkId}&action=status`);
+    const res = await fetch(`${BASE}?benchmark=${benchmarkId}&action=status&accountId=${currentAccountId}`);
     const result = await res.json();
     setStatus(result.status);
     if (result.hasResult && result.status !== 'running') {
-      const resData = await fetch(`${BASE}?benchmark=${benchmarkId}&action=result`);
+      const resData = await fetch(`${BASE}?benchmark=${benchmarkId}&action=result&accountId=${currentAccountId}`);
       const benchData = await resData.json();
       if (!benchData.error) setData(benchData);
     }
-  }, [benchmarkId]);
+  }, [benchmarkId, currentAccountId]);
 
   useEffect(() => { checkStatus(); }, [checkStatus]);
 
   useEffect(() => {
     if (status === 'running') {
       pollRef.current = setInterval(async () => {
-        const res = await fetch(`${BASE}?benchmark=${benchmarkId}&action=status`);
+        const res = await fetch(`${BASE}?benchmark=${benchmarkId}&action=status&accountId=${currentAccountId}`);
         const result = await res.json();
         if (result.status !== 'running') {
           setStatus(result.status);
           if (result.hasResult) {
-            const resData = await fetch(`${BASE}?benchmark=${benchmarkId}&action=result`);
+            const resData = await fetch(`${BASE}?benchmark=${benchmarkId}&action=result&accountId=${currentAccountId}`);
             const benchData = await resData.json();
             if (!benchData.error) setData(benchData);
           }
@@ -64,7 +66,7 @@ export default function CompliancePage() {
   const runBenchmark = async () => {
     setData(null);
     setStatus('running');
-    await fetch(`${BASE}?benchmark=${benchmarkId}&action=run`);
+    await fetch(`${BASE}?benchmark=${benchmarkId}&action=run&accountId=${currentAccountId}`);
   };
 
   const summary = data?.summary?.status || { alarm: 0, ok: 0, info: 0, skip: 0, error: 0 };

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { useAccountContext } from '@/contexts/AccountContext';
 import { Send, Bot, User, Loader2, Sparkles, Database, Copy, Check, Activity, History, ChevronDown, ChevronUp } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -18,6 +19,7 @@ interface Message {
 }
 
 export default function AIPage() {
+  const { currentAccountId } = useAccountContext();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -85,6 +87,7 @@ export default function AIPage() {
           messages: newMessages.map(m => ({ role: m.role, content: m.content })),
           model,
           stream: true,
+          accountId: currentAccountId,
         }),
       });
 

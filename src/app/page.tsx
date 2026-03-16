@@ -31,6 +31,7 @@ import { queries as ecrQ } from '@/lib/queries/ecr';
 import { queries as ebsQ } from '@/lib/queries/ebs';
 import { queries as mskQ } from '@/lib/queries/msk';
 import { queries as osQ } from '@/lib/queries/opensearch';
+import { useAccountContext } from '@/contexts/AccountContext';
 
 interface DashboardData {
   [key: string]: { rows: Record<string, unknown>[]; error?: string };
@@ -49,6 +50,7 @@ function CardLink({ href, children, className = '' }: { href: string; children: 
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { currentAccountId } = useAccountContext();
   const [data, setData] = useState<DashboardData>({});
   const [loading, setLoading] = useState(true);
   const [costAvailable, setCostAvailable] = useState<boolean | null>(null);
@@ -62,6 +64,7 @@ export default function DashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           saveInventory: true,
+          accountId: currentAccountId,
           queries: {
             ec2Status: ec2Q.statusCount,
             ec2Types: ec2Q.typeDistribution,
@@ -95,7 +98,7 @@ export default function DashboardPage() {
       });
       setData(await res.json());
     } catch {} finally { setLoading(false); }
-  }, [costAvailable]);
+  }, [costAvailable, currentAccountId]);
 
   // Cost Explorer 가용성 선 확인 / Pre-check cost availability
   useEffect(() => {

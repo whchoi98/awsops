@@ -50,14 +50,23 @@ echo "  Plugins: aws, kubernetes, trivy"
 #   iam:ListMFADevices, lambda:GetFunction. Without ignore_error_codes,
 #   the entire query fails when a single hydrate column is blocked.
 #   See: docs/TROUBLESHOOTING.md #2 (SCP 차단)
+#
+#   MULTI-ACCOUNT: From the start, we use aggregator structure:
+#     - Host account connection: "aws_{ACCOUNT_ID}" (individual)
+#     - Aggregator connection: "aws" (type=aggregator, connections=["aws_*"])
+#   This way, single-account works identically (aggregator wraps one connection),
+#   and adding accounts later via the /accounts UI page is seamless.
 echo ""
-echo -e "${CYAN}[3/6] Configuring AWS plugin (aws.spc)...${NC}"
+echo -e "${CYAN}[3/6] Configuring AWS plugin (aws.spc) with aggregator structure...${NC}"
 # 배포 리전만 조회 (모든 리전 조회 시 30+ 리전으로 타임아웃 발생)
 # Only query the deployment region (querying all regions causes timeout)
 echo -e "  ${YELLOW}NOTE: regions = [\"$REGION\"] (배포 리전만 조회 / deployment region only)${NC}"
 echo -e "  ${YELLOW}  모든 리전 조회가 필요하면: regions = [\"*\"] 로 변경${NC}"
+echo -e "  ${YELLOW}NOTE: Host account = aws_${ACCOUNT_ID}, Aggregator = aws (multi-account ready)${NC}"
 cat > ~/.steampipe/config/aws.spc << EOF
-connection "aws" {
+# Host account connection (individual)
+# 호스트 계정 개별 연결
+connection "aws_${ACCOUNT_ID}" {
   plugin = "aws"
 
   # 배포 리전만 조회 (성능 최적화) / Query deployment region only (performance)
@@ -74,8 +83,19 @@ connection "aws" {
     "AuthorizationError"
   ]
 }
+
+# Aggregator: combines all aws_* connections
+# 싱글 어카운트에서도 동일하게 동작 (aws_* 하나만 포함)
+# 멀티 어카운트 추가 시 /accounts UI 페이지에서 aws_* 연결 추가
+connection "aws" {
+  plugin      = "aws"
+  type        = "aggregator"
+  connections = ["aws_*"]
+}
 EOF
 echo "  Written: ~/.steampipe/config/aws.spc"
+echo "  Host connection: aws_${ACCOUNT_ID}"
+echo "  Aggregator: aws (connections = [\"aws_*\"])"
 echo -e "  ${YELLOW}NOTE: ignore_error_codes set for SCP-blocked API handling${NC}"
 
 # -- [4/6] Configure Kubernetes Plugin ----------------------------------------

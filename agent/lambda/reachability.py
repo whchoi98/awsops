@@ -1,11 +1,16 @@
 """VPC Reachability Analyzer Lambda / VPC 도달성 분석 Lambda"""
 # VPC 리소스 간 네트워크 도달성 분석 / Analyze network reachability between VPC resources
 import boto3, json
+from cross_account import get_client
 
 def lambda_handler(event, context):
     # 파라미터 추출 / Extract parameters
-    ec2 = boto3.client('ec2')
     params = event if isinstance(event, dict) else json.loads(event)
+    args = params.get("arguments", params)
+    region = args.get("region", "ap-northeast-2")
+    target_account_id = args.get('target_account_id')
+    role_arn = f'arn:aws:iam::{target_account_id}:role/AWSopsReadOnlyRole' if target_account_id else None
+    ec2 = get_client('ec2', region, role_arn)
     source = params['source']
     destination = params['destination']
     protocol = params.get('protocol', 'tcp')

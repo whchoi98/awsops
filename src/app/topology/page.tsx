@@ -8,6 +8,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import Header from '@/components/layout/Header';
 import { queries as relQ } from '@/lib/queries/relationships';
+import { useAccountContext } from '@/contexts/AccountContext';
 
 const NODE_COLORS: Record<string, string> = {
   vpc: '#00d4ff',
@@ -65,6 +66,7 @@ function makeEdge(source: string, target: string, label?: string): Edge {
 }
 
 export default function TopologyPage() {
+  const { currentAccountId } = useAccountContext();
   const [data, setData] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'infra' | 'k8s'>('infra');
@@ -81,6 +83,7 @@ export default function TopologyPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          accountId: currentAccountId,
           queries: {
             ec2: relQ.ec2Relations,
             vpcSubnets: relQ.vpcSubnets,
@@ -97,7 +100,7 @@ export default function TopologyPage() {
       });
       setData(await res.json());
     } catch {} finally { setLoading(false); }
-  }, []);
+  }, [currentAccountId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

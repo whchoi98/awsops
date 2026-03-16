@@ -8,12 +8,14 @@ import PieChartCard from '@/components/charts/PieChartCard';
 import DataTable from '@/components/table/DataTable';
 import { Container, X, Settings, Tag } from 'lucide-react';
 import { queries as ecsQ } from '@/lib/queries/ecs';
+import { useAccountContext } from '@/contexts/AccountContext';
 
 interface PageData {
   [key: string]: { rows: Record<string, unknown>[]; error?: string };
 }
 
 export default function ECSPage() {
+  const { currentAccountId, isMultiAccount } = useAccountContext();
   const [data, setData] = useState<PageData>({});
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<any>(null);
@@ -26,6 +28,7 @@ export default function ECSPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          accountId: currentAccountId,
           queries: {
             summary: ecsQ.summary,
             clusterList: ecsQ.clusterList,
@@ -39,7 +42,7 @@ export default function ECSPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentAccountId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -183,6 +186,9 @@ export default function ECSPage() {
                 </div>
 
                 <Section title="Cluster" icon={Container}>
+                  {selected.account_id && isMultiAccount && (
+                    <Row label="Account" value={selected.account_id} />
+                  )}
                   <Row label="Name" value={selected.cluster_name} />
                   <Row label="ARN" value={selected.cluster_arn} />
                   <Row label="Status" value={selected.status} />

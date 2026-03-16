@@ -9,10 +9,12 @@ import DataTable from '@/components/table/DataTable';
 import { Activity, Cpu, HardDrive, Database, X, MemoryStick, Wifi, ArrowLeft, Calendar } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis } from 'recharts';
 import { queries as metQ } from '@/lib/queries/metrics';
+import { useAccountContext } from '@/contexts/AccountContext';
 
 type TabKey = 'ec2' | 'network' | 'memory' | 'ebs' | 'rds';
 
 export default function MonitoringPage() {
+  const { currentAccountId, isMultiAccount } = useAccountContext();
   const [data, setData] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>('ec2');
@@ -32,6 +34,7 @@ export default function MonitoringPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          accountId: currentAccountId,
           queries: {
             ec2CpuLatest: metQ.ec2CpuLatest,
             ec2CpuHourly: metQ.ec2CpuHourly,
@@ -48,7 +51,7 @@ export default function MonitoringPage() {
       });
       setData(await res.json());
     } catch {} finally { setLoading(false); }
-  }, []);
+  }, [currentAccountId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -311,7 +314,10 @@ export default function MonitoringPage() {
           </button>
           <div>
             <h1 className="text-lg font-bold text-white font-mono">{detailInstance.name || detailInstance.instance_id}</h1>
-            <p className="text-xs text-gray-500">{detailInstance.instance_id} · {detailInstance.instance_type} · CPU: {detailInstance.avg_cpu}%</p>
+            <p className="text-xs text-gray-500">
+              {isMultiAccount && detailInstance.account_id && <span className="text-accent-cyan">{detailInstance.account_id} · </span>}
+              {detailInstance.instance_id} · {detailInstance.instance_type} · CPU: {detailInstance.avg_cpu}%
+            </p>
           </div>
           {/* Date Range / 기간 필터 */}
           <div className="ml-auto flex items-center gap-1">

@@ -23,6 +23,7 @@ export const queries = {
 
   list: `
     SELECT
+      account_id,
       instance_id,
       instance_state,
       instance_type,
@@ -41,6 +42,7 @@ export const queries = {
 
   detail: `
     SELECT
+      i.account_id,
       i.instance_id,
       i.instance_state,
       i.instance_type,
@@ -79,8 +81,9 @@ export const queries = {
       t.instance_storage_supported
     FROM
       aws_ec2_instance i
-    LEFT JOIN
-      aws_ec2_instance_type t ON i.instance_type = t.instance_type
+    LEFT JOIN LATERAL (
+      SELECT * FROM aws_ec2_instance_type WHERE instance_type = i.instance_type LIMIT 1
+    ) t ON true
     WHERE
       i.instance_id = '{instance_id}'
   `,

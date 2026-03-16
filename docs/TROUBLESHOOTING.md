@@ -205,3 +205,25 @@ fuser 3000/tcp 9193/tcp
 # 전체 검증
 bash scripts/09-verify.sh
 ```
+
+---
+
+## 멀티 어카운트 이슈 / Multi-Account Issues
+
+### Cross-Account AssumeRole 실패
+- Target 어카운트에 `AWSopsReadOnlyRole` 존재 확인
+- Host EC2 역할에 `sts:AssumeRole` 권한 확인
+- CFN 재배포: `aws cloudformation deploy --template-file infra-cdk/cfn-target-account-role.yaml ...`
+
+### 어카운트 추가 후 데이터 안 나옴
+- Steampipe connection 확인: `grep "aws_XXXX" ~/.steampipe/config/aws.spc`
+- pg Pool 리셋: 서버 재시작 또는 Accounts 페이지에서 재추가
+- 수동 쿼리 테스트: `steampipe query "SELECT 1 FROM aws_XXXX.aws_account"`
+
+### "All Accounts"에서 데이터 중복
+- aggregator가 모든 connection을 통합하므로 정상 동작
+- Cost 쿼리는 어카운트별 합산될 수 있음 (costEnabled 플래그로 관리)
+
+### 특정 어카운트 메뉴가 안 보임
+- `data/config.json`의 `accounts[].features` 확인 (costEnabled, eksEnabled, k8sEnabled)
+- Accounts 페이지에서 어카운트 재추가하면 features 자동 재감지

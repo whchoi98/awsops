@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Header from '@/components/layout/Header';
+import { useAccountContext } from '@/contexts/AccountContext';
 import StatsCard from '@/components/dashboard/StatsCard';
 import LineChartCard from '@/components/charts/LineChartCard';
 import BarChartCard from '@/components/charts/BarChartCard';
@@ -19,6 +20,7 @@ const PERIODS = [
 ];
 
 export default function CostPage() {
+  const { currentAccountId, isMultiAccount } = useAccountContext();
   const [data, setData] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<any>(null);
@@ -38,6 +40,7 @@ export default function CostPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          accountId: currentAccountId,
           queries: { monthlyCost: costQ.monthlyCost, dailyCost: costQ.dailyCost, serviceCost: costQ.serviceCost },
         }),
       });
@@ -53,7 +56,7 @@ export default function CostPage() {
     // Live query failed or empty — try cached snapshot
     await loadSnapshot();
     setLoading(false);
-  }, []);
+  }, [currentAccountId]);
 
   const loadSnapshot = useCallback(async () => {
     try {
@@ -417,6 +420,9 @@ export default function CostPage() {
             ) : selected ? (
               <div className="p-6 space-y-6">
                 <Section title="Cost Summary" icon={DollarSign}>
+                  {isMultiAccount && (
+                    <Row label="Account" value={currentAccountId === '__all__' ? 'All Accounts' : currentAccountId} />
+                  )}
                   <Row label="Service" value={selected.service} />
                   <Row label="Total Cost" value={`$${selected.rows.reduce((s: number, r: any) => s + (Number(r.cost) || 0), 0).toFixed(2)}`} />
                   <Row label="Periods" value={`${selected.rows.length} months`} />

@@ -9,12 +9,14 @@ import BarChartCard from '@/components/charts/BarChartCard';
 import DataTable from '@/components/table/DataTable';
 import { Bell, X, Settings } from 'lucide-react';
 import { queries as cwQ } from '@/lib/queries/cloudwatch';
+import { useAccountContext } from '@/contexts/AccountContext';
 
 interface PageData {
   [key: string]: { rows: Record<string, unknown>[]; error?: string };
 }
 
 export default function CloudWatchPage() {
+  const { currentAccountId, isMultiAccount } = useAccountContext();
   const [data, setData] = useState<PageData>({});
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<any>(null);
@@ -27,6 +29,7 @@ export default function CloudWatchPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          accountId: currentAccountId,
           queries: {
             summary: cwQ.summary,
             alarmList: cwQ.alarmList,
@@ -40,7 +43,7 @@ export default function CloudWatchPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentAccountId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -172,6 +175,9 @@ export default function CloudWatchPage() {
                 </div>
 
                 <Section title="Alarm" icon={Bell}>
+                  {selected.account_id && isMultiAccount && (
+                    <Row label="Account" value={selected.account_id} />
+                  )}
                   <Row label="Name" value={selected.name} />
                   <Row label="ARN" value={selected.arn} />
                   <Row label="State" value={selected.state_value} />

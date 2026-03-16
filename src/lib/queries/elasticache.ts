@@ -36,6 +36,7 @@ export const queries = {
 
   detail: `
     SELECT
+      account_id,
       cache_cluster_id,
       arn,
       engine,
@@ -91,6 +92,7 @@ export const queries = {
 
   clusterList: `
     SELECT
+      account_id,
       cache_cluster_id,
       cache_node_type,
       engine,

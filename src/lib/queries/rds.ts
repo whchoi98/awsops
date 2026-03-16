@@ -23,6 +23,7 @@ export const queries = {
 
   detail: `
     SELECT
+      account_id,
       db_instance_identifier,
       engine,
       engine_version,
@@ -96,6 +97,7 @@ export const queries = {
 
   list: `
     SELECT
+      account_id,
       db_instance_identifier,
       engine,
       engine_version,

@@ -6,6 +6,7 @@ import json
 import boto3
 import time
 from datetime import datetime, timedelta
+from cross_account import get_client
 
 
 def lambda_handler(event, context):
@@ -14,6 +15,8 @@ def lambda_handler(event, context):
     t = params.get("tool_name", "")
     args = params.get("arguments", params)
     region = args.get("region", "ap-northeast-2")
+    target_account_id = args.get('target_account_id')
+    role_arn = f'arn:aws:iam::{target_account_id}:role/AWSopsReadOnlyRole' if target_account_id else None
 
     # Auto-detect tool from parameters if not specified / tool_name 미지정 시 파라미터로 도구 자동 감지
     if not t:
@@ -28,8 +31,8 @@ def lambda_handler(event, context):
         args = params
 
     try:
-        cw = boto3.client('cloudwatch', region_name=region)
-        logs = boto3.client('logs', region_name=region)
+        cw = get_client('cloudwatch', region, role_arn)
+        logs = get_client('logs', region, role_arn)
 
         # ========== Metrics / 지표 ==========
         # Get metric statistics for a given time range / 지정 시간 범위의 지표 통계 조회

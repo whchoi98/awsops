@@ -6,8 +6,10 @@ import StatsCard from '@/components/dashboard/StatsCard';
 import DataTable from '@/components/table/DataTable';
 import { Shield, X, Tag } from 'lucide-react';
 import { queries as wafQ } from '@/lib/queries/waf';
+import { useAccountContext } from '@/contexts/AccountContext';
 
 export default function WAFPage() {
+  const { currentAccountId, isMultiAccount } = useAccountContext();
   const [data, setData] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<any>(null);
@@ -18,11 +20,11 @@ export default function WAFPage() {
     try {
       const res = await fetch(bustCache ? '/awsops/api/steampipe?bustCache=true' : '/awsops/api/steampipe', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ queries: { summary: wafQ.summary, list: wafQ.webAclList } }),
+        body: JSON.stringify({ accountId: currentAccountId, queries: { summary: wafQ.summary, list: wafQ.webAclList } }),
       });
       setData(await res.json());
     } catch {} finally { setLoading(false); }
-  }, []);
+  }, [currentAccountId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -78,6 +80,9 @@ export default function WAFPage() {
             {detailLoading ? <div className="p-6 space-y-4">{[1,2,3].map(i => <div key={i} className="h-12 skeleton rounded" />)}</div> : selected ? (
               <div className="p-6 space-y-6">
                 <Section title="Web ACL" icon={Shield}>
+                  {selected.account_id && isMultiAccount && (
+                    <Row label="Account" value={selected.account_id} />
+                  )}
                   <Row label="Name" value={selected.name} />
                   <Row label="ID" value={selected.id} />
                   <Row label="ARN" value={selected.arn} />

@@ -347,8 +347,9 @@ def handler(payload):
 
     gateway_role = payload.get("gateway", DEFAULT_GATEWAY)
     gateway_url = GATEWAYS.get(gateway_role, GATEWAYS[DEFAULT_GATEWAY])
+    target_account_id = payload.get("targetAccountId")
 
-    logging.info(f"Gateway: {gateway_role} -> {gateway_url} (history: {len(history)} messages)")
+    logging.info(f"Gateway: {gateway_role} -> {gateway_url} (history: {len(history)} messages, account: {target_account_id or 'default'})")
 
     try:
         mcp_client = MCPClient(lambda: create_gateway_transport(gateway_url))
@@ -360,6 +361,8 @@ def handler(payload):
 
             # Build skill prompt: static patterns + dynamic tool list / 스킬 프롬프트 구성: 정적 패턴 + 동적 도구 목록
             system_prompt = build_skill_prompt(gateway_role, tools)
+            if target_account_id:
+                system_prompt += f"\n\nIMPORTANT: Target AWS account is {target_account_id}. When calling tools, pass target_account_id='{target_account_id}' if the tool supports it."
 
             agent = Agent(
                 model=model,

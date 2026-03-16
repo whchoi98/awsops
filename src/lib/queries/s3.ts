@@ -15,6 +15,7 @@ export const queries = {
 
   list: `
     SELECT
+      account_id,
       name,
       region,
       creation_date,
@@ -31,6 +32,7 @@ export const queries = {
 
   detail: `
     SELECT
+      account_id,
       name,
       arn,
       region,

@@ -11,6 +11,7 @@ export const queries = {
 
   list: `
     SELECT
+      account_id,
       id,
       domain_name,
       status,
@@ -29,6 +30,7 @@ export const queries = {
 
   detail: `
     SELECT
+      account_id,
       id,
       arn,
       domain_name,

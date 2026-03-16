@@ -5,6 +5,7 @@ Terraform/Terragrunt 실행, 프로바이더 문서, 모듈 검색, Checkov 보�
 import json
 import urllib.request
 import re
+from cross_account import get_client
 
 
 def search_provider_docs(asset_name, provider='aws'):
@@ -127,6 +128,8 @@ def lambda_handler(event, context):
     params = event if isinstance(event, dict) else json.loads(event)
     t = params.get("tool_name", "")
     args = params.get("arguments", params)
+    target_account_id = args.get('target_account_id')
+    role_arn = f'arn:aws:iam::{target_account_id}:role/AWSopsReadOnlyRole' if target_account_id else None
 
     # Infer tool from parameters if not specified / 도구명이 없으면 파라미터로 추론
     if not t:

@@ -37,6 +37,7 @@ export const queries = {
   // Volume list with attachment info / 볼륨 목록 (어태치 정보 포함)
   list: `
     SELECT
+      v.account_id,
       v.volume_id,
       v.volume_type,
       v.size,
@@ -58,6 +59,7 @@ export const queries = {
   // Volume detail with attachment mapping / 볼륨 상세 (어태치먼트 매핑)
   detail: `
     SELECT
+      v.account_id,
       v.volume_id,
       v.volume_type,
       v.size,

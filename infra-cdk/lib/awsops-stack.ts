@@ -179,6 +179,13 @@ export class AwsopsStack extends cdk.Stack {
       description: 'AWSops EC2 role - SSM, CloudWatch, ReadOnlyAccess for Steampipe',
     });
 
+    // Multi-account: allow EC2 role to assume cross-account read-only roles
+    ec2Role.addToPolicy(new iam.PolicyStatement({
+      actions: ['sts:AssumeRole'],
+      resources: ['arn:aws:iam::*:role/AWSopsReadOnlyRole'],
+      description: 'Allow assuming AWSopsReadOnlyRole in target accounts for multi-account support',
+    }));
+
     // -------------------------------------------------------
     // EC2 Instance (Private Subnet, ARM64 Graviton by default)
     // -------------------------------------------------------

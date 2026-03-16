@@ -8,10 +8,12 @@ import PieChartCard from '@/components/charts/PieChartCard';
 import DataTable from '@/components/table/DataTable';
 import { Network, X, Tag, Shield, Globe, ArrowRightLeft } from 'lucide-react';
 import { queries as vpcQ } from '@/lib/queries/vpc';
+import { useAccountContext } from '@/contexts/AccountContext';
 
 type TabKey = 'vpcs' | 'subnets' | 'sgs' | 'rtb' | 'tgw' | 'elb' | 'nat' | 'igw';
 
 export default function VPCPage() {
+  const { currentAccountId } = useAccountContext();
   const [data, setData] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>('vpcs');
@@ -32,6 +34,7 @@ export default function VPCPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          accountId: currentAccountId,
           queries: {
             summary: vpcQ.summary,
             vpcList: vpcQ.vpcList,
@@ -48,7 +51,7 @@ export default function VPCPage() {
       });
       setData(await res.json());
     } catch {} finally { setLoading(false); }
-  }, []);
+  }, [currentAccountId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

@@ -6,12 +6,14 @@ import StatsCard from '@/components/dashboard/StatsCard';
 import DataTable from '@/components/table/DataTable';
 import { Rocket, CheckCircle, AlertTriangle } from 'lucide-react';
 import { queries as k8sQ } from '@/lib/queries/k8s';
+import { useAccountContext } from '@/contexts/AccountContext';
 
 interface DashboardData {
   [key: string]: { rows: Record<string, unknown>[]; error?: string };
 }
 
 export default function K8sDeploymentsPage() {
+  const { currentAccountId } = useAccountContext();
   const [data, setData] = useState<DashboardData>({});
   const [_loading, setLoading] = useState(true);
 
@@ -22,6 +24,7 @@ export default function K8sDeploymentsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          accountId: currentAccountId,
           queries: {
             deploymentSummary: k8sQ.deploymentSummary,
             deploymentList: k8sQ.deploymentList,
@@ -34,7 +37,7 @@ export default function K8sDeploymentsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentAccountId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

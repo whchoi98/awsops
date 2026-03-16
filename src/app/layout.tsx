@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Sidebar from "@/components/layout/Sidebar";
+import AccountProvider from "@/contexts/AccountContext";
 
 export const metadata: Metadata = {
   title: "AWSops Dashboard",
@@ -15,12 +16,14 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="bg-navy-900 text-gray-100 antialiased">
-        <div className="flex h-screen overflow-hidden">
-          <Sidebar />
-          <main className="flex-1 overflow-y-auto">
-            {children}
-          </main>
-        </div>
+        <AccountProvider>
+          <div className="flex h-screen overflow-hidden">
+            <Sidebar />
+            <main className="flex-1 overflow-y-auto">
+              {children}
+            </main>
+          </div>
+        </AccountProvider>
       </body>
     </html>
   );

@@ -1,26 +1,54 @@
 import { Pool } from 'pg';
 import NodeCache from 'node-cache';
-import { getConfig } from '@/lib/app-config';
+import { getConfig, isMultiAccount, ALL_ACCOUNTS } from '@/lib/app-config';
+
+export interface QueryOptions {
+  bustCache?: boolean;
+  accountId?: string;
+}
+
+function buildSearchPath(accountId?: string): string {
+  if (!accountId || accountId === ALL_ACCOUNTS) return '';
+  if (!isMultiAccount()) return '';
+  const sanitized = accountId.replace(/[^0-9]/g, '');
+  if (!sanitized) return '';
+  return `public, aws_${sanitized}, kubernetes, trivy`;
+}
 
 const cache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
 
-// Steampipe 비밀번호: config에서 읽기, 환경변수 폴백
-// Steampipe password: from config, env var fallback
-const spPassword = getConfig().steampipePassword
-  || process.env.STEAMPIPE_PASSWORD
-  || 'steampipe';
+function createPool() {
+  const pw = getConfig().steampipePassword || process.env.STEAMPIPE_PASSWORD || 'steampipe';
+  return new Pool({
+    host: '127.0.0.1',
+    port: 9193,
+    database: 'steampipe',
+    user: 'steampipe',
+    password: pw,
+    max: 5,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 30000,
+    statement_timeout: 120000,
+  });
+}
 
-const pool = new Pool({
-  host: '127.0.0.1',
-  port: 9193,
-  database: 'steampipe',
-  user: 'steampipe',
-  password: spPassword,
-  max: 5,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 30000,
-  statement_timeout: 120000,
-});
+let pool = createPool();
+
+// Pool 리셋: Steampipe 재시작 후 stale 연결 정리
+export async function resetPool(): Promise<void> {
+  try { await pool.end(); } catch {}
+  pool = createPool();
+  cache.flushAll();
+  // 헬스체크: DB 준비될 때까지 대기 (최대 15초)
+  for (let i = 0; i < 15; i++) {
+    try {
+      await pool.query('SELECT 1');
+      return;
+    } catch {
+      await new Promise(r => setTimeout(r, 1000));
+    }
+  }
+}
 
 const ALLOWED_PATTERN = /^\s*SELECT\s/i;
 
@@ -35,9 +63,16 @@ function validateQuery(sql: string): void {
 
 export async function runQuery<T = Record<string, unknown>>(
   sql: string,
-  bustCache = false
+  bustCacheOrOptions: boolean | QueryOptions = false
 ): Promise<{ rows: T[]; error?: string }> {
-  const cacheKey = `sp:${sql}`;
+  const opts = typeof bustCacheOrOptions === 'boolean'
+    ? { bustCache: bustCacheOrOptions }
+    : bustCacheOrOptions;
+  const { bustCache = false, accountId } = opts;
+  const searchPath = buildSearchPath(accountId);
+
+  const cachePrefix = accountId || 'default';
+  const cacheKey = `sp:${cachePrefix}:${sql}`;
 
   if (!bustCache) {
     const cached = cache.get<{ rows: T[] }>(cacheKey);
@@ -46,8 +81,21 @@ export async function runQuery<T = Record<string, unknown>>(
 
   try {
     validateQuery(sql);
-    const result = await pool.query(sql);
-    const rows: T[] = result.rows || [];
+    let rows: T[];
+    if (searchPath) {
+      const client = await pool.connect();
+      try {
+        await client.query(`SET search_path TO ${searchPath}`);
+        const result = await client.query(sql);
+        rows = result.rows || [];
+      } finally {
+        await client.query('RESET search_path').catch(() => {});
+        client.release();
+      }
+    } else {
+      const result = await pool.query(sql);
+      rows = result.rows || [];
+    }
     const data = { rows };
     cache.set(cacheKey, data);
     return data;
@@ -59,8 +107,12 @@ export async function runQuery<T = Record<string, unknown>>(
 
 export async function batchQuery(
   queries: Record<string, string>,
-  bustCache = false
+  bustCacheOrOptions: boolean | QueryOptions = false
 ): Promise<Record<string, { rows: unknown[]; error?: string }>> {
+  const opts = typeof bustCacheOrOptions === 'boolean'
+    ? { bustCache: bustCacheOrOptions }
+    : bustCacheOrOptions;
+
   const results: Record<string, { rows: unknown[]; error?: string }> = {};
   const entries = Object.entries(queries);
 
@@ -69,7 +121,7 @@ export async function batchQuery(
   for (let i = 0; i < entries.length; i += BATCH_SIZE) {
     const batch = entries.slice(i, i + BATCH_SIZE);
     const settled = await Promise.allSettled(
-      batch.map(([, sql]) => runQuery(sql, bustCache))
+      batch.map(([, sql]) => runQuery(sql, opts))
     );
     batch.forEach(([key], j) => {
       const s = settled[j];

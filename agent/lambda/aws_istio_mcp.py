@@ -9,6 +9,7 @@ import json
 import boto3
 import os
 import pg8000
+from cross_account import get_client
 
 
 # Steampipe PostgreSQL connection config (VPC-only, same as steampipe-query Lambda)
@@ -47,6 +48,8 @@ def lambda_handler(event, context):
     params = event if isinstance(event, dict) else json.loads(event)
     t = params.get("tool_name", "")
     args = params.get("arguments", params)
+    target_account_id = args.get('target_account_id')
+    role_arn = f'arn:aws:iam::{target_account_id}:role/AWSopsReadOnlyRole' if target_account_id else None
 
     # Auto-detect tool from parameters using keyword matching / 키워드 매칭을 통해 파라미터에서 도구를 자동 감지
     if not t:

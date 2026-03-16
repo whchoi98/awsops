@@ -8,12 +8,14 @@ import PieChartCard from '@/components/charts/PieChartCard';
 import DataTable from '@/components/table/DataTable';
 import { Box, Play, Clock, XCircle } from 'lucide-react';
 import { queries as k8sQ } from '@/lib/queries/k8s';
+import { useAccountContext } from '@/contexts/AccountContext';
 
 interface DashboardData {
   [key: string]: { rows: Record<string, unknown>[]; error?: string };
 }
 
 export default function K8sPodsPage() {
+  const { currentAccountId } = useAccountContext();
   const [data, setData] = useState<DashboardData>({});
   const [_loading, setLoading] = useState(true);
 
@@ -24,6 +26,7 @@ export default function K8sPodsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          accountId: currentAccountId,
           queries: {
             podSummary: k8sQ.podSummary,
             podList: k8sQ.podList,
@@ -36,7 +39,7 @@ export default function K8sPodsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentAccountId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

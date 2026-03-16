@@ -66,6 +66,14 @@
 
 ## 기능
 
+### Multi-Account Support
+- **Cross-Account IAM Role**: Host 어카운트에서 배포, Target 어카운트는 AssumeRole로 접근
+- **All Accounts 통합 뷰**: Steampipe aggregator를 통해 모든 어카운트 리소스를 단일 뷰로 조회
+- **Account Selector**: Sidebar 드롭다운으로 어카운트 전환, 전환 시 자동 데이터 리프레시
+- **Accounts 관리 페이지**: UI에서 어카운트 추가/삭제/연결 테스트 (/accounts)
+- **CFN 템플릿**: Target 어카운트에 IAM Role 자동 생성 (`infra-cdk/cfn-target-account-role.yaml`)
+- **하위 호환**: accounts 미설정 시 기존 싱글 어카운트 동작 100% 유지
+
 ### 대시보드 페이지 (31개) / Dashboard Pages (31 pages)
 
 | Category | Page | Path | Features / 기능 |

@@ -1,34 +1,44 @@
-# AWSops 대시보드 v1.5.2 — Claude 컨텍스트
+# AWSops 대시보드 v1.6.0 — Claude 컨텍스트
 
 ## 프로젝트 개요
 실시간 AWS/Kubernetes 리소스 모니터링, 네트워크 문제 해결, CIS 컴플라이언스, AI 기반 분석을 제공하는 운영 대시보드.
-Steampipe, Next.js 14, Amazon Bedrock AgentCore로 구축.
+Steampipe, Next.js 14, Amazon Bedrock AgentCore로 구축. **멀티 어카운트 지원** (Cross-Account IAM Role).
 
 ## 아키텍처
 - **프론트엔드**: Next.js 14 (App Router) + Tailwind CSS 다크 테마 + Recharts + React Flow
 - **데이터**: Steampipe 내장 PostgreSQL (포트 9193) — AWS 380+ 테이블, K8s 60+ 테이블
+- **멀티 어카운트**: Steampipe aggregator + search_path 전환 (Host 어카운트 배포 + Target 어카운트 AssumeRole)
 - **AI 엔진**: Bedrock Sonnet/Opus 4.6 + AgentCore Runtime (Strands) + 8 Gateway (125 MCP 도구) + 19 Lambda
 - **인증**: Cognito User Pool + Lambda@Edge (Python 3.12, us-east-1) + CloudFront
 - **인프라**: CDK (`infra-cdk/`) → CloudFront (CACHING_DISABLED) → ALB → EC2 (t4g.2xlarge, Private Subnet)
 
-## 현황 (v1.5.2)
+## 현황 (v1.6.0)
 | 항목 | 수치 |
 |------|------|
-| 페이지 | 31 |
-| 라우트 | 46 |
+| 페이지 | 32 |
+| 라우트 | 48 |
 | SQL 쿼리 파일 | 22 |
 | API 라우트 | 10 |
-| 컴포넌트 | 14 |
+| 컴포넌트 | 16 |
 | MCP 도구 | 125 (8 Gateway, 19 Lambda) |
-| ADR | 7 (001-007) |
+| ADR | 8 (001-008) |
 
 ## 필수 규칙
 
 ### 데이터 접근
 - 모든 쿼리는 `src/lib/steampipe.ts`의 **pg Pool**을 통해 실행 — Steampipe CLI 사용 금지
 - 풀 설정: `max: 5, statement_timeout: 120s, batchQuery: 5 sequential`
-- 결과는 node-cache를 통해 5분간 캐싱
+- 결과는 node-cache를 통해 5분간 캐싱 (어카운트별 캐시 키: `sp:{accountId}:{sql}`)
 - `steampipe query "SQL"` CLI는 660배 느림 — 절대 사용 금지
+
+### 멀티 어카운트 규칙
+- 어카운트 스코핑은 Steampipe `search_path` 전환으로 처리 — SQL 쿼리에 WHERE account_id 불필요
+- 모든 페이지에서 `useAccountContext` 사용 + fetch body에 `accountId: currentAccountId` 포함
+- `useCallback` 의존성에 `currentAccountId` 포함 (계정 전환 시 자동 리프레시)
+- list/detail SQL 쿼리에 반드시 `account_id` 컬럼 포함 (DataTable 자동 표시 + detail 패널 Account Row)
+- detail 패널: `{selected.account_id && isMultiAccount && (<Row label="Account" value={selected.account_id} />)}`
+- Steampipe 재시작 후 `resetPool()` 호출 필수 (stale connection 방지)
+- `data/config.json`에 `accounts` 미설정 시 싱글 어카운트 모드 (기존 동작 100% 유지)
 
 ### Next.js 규칙
 - `basePath: '/awsops'` — `next.config.mjs`에 설정
@@ -70,14 +80,21 @@ Steampipe, Next.js 14, Amazon Bedrock AgentCore로 구축.
 ## 주요 파일
 
 ### 핵심 라이브러리 (`src/lib/`)
-- `steampipe.ts` — pg 풀 + 배치 쿼리 + 캐시 + Cost 가용성 probe
-- `queries/*.ts` — 22개 SQL 쿼리 파일 (ebs, msk, opensearch 포함)
-- `resource-inventory.ts` — 리소스 인벤토리 스냅샷 (data/inventory/, 추가 쿼리 0건)
-- `cost-snapshot.ts` — Cost 데이터 스냅샷 폴백 (data/cost/)
-- `app-config.ts` — 앱 설정 (costEnabled, agentRuntimeArn, codeInterpreterName, memoryId)
+- `steampipe.ts` — pg 풀 + 배치 쿼리 + 캐시 + Cost 가용성 probe + **QueryOptions (accountId) + resetPool()**
+- `queries/*.ts` — 22개 SQL 쿼리 파일 (list/detail에 account_id 포함)
+- `resource-inventory.ts` — 리소스 인벤토리 스냅샷 (data/inventory/{accountId}/, 추가 쿼리 0건)
+- `cost-snapshot.ts` — Cost 데이터 스냅샷 폴백 (data/cost/{accountId}/)
+- `app-config.ts` — 앱 설정 + **AccountConfig, getAccounts(), isMultiAccount(), getAccountFeatures()**
 - `agentcore-stats.ts` — AgentCore 호출 통계 (총 호출, 평균 응답시간, 게이트웨이별)
 - `agentcore-memory.ts` — 대화 이력 영구 저장/검색 (사용자별 분리, data/memory/)
 - `auth-utils.ts` — Cognito JWT에서 사용자 정보 추출 (email, sub)
+
+### 멀티 어카운트 (`src/contexts/`, `src/components/layout/`)
+- `contexts/AccountContext.tsx` — React Context (currentAccountId, accounts, getFeatures, refreshAccounts)
+- `components/layout/AccountSelector.tsx` — Sidebar 어카운트 전환 드롭다운 (isMultiAccount=false면 숨김)
+- `components/dashboard/AccountBadge.tsx` — 어카운트 alias + 색상 코딩 배지
+- `infra-cdk/cfn-target-account-role.yaml` — Target 어카운트 IAM Role CFN 템플릿
+- `agent/lambda/cross_account.py` — Lambda cross-account AssumeRole 헬퍼
 
 ### API 라우트 (`src/app/api/`, 10개)
 - `ai/route.ts` — AI 라우팅 (10 routes, 멀티 라우트, SSE 스트리밍, 도구 추론)
@@ -152,35 +169,45 @@ Step 7:  07-setup-cloudfront-auth.sh     Lambda@Edge → CloudFront 연동
 
 ---
 
-# AWSops Dashboard v1.5.2 — Claude Context (English)
+# AWSops Dashboard v1.6.0 — Claude Context (English)
 
 ## Project Overview
-AWS + Kubernetes operations dashboard with real-time resource monitoring, network troubleshooting, CIS compliance, and AI-powered analysis. Built with Steampipe, Next.js 14, and Amazon Bedrock AgentCore.
+AWS + Kubernetes operations dashboard with real-time resource monitoring, network troubleshooting, CIS compliance, and AI-powered analysis. Built with Steampipe, Next.js 14, and Amazon Bedrock AgentCore. **Multi-account support** via Cross-Account IAM Roles.
 
 ## Architecture
 - **Frontend**: Next.js 14 (App Router) + Tailwind CSS dark theme + Recharts + React Flow
 - **Data**: Steampipe embedded PostgreSQL (port 9193) — 380+ AWS tables, 60+ K8s tables
+- **Multi-Account**: Steampipe aggregator + search_path switching (Host account deploys, Target accounts via AssumeRole)
 - **AI**: Bedrock Sonnet/Opus 4.6 + AgentCore Runtime (Strands) + 8 Gateways (125 MCP tools) + 19 Lambda
 - **Auth**: Cognito User Pool + Lambda@Edge (Python 3.12, us-east-1) + CloudFront
 - **Infra**: CDK → CloudFront (CACHING_DISABLED) → ALB → EC2 (t4g.2xlarge, Private Subnet)
 
-## Stats (v1.5.2)
+## Stats (v1.6.0)
 | Item | Count |
 |------|-------|
-| Pages | 31 |
-| Routes | 46 |
+| Pages | 32 |
+| Routes | 48 |
 | SQL Query Files | 22 |
 | API Routes | 10 |
-| Components | 14 |
+| Components | 16 |
 | MCP Tools | 125 (8 Gateways, 19 Lambda) |
-| ADRs | 7 (001-007) |
+| ADRs | 8 (001-008) |
 
 ## Critical Rules
 
 ### Data Access
 - ALL queries through `src/lib/steampipe.ts` pg Pool — NOT Steampipe CLI
-- Pool: max 5, 120s timeout, 5 sequential batch. Cache: 5min TTL (node-cache)
+- Pool: max 5, 120s timeout, 5 sequential batch. Cache: 5min TTL (account-scoped key: `sp:{accountId}:{sql}`)
 - Never use `steampipe query "SQL"` CLI — it's 660x slower
+
+### Multi-Account Rules
+- Account scoping via Steampipe `search_path` switching — no WHERE account_id needed in SQL
+- All pages: `useAccountContext` + `accountId: currentAccountId` in fetch body
+- `useCallback` dependency must include `currentAccountId` (auto-refresh on account switch)
+- list/detail SQL queries must include `account_id` column (DataTable auto-display + detail panel Account Row)
+- Detail panel: `{selected.account_id && isMultiAccount && (<Row label="Account" value={selected.account_id} />)}`
+- After Steampipe restart: call `resetPool()` (prevents stale connections)
+- No `accounts` in `data/config.json` = single-account mode (100% backward compatible)
 
 ### Next.js
 - `basePath: '/awsops'` in `next.config.mjs`
@@ -223,12 +250,19 @@ AWS + Kubernetes operations dashboard with real-time resource monitoring, networ
 ### Core Libraries (`src/lib/`)
 - `steampipe.ts` — pg Pool + batchQuery + cache + checkCostAvailability
 - `queries/*.ts` — 22 SQL query files (incl. ebs, msk, opensearch)
-- `resource-inventory.ts` — Resource inventory snapshots (data/inventory/, zero extra queries)
-- `cost-snapshot.ts` — Cost data snapshot fallback (data/cost/)
-- `app-config.ts` — App config (costEnabled, agentRuntimeArn, codeInterpreterName, memoryId)
+- `resource-inventory.ts` — Resource inventory snapshots (data/inventory/{accountId}/, zero extra queries)
+- `cost-snapshot.ts` — Cost data snapshot fallback (data/cost/{accountId}/)
+- `app-config.ts` — App config + **AccountConfig, getAccounts(), isMultiAccount(), getAccountFeatures()**
 - `agentcore-stats.ts` — AgentCore call stats (total calls, avg time, per-gateway)
 - `agentcore-memory.ts` — Conversation history persistence/search (per-user, data/memory/)
 - `auth-utils.ts` — Extract Cognito user info from JWT (email, sub)
+
+### Multi-Account (`src/contexts/`, `src/components/layout/`)
+- `contexts/AccountContext.tsx` — React Context (currentAccountId, accounts, getFeatures, refreshAccounts)
+- `components/layout/AccountSelector.tsx` — Sidebar account switcher dropdown (hidden if single-account)
+- `components/dashboard/AccountBadge.tsx` — Account alias + color-coded badge
+- `infra-cdk/cfn-target-account-role.yaml` — Target account IAM Role CFN template
+- `agent/lambda/cross_account.py` — Lambda cross-account AssumeRole helper
 
 ### API Routes (`src/app/api/`, 10 routes)
 - `ai/route.ts` — AI routing (10 routes, multi-route, SSE streaming, tool inference)

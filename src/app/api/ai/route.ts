@@ -310,6 +310,7 @@ Rules:
 - No $ in SQL — use conditions::text LIKE '%..%' instead of jsonb_path_exists
 - Always include key identifying columns: ID, name/tags, type, state/status
 - Avoid: mfa_enabled, attached_policy_arns, Lambda tags columns (SCP blocks hydrate)
+- All AWS tables have an 'account_id' column. Account scoping is handled automatically via search_path — do NOT add WHERE account_id filters unless the user explicitly asks to compare or filter by account.
 
 EXACT column names for key tables (use ONLY these, not guessed names):
 
@@ -379,9 +380,9 @@ async function generateSQL(messages: Array<{role: string; content: string}>): Pr
   }
 }
 
-async function queryAWS(sql: string): Promise<{ data: string; rowCount: number; error?: string }> {
+async function queryAWS(sql: string, accountId?: string): Promise<{ data: string; rowCount: number; error?: string }> {
   try {
-    const result = await runQuery(sql);
+    const result = await runQuery(sql, { accountId });
     if (result.error) return { data: `Query error: ${result.error}`, rowCount: 0, error: result.error };
     if (result.rows.length === 0) return { data: 'No results found.', rowCount: 0 };
     return { data: JSON.stringify(result.rows, null, 2), rowCount: result.rows.length };
@@ -451,14 +452,15 @@ const AGENTCORE_TIMEOUT_MS = 90000; // 90초 — Gateway 도구 실행 시간 �
 
 async function invokeAgentCore(
   messages: Array<{role: string; content: string}>,
-  gateway: string
+  gateway: string,
+  targetAccountId?: string
 ): Promise<string | null> {
   try {
     const recentMessages = messages.slice(-10);
     const command = new InvokeAgentRuntimeCommand({
       agentRuntimeArn: getAgentRuntimeArn(),
       qualifier: 'DEFAULT',
-      payload: JSON.stringify({ messages: recentMessages, gateway }),
+      payload: JSON.stringify({ messages: recentMessages, gateway, targetAccountId }),
     });
 
     const timeoutPromise = new Promise<null>((resolve) =>
@@ -647,7 +649,7 @@ function recordAndSave(p: {
 // ============================================================================
 export async function POST(request: NextRequest) {
   const reqBody = await request.json();
-  const { messages, model: modelKey, stream: useStream } = reqBody;
+  const { messages, model: modelKey, stream: useStream, accountId } = reqBody;
 
   if (!messages || !Array.isArray(messages) || messages.length === 0)
     return NextResponse.json({ error: 'Messages required' }, { status: 400 });
@@ -658,7 +660,7 @@ export async function POST(request: NextRequest) {
   // Non-streaming mode: return JSON (backward compatible for test scripts)
   // 비스트리밍 모드: JSON 반환 (테스트 스크립트 하위 호환)
   if (!useStream) {
-    return handleNonStreaming(messages, modelKey);
+    return handleNonStreaming(messages, modelKey, accountId);
   }
 
   // Streaming mode: SSE events / 스트리밍 모드: SSE 이벤트
@@ -728,7 +730,7 @@ export async function POST(request: NextRequest) {
 
           for (let attempt = 0; attempt < 2 && sql; attempt++) {
             send('status', { step: 'sql-querying', message: `🔎 Steampipe 쿼리 실행 중...${attempt > 0 ? ' (재시도)' : ''}`, sql });
-            queryResult = await queryAWS(sql);
+            queryResult = await queryAWS(sql, accountId);
             if (!queryResult.error) break;
             if (attempt === 0) {
               send('status', { step: 'sql-retrying', message: '🔄 SQL 수정 후 재시도...' });
@@ -842,7 +844,7 @@ export async function POST(request: NextRequest) {
         // Single route: existing logic / 단일 라우트: 기존 로직
         const gateway = config.gateway || 'ops';
         send('status', { step: 'agentcore', message: `🤖 ${config.display} 도구 호출 중...` });
-        const agentResponse = await invokeAgentCore(messages, gateway);
+        const agentResponse = await invokeAgentCore(messages, gateway, accountId);
 
         if (agentResponse) {
           const usedTools = extractUsedTools(agentResponse);
@@ -902,7 +904,7 @@ export async function POST(request: NextRequest) {
 // Single route handler / 단일 라우트 핸들러
 // ============================================================================
 async function handleSingleRoute(
-  route: RouteType, messages: Array<{role: string; content: string}>, modelKey?: string
+  route: RouteType, messages: Array<{role: string; content: string}>, modelKey?: string, accountId?: string
 ): Promise<{ content: string; via: string; queriedResources: string[]; usedTools?: string[] } | null> {
   const config = ROUTE_REGISTRY[route];
   const lastMessage = messages[messages.length - 1]?.content || '';
@@ -935,7 +937,7 @@ async function handleSingleRoute(
     let sql = await generateSQL(messages);
     let queryResult: { data: string; rowCount: number; error?: string } | null = null;
     for (let attempt = 0; attempt < 2 && sql; attempt++) {
-      queryResult = await queryAWS(sql);
+      queryResult = await queryAWS(sql, accountId);
       if (!queryResult.error) break;
       if (attempt === 0) {
         const fixMessages = [...messages.slice(-4),
@@ -963,7 +965,7 @@ async function handleSingleRoute(
 
   // AgentCore Gateway / AgentCore 게이트웨이
   const gateway = config.gateway || 'ops';
-  const agentResponse = await invokeAgentCore(messages, gateway);
+  const agentResponse = await invokeAgentCore(messages, gateway, accountId);
   if (agentResponse) {
     const usedTools = extractUsedTools(agentResponse);
     const cleaned = agentResponse.replace(/<tool_call>[\s\S]*?<\/tool_call>\s*/g, '').replace(/<tool_response>[\s\S]*?<\/tool_response>\s*/g, '').trim();
@@ -999,7 +1001,7 @@ async function synthesizeResponses(
 // ============================================================================
 // Non-streaming handler — supports multi-route / 비스트리밍 — 멀티 라우트 지원
 // ============================================================================
-async function handleNonStreaming(messages: Array<{role: string; content: string}>, modelKey?: string) {
+async function handleNonStreaming(messages: Array<{role: string; content: string}>, modelKey?: string, accountId?: string) {
   try {
     const routes = await classifyIntent(messages);
     const primaryRoute = routes[0];
@@ -1007,7 +1009,7 @@ async function handleNonStreaming(messages: Array<{role: string; content: string
 
     // Single route (most common) / 단일 라우트 (일반적)
     if (routes.length === 1) {
-      const result = await handleSingleRoute(primaryRoute, messages, modelKey);
+      const result = await handleSingleRoute(primaryRoute, messages, modelKey, accountId);
       if (result) {
         return NextResponse.json({
           content: result.content, model: modelKey || 'sonnet-4.6',

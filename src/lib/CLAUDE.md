@@ -4,14 +4,15 @@
 핵심 라이브러리: Steampipe 데이터베이스 연결, SQL 쿼리 정의, 인벤토리, 설정 관리.
 
 ## 주요 파일
-- `steampipe.ts` — pg 풀 연결 (max 5, 120s 타임아웃, 5분 TTL 캐시, Cost 가용성 probe)
-- `resource-inventory.ts` — 리소스 인벤토리 스냅샷 (data/inventory/, 추가 쿼리 0건)
-- `cost-snapshot.ts` — Cost 데이터 스냅샷 폴백 (data/cost/)
-- `app-config.ts` — 앱 설정 (costEnabled, agentRuntimeArn, codeInterpreterName, memoryId)
+- `steampipe.ts` — pg 풀 연결 (max 5, 120s 타임아웃, 5분 TTL 캐시, Cost 가용성 probe) + QueryOptions (accountId) + resetPool()
+- `resource-inventory.ts` — 리소스 인벤토리 스냅샷 (data/inventory/{accountId}/, 추가 쿼리 0건)
+- `cost-snapshot.ts` — Cost 데이터 스냅샷 폴백 (data/cost/{accountId}/)
+- `app-config.ts` — 앱 설정 (costEnabled, agentRuntimeArn, codeInterpreterName, memoryId) + AccountConfig, getAccounts(), isMultiAccount()
 - `agentcore-stats.ts` — AgentCore 호출 통계 (data/agentcore-stats.json)
 - `agentcore-memory.ts` — 대화 이력 저장/검색, 사용자별 분리 (data/memory/)
 - `auth-utils.ts` — Cognito JWT에서 사용자 정보 추출 (Lambda@Edge 검증 후 payload 디코딩)
 - `queries/*.ts` — 22개 SQL 쿼리 파일 (ebs, msk, opensearch 포함)
+- `../contexts/AccountContext.tsx` — React Context (어카운트 상태, 전환, features)
 
 ## 규칙
 - 모든 DB 접근은 `steampipe.ts`의 `runQuery()` 또는 `batchQuery()`를 통해 수행
@@ -21,6 +22,8 @@
 - JSONB 중첩 주의: MSK `provisioned`, OpenSearch `encryption_at_rest_options`, ElastiCache `cache_nodes`
 - SQL에서 `$` 사용 금지
 - 목록 쿼리에서 SCP 차단 컬럼 사용 금지
+- 멀티 어카운트: runQuery/batchQuery에 `{ accountId }` 옵션 전달, search_path 자동 스코핑
+- Steampipe 재시작 후 `resetPool()` 호출 필수 (stale connection 방지)
 
 ---
 
@@ -30,14 +33,15 @@
 Core libraries: Steampipe database connection, SQL query definitions, inventory, config management.
 
 ## Key Files
-- `steampipe.ts` — pg Pool (max 5, 120s timeout, 5min TTL cache, checkCostAvailability)
-- `resource-inventory.ts` — Resource inventory snapshots (data/inventory/, zero extra queries)
-- `cost-snapshot.ts` — Cost data snapshot fallback (data/cost/)
-- `app-config.ts` — App config (costEnabled, agentRuntimeArn, codeInterpreterName, memoryId)
+- `steampipe.ts` — pg Pool (max 5, 120s timeout, 5min TTL cache, checkCostAvailability) + QueryOptions (accountId) + resetPool()
+- `resource-inventory.ts` — Resource inventory snapshots (data/inventory/{accountId}/, zero extra queries)
+- `cost-snapshot.ts` — Cost data snapshot fallback (data/cost/{accountId}/)
+- `app-config.ts` — App config (costEnabled, agentRuntimeArn, codeInterpreterName, memoryId) + AccountConfig, getAccounts(), isMultiAccount()
 - `agentcore-stats.ts` — AgentCore call stats (data/agentcore-stats.json)
 - `agentcore-memory.ts` — Conversation history save/search, per-user isolation (data/memory/)
 - `auth-utils.ts` — Extract Cognito user from JWT (payload decode after Lambda@Edge verification)
 - `queries/*.ts` — 22 SQL query files (incl. ebs, msk, opensearch)
+- `../contexts/AccountContext.tsx` — React Context (account state, switching, features)
 
 ## Rules
 - ALL database access through `runQuery()` or `batchQuery()` in steampipe.ts
@@ -46,3 +50,5 @@ Core libraries: Steampipe database connection, SQL query definitions, inventory,
 - Verify column names via `information_schema.columns` before writing queries
 - Watch JSONB nesting: MSK `provisioned`, OpenSearch `encryption_at_rest_options`, ElastiCache `cache_nodes`
 - No `$` in SQL. Avoid SCP-blocked columns in list queries.
+- Multi-account: pass `{ accountId }` option to runQuery/batchQuery, search_path auto-scoping
+- After Steampipe restart, must call `resetPool()` (prevent stale connections)
