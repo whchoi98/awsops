@@ -1,10 +1,10 @@
-# AWSops 대시보드 v1.5.2
+# AWSops 대시보드 v1.6.0
 
 > Steampipe, Next.js 14, Amazon Bedrock AgentCore 기반 AWS + Kubernetes 운영 대시보드
 
 실시간 AWS/K8s 리소스 모니터링, 네트워크 트러블슈팅, CIS 컴플라이언스 스캔, AI 기반 분석을 단일 대시보드에서 제공합니다.
 
-**현황**: 31 페이지 · 46 라우트 · 22 쿼리 파일 · 10 API 라우트 · 125 MCP 도구 (8 Gateway) · 14 컴포넌트
+**현황**: 34 페이지 · 49 라우트 · 24 쿼리 파일 · 12 API 라우트 · 125 MCP 도구 (8 Gateway) · 14 컴포넌트
 
 ---
 
@@ -85,6 +85,8 @@
 | | EKS Deployments | `/awsops/k8s/deployments` | Deployment list, replicas |
 | | EKS Services | `/awsops/k8s/services` | Service list, types, endpoints |
 | | EKS Explorer | `/awsops/k8s/explorer` | K9s-style terminal UI |
+| | ECS Container Cost | `/awsops/container-cost` | Fargate pricing, Container Insights metrics |
+| | EKS Container Cost | `/awsops/eks-container-cost` | OpenCost (CPU/Mem/Net/Storage/GPU) + request-based fallback |
 | **Network & CDN** | VPC / Network | `/awsops/vpc` | VPCs, Subnets, SGs, Route Tables, TGW, ELB, NAT, IGW + Resource Map |
 | | CloudFront | `/awsops/cloudfront-cdn` | Distributions, origins, behaviors |
 | | WAF | `/awsops/waf` | Web ACLs, rules, metrics |
@@ -272,7 +274,7 @@ bash scripts/10-verify.sh       # Health check
 ```
 awsops/
 ├── src/
-│   ├── app/                      # 31 pages + 10 API routes
+│   ├── app/                      # 34 pages + 12 API routes
 │   │   ├── page.tsx              # Dashboard home (18 StatsCards)
 │   │   ├── ai/                   # AI Assistant (SSE streaming)
 │   │   ├── ec2/                  # EC2 instances
@@ -294,18 +296,20 @@ awsops/
 │   │   ├── cloudtrail/           # CloudTrail events
 │   │   ├── opensearch/            # OpenSearch 도메인 (domains, encryption, VPC, CW metrics)
 │   │   ├── msk/                  # MSK Kafka 클러스터 (brokers, CW metrics: CPU/Memory/Net)
+│   │   ├── container-cost/       # ECS Container Cost (Fargate pricing)
+│   │   ├── eks-container-cost/  # EKS Container Cost (OpenCost + request-based)
 │   │   ├── cost/                 # Cost Explorer (period/service, MSP auto-detect)
 │   │   ├── inventory/            # Resource Inventory (count trends, cost impact)
 │   │   ├── iam/                  # IAM users/roles
 │   │   ├── security/             # Security findings
 │   │   ├── compliance/           # CIS v1.5~v4.0 benchmarks
-│   │   └── api/                  # 10 API routes (ai, steampipe, auth, msk, rds, elasticache, opensearch, agentcore, code, benchmark)
+│   │   └── api/                  # 12 API routes (ai, steampipe, auth, msk, rds, elasticache, opensearch, agentcore, code, benchmark, container-cost, eks-container-cost)
 │   ├── components/               # 14 shared components (Sidebar, Charts, Table, K9s)
 │   ├── lib/steampipe.ts          # pg Pool (NOT CLI) — max 5, 120s timeout, 5min cache
 │   ├── lib/resource-inventory.ts  # 리소스 인벤토리 스냅샷 (resource snapshots)
 │   ├── lib/cost-snapshot.ts      # Cost 데이터 스냅샷 (cost data fallback)
 │   ├── lib/app-config.ts         # 앱 설정 (app config: costEnabled)
-│   ├── lib/queries/              # 22 SQL query files (ec2, ebs, msk, opensearch, vpc, s3, rds, k8s...)
+│   ├── lib/queries/              # 24 SQL query files (ec2, ebs, msk, opensearch, vpc, s3, rds, k8s, container-cost, eks-container-cost...)
 │   └── types/aws.ts              # TypeScript type definitions
 ├── agent/                        # Strands Agent 소스 (EC2에서 빌드 → ECR → AgentCore에서 실행)
 │   ├── agent.py                  # Main entrypoint with dynamic gateway selection
@@ -326,6 +330,7 @@ awsops/
 │   ├── 05-setup-cognito.sh       # Step 5: Cognito auth
 │   ├── 06-setup-agentcore.sh     # Step 6: Wrapper (6a->6b->6c->6d->6e)
 │   ├── 06a~06e-setup-agentcore-* # Step 6a-6e: AgentCore (split)
+│   ├── 06f-setup-opencost.sh    # Step 6f: Prometheus + OpenCost (EKS cost)
 │   ├── 07-setup-cloudfront-auth.sh # Step 7: Lambda@Edge
 │   ├── 08-start-all.sh           # Start all services
 │   ├── 09-stop-all.sh            # Stop all services
@@ -377,6 +382,7 @@ awsops/
 | MSK | ap-northeast-2 | Kafka cluster monitoring |
 | SSM | ap-northeast-2 | EC2 access |
 | CDK (CloudFormation) | ap-northeast-2 | Infrastructure deployment (AwsopsStack) |
+| OpenCost + Prometheus | EKS cluster | Pod-level cost analysis (CPU/Mem/Net/Storage/GPU) |
 
 ---
 
@@ -422,13 +428,13 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for details.
 
 ---
 
-# AWSops Dashboard v1.5.2 (English)
+# AWSops Dashboard v1.6.0 (English)
 
 > AWS + Kubernetes Operations Dashboard — Steampipe, Next.js 14, Amazon Bedrock AgentCore
 
 Real-time AWS/K8s resource monitoring, network troubleshooting, CIS compliance scanning, and AI-powered analysis in a single dashboard.
 
-**Stats**: 31 pages · 46 routes · 22 query files · 10 API routes · 125 MCP tools (8 Gateways) · 14 components
+**Stats**: 34 pages · 49 routes · 24 query files · 12 API routes · 125 MCP tools (8 Gateways) · 14 components
 
 ## Documentation
 

@@ -3,7 +3,7 @@
 ## 역할
 Steampipe용 SQL 쿼리 정의. 각 파일은 특정 AWS/K8s 서비스에 대한 쿼리를 내보냄.
 
-## 주요 파일 (22개)
+## 주요 파일 (24개)
 - `ebs.ts` — EBS 볼륨/스냅샷 (암호화, 어태치먼트, 인스턴스 조회)
 - `ec2.ts` — EC2 인스턴스
 - `msk.ts` — MSK 클러스터 (`provisioned` JSONB에서 Kafka 버전/브로커/암호화 추출)
@@ -26,6 +26,8 @@ Steampipe용 SQL 쿼리 정의. 각 파일은 특정 AWS/K8s 서비스에 대한
 - `security.ts` — 보안 점검 (Public S3, Open SG, Unencrypted EBS, CVE)
 - `metrics.ts` — CloudWatch 메트릭 데이터 (모니터링 페이지)
 - `relationships.ts` — 리소스 관계 (토폴로지 그래프)
+- `container-cost.ts` — ECS 컨테이너 비용 (Task 메타데이터, 서비스 요약)
+- `eks-container-cost.ts` — EKS 컨테이너 비용 (Pod 리소스 요청, 노드 용량)
 
 ## 규칙
 - 쿼리 작성 전 `information_schema.columns`로 컬럼명 확인
@@ -41,7 +43,7 @@ Steampipe용 SQL 쿼리 정의. 각 파일은 특정 AWS/K8s 서비스에 대한
 ## Role
 SQL query definitions for Steampipe. Each file exports queries for a specific AWS/K8s service.
 
-## Key Files (22)
+## Key Files (24)
 - `ebs.ts` — EBS volumes/snapshots (encryption, attachments, instance lookup)
 - `ec2.ts` — EC2 instances
 - `msk.ts` — MSK clusters (extract Kafka version/brokers/encryption from `provisioned` JSONB)
@@ -64,6 +66,8 @@ SQL query definitions for Steampipe. Each file exports queries for a specific AW
 - `security.ts` — Security checks (Public S3, Open SGs, Unencrypted EBS, CVE)
 - `metrics.ts` — CloudWatch metric data (monitoring page)
 - `relationships.ts` — Resource relationships (topology graph)
+- `container-cost.ts` — ECS container cost (task metadata, service summary)
+- `eks-container-cost.ts` — EKS container cost (pod resource requests, node capacity)
 
 ## Rules
 - Verify column names via `information_schema.columns` before writing queries
