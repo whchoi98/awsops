@@ -19,8 +19,11 @@ interface PodCost {
   memory_request_mb: number;
   cpuCostDaily: number;
   memCostDaily: number;
+  networkCostDaily?: number;
+  pvCostDaily?: number;
+  gpuCostDaily?: number;
   totalCostDaily: number;
-  containers: { name: string; cpu_request: string; memory_request: string }[];
+  containers?: { name: string; cpu_request: string; memory_request: string }[];
 }
 
 interface NodeCost {
@@ -46,6 +49,7 @@ interface EksCostData {
   nodes: NodeCost[];
   namespaceCosts: { name: string; cost: number }[];
   opencostEnabled: boolean;
+  dataSource?: string;
 }
 
 const CHART_COLORS = ['#00d4ff', '#00ff88', '#a855f7', '#f59e0b', '#ef4444', '#6366f1', '#14b8a6', '#f97316'];
@@ -91,9 +95,11 @@ export default function EksContainerCostPage() {
         </div>
       )}
 
-      {data?.opencostEnabled && (
-        <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-green-400 text-sm">
-          OpenCost is configured. For more accurate cost data (Network, Storage, GPU), use the OpenCost integration.
+      {data && (
+        <div className={`${data.dataSource === 'opencost' ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'} border rounded-lg p-3 text-sm`}>
+          {data.dataSource === 'opencost'
+            ? '✅ OpenCost (Prometheus) — Actual usage-based cost: CPU + Memory + Network + Storage + GPU'
+            : '⚠️ Request-based estimation — CPU + Memory only. Install OpenCost for full cost data: scripts/06f-setup-opencost.sh'}
         </div>
       )}
 
@@ -193,7 +199,9 @@ export default function EksContainerCostPage() {
             Nodes ({data?.summary.nodeCount || 0})
           </button>
           <span className="ml-auto text-xs text-gray-400">
-            Cost = Pod resource request ratio x EC2 node cost (50% CPU + 50% Memory)
+            {data?.dataSource === 'opencost'
+              ? 'Source: OpenCost (Prometheus actual usage × AWS pricing)'
+              : 'Source: Request-based (Pod request ratio × EC2 node cost)'}
           </span>
         </div>
 
@@ -203,11 +211,15 @@ export default function EksContainerCostPage() {
               { key: 'namespace', label: 'Namespace', render: (v: string) => <span className="text-cyan-400">{v}</span> },
               { key: 'pod_name', label: 'Pod', render: (v: string) => <span className="font-mono text-xs">{v}</span> },
               { key: 'node_name', label: 'Node', render: (v: string) => <span className="text-xs">{v?.split('.')[0]}</span> },
-              { key: 'instance_type', label: 'Instance', render: (v: string) => <span className="text-xs text-gray-400">{v}</span> },
-              { key: 'cpu_request_vcpu', label: 'CPU Req (vCPU)', render: (v: number) => <span>{v?.toFixed(3)}</span> },
-              { key: 'memory_request_mb', label: 'Mem Req (MB)', render: (v: number) => <span>{v}</span> },
+              { key: 'cpuCostDaily', label: 'CPU', render: (v: number) => <span className="text-xs">{formatCost(v)}</span> },
+              { key: 'memCostDaily', label: 'Memory', render: (v: number) => <span className="text-xs">{formatCost(v)}</span> },
+              ...(data?.dataSource === 'opencost' ? [
+                { key: 'networkCostDaily', label: 'Network', render: (v: number) => <span className="text-xs">{formatCost(v || 0)}</span> },
+                { key: 'pvCostDaily', label: 'Storage', render: (v: number) => <span className="text-xs">{formatCost(v || 0)}</span> },
+                { key: 'gpuCostDaily', label: 'GPU', render: (v: number) => <span className="text-xs">{formatCost(v || 0)}</span> },
+              ] : []),
               {
-                key: 'totalCostDaily', label: 'Daily Cost',
+                key: 'totalCostDaily', label: 'Total/Day',
                 render: (v: number) => <span className="text-green-400 font-medium">{formatCost(v)}</span>,
               },
             ]}

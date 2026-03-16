@@ -62,28 +62,94 @@ export async function GET(request: NextRequest) {
   const action = searchParams.get('action') || 'summary';
 
   try {
-    if (action === 'opencost') {
-      // Phase 2: OpenCost API / 2단계: OpenCost API
-      const config = getConfig();
-      const endpoint = config.opencostEndpoint;
-      if (!endpoint) {
-        return NextResponse.json({
-          error: 'OpenCost not configured',
-          message: 'Set opencostEndpoint in data/config.json. Install with scripts/06f-setup-opencost.sh',
-          opencostEnabled: false,
-        });
-      }
+    // Auto-detect OpenCost: use it as primary if configured / OpenCost 자동 감지: 설정 시 우선 사용
+    const config = getConfig();
+    const opencostEndpoint = config.opencostEndpoint;
+
+    if (opencostEndpoint && action !== 'request-only') {
+      // OpenCost mode: actual usage-based cost (CPU, Memory, Network, Storage, GPU)
+      // OpenCost 모드: 실제 사용량 기반 비용 (CPU, Memory, Network, Storage, GPU)
       try {
         const window = searchParams.get('window') || '1d';
-        const res = await fetch(`${endpoint}/allocation/compute?window=${window}&aggregate=namespace,pod`, { signal: AbortSignal.timeout(10000) });
-        const data = await res.json();
-        return NextResponse.json({ data, opencostEnabled: true });
+        const res = await fetch(
+          `${opencostEndpoint}/allocation/compute?window=${window}&aggregate=namespace,pod`,
+          { signal: AbortSignal.timeout(10000) }
+        );
+        const ocData = await res.json();
+
+        if (ocData.code === 200 && ocData.data?.[0]) {
+          const allocations = ocData.data[0];
+          const podList: any[] = [];
+          const nsCosts: Record<string, number> = {};
+          let totalDailyCost = 0;
+
+          Object.entries(allocations).forEach(([key, alloc]: [string, any]) => {
+            if (!alloc || key === '__idle__') return;
+            const ns = alloc.properties?.namespace || 'unknown';
+            const podName = alloc.properties?.pod || alloc.name || key;
+            // Scale costs to 24h based on actual window minutes / 실제 윈도우 분 기준 24시간으로 환산
+            const minutes = alloc.minutes || 60;
+            const scale = (24 * 60) / minutes;
+            const cpuCost = (alloc.cpuCost || 0) * scale;
+            const memCost = (alloc.ramCost || 0) * scale;
+            const networkCost = (alloc.networkCost || 0) * scale;
+            const pvCost = (alloc.pvCost || 0) * scale;
+            const gpuCost = (alloc.gpuCost || 0) * scale;
+            const totalCost = cpuCost + memCost + networkCost + pvCost + gpuCost;
+
+            podList.push({
+              pod_name: podName,
+              namespace: ns,
+              node_name: alloc.properties?.node || '',
+              instance_type: '',
+              cpu_request_vcpu: alloc.cpuCoreRequestAverage || 0,
+              memory_request_mb: Math.round((alloc.ramByteRequestAverage || 0) / (1024 * 1024)),
+              cpuCostDaily: Math.round(cpuCost * 10000) / 10000,
+              memCostDaily: Math.round(memCost * 10000) / 10000,
+              networkCostDaily: Math.round(networkCost * 10000) / 10000,
+              pvCostDaily: Math.round(pvCost * 10000) / 10000,
+              gpuCostDaily: Math.round(gpuCost * 10000) / 10000,
+              totalCostDaily: Math.round(totalCost * 10000) / 10000,
+              cpuEfficiency: alloc.cpuEfficiency || 0,
+              ramEfficiency: alloc.ramEfficiency || 0,
+            });
+
+            nsCosts[ns] = (nsCosts[ns] || 0) + totalCost;
+            totalDailyCost += totalCost;
+          });
+
+          podList.sort((a, b) => b.totalCostDaily - a.totalCostDaily);
+
+          const namespaceCosts = Object.entries(nsCosts)
+            .map(([name, cost]) => ({ name, cost: Math.round(cost * 1000) / 1000 }))
+            .sort((a, b) => b.cost - a.cost);
+
+          return NextResponse.json({
+            summary: {
+              totalPodCostDaily: Math.round(totalDailyCost * 1000) / 1000,
+              totalPodCostMonthly: Math.round(totalDailyCost * 30 * 100) / 100,
+              totalNodeCostDaily: 0,
+              totalNodeCostMonthly: 0,
+              podCount: podList.length,
+              nodeCount: 0,
+              namespaceCount: namespaceCosts.length,
+              topNamespace: namespaceCosts[0] || null,
+            },
+            pods: podList,
+            nodes: [],
+            namespaces: [],
+            namespaceCosts,
+            opencostEnabled: true,
+            dataSource: 'opencost',
+          });
+        }
       } catch (err: any) {
-        return NextResponse.json({ error: `OpenCost unreachable: ${err.message}`, opencostEnabled: false });
+        console.warn('[EKS Cost] OpenCost failed, falling back to request-based:', err.message);
+        // Fall through to request-based / Request 기반으로 폴백
       }
     }
 
-    // Default: Request-based cost estimation / 기본: 리소스 요청 기반 비용 추정
+    // Request-based cost estimation (fallback or no OpenCost) / 리소스 요청 기반 비용 추정 (폴백 또는 OpenCost 없음)
     const [podsResult, nodesResult, nodeAggResult, nsResult] = await Promise.all([
       runQuery(queries.podResourceRequests),
       runQuery(queries.nodeCapacity),
@@ -207,7 +273,8 @@ export async function GET(request: NextRequest) {
       nodes: nodeCosts,
       namespaces: nsResult.rows || [],
       namespaceCosts,
-      opencostEnabled: !!(getConfig().opencostEndpoint),
+      opencostEnabled: !!opencostEndpoint,
+      dataSource: 'request-based',
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Failed to fetch EKS container cost data' }, { status: 500 });
