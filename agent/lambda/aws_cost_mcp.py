@@ -5,6 +5,7 @@ AWS 비용 운영 MCP 람다 - Cost Explorer, 요금 조회, 예산 관리
 import json
 import boto3
 from datetime import datetime, timedelta
+from cross_account import get_client
 
 
 def lambda_handler(event, context):
@@ -12,6 +13,8 @@ def lambda_handler(event, context):
     params = event if isinstance(event, dict) else json.loads(event)
     t = params.get("tool_name", "")
     args = params.get("arguments", params)
+    target_account_id = args.get('target_account_id')
+    role_arn = f'arn:aws:iam::{target_account_id}:role/AWSopsReadOnlyRole' if target_account_id else None
 
     # Auto-detect tool from parameters if not specified / tool_name 미지정 시 파라미터로 도구 자동 감지
     if not t:
@@ -37,7 +40,7 @@ def lambda_handler(event, context):
 
         # Get cost and usage breakdown by service / 서비스별 비용 및 사용량 조회
         elif t == "get_cost_and_usage":
-            ce = boto3.client('ce', region_name='us-east-1')
+            ce = get_client('ce', 'us-east-1', role_arn)
             now = datetime.utcnow()
             start = args.get("start_date", (now.replace(day=1) - timedelta(days=30)).strftime("%Y-%m-01"))
             end = args.get("end_date", now.strftime("%Y-%m-%d"))
@@ -72,7 +75,7 @@ def lambda_handler(event, context):
 
         # Compare current vs previous month costs / 이번 달과 지난 달 비용 비교
         elif t == "get_cost_and_usage_comparisons":
-            ce = boto3.client('ce', region_name='us-east-1')
+            ce = get_client('ce', 'us-east-1', role_arn)
             now = datetime.utcnow()
             # Current month vs last month
             cur_start = now.strftime("%Y-%m-01")
@@ -113,7 +116,7 @@ def lambda_handler(event, context):
 
         # Identify top cost change drivers between months / 월간 비용 변동 주요 원인 분석
         elif t == "get_cost_comparison_drivers":
-            ce = boto3.client('ce', region_name='us-east-1')
+            ce = get_client('ce', 'us-east-1', role_arn)
             now = datetime.utcnow()
             cur_start = now.strftime("%Y-%m-01")
             cur_end = now.strftime("%Y-%m-%d")
@@ -147,7 +150,7 @@ def lambda_handler(event, context):
 
         # Forecast future costs / 향후 비용 예측
         elif t == "get_cost_forecast":
-            ce = boto3.client('ce', region_name='us-east-1')
+            ce = get_client('ce', 'us-east-1', role_arn)
             now = datetime.utcnow()
             start = now.strftime("%Y-%m-%d")
             # Forecast to end of next month
@@ -169,7 +172,7 @@ def lambda_handler(event, context):
 
         # Get available dimension values (e.g., SERVICE, REGION) / 사용 가능한 차원 값 조회 (예: SERVICE, REGION)
         elif t == "get_dimension_values":
-            ce = boto3.client('ce', region_name='us-east-1')
+            ce = get_client('ce', 'us-east-1', role_arn)
             now = datetime.utcnow()
             start = (now - timedelta(days=30)).strftime("%Y-%m-%d")
             end = now.strftime("%Y-%m-%d")
@@ -181,7 +184,7 @@ def lambda_handler(event, context):
 
         # Get tag values for cost allocation / 비용 할당용 태그 값 조회
         elif t == "get_tag_values":
-            ce = boto3.client('ce', region_name='us-east-1')
+            ce = get_client('ce', 'us-east-1', role_arn)
             now = datetime.utcnow()
             start = (now - timedelta(days=30)).strftime("%Y-%m-%d")
             end = now.strftime("%Y-%m-%d")
@@ -191,7 +194,7 @@ def lambda_handler(event, context):
 
         # Get AWS service pricing information / AWS 서비스 요금 정보 조회
         elif t == "get_pricing":
-            pricing = boto3.client('pricing', region_name='us-east-1')
+            pricing = get_client('pricing', 'us-east-1', role_arn)
             service_code = args.get("service_code", "AmazonEC2")
             filters = args.get("filters", [])
             kwargs = {"ServiceCode": service_code, "MaxResults": 10}
@@ -211,9 +214,9 @@ def lambda_handler(event, context):
 
         # List AWS Budgets with spend info / AWS 예산 목록 및 지출 정보 조회
         elif t == "list_budgets":
-            budgets = boto3.client('budgets', region_name='us-east-1')
+            budgets = get_client('budgets', 'us-east-1', role_arn)
             # Get account ID for Budgets API / Budgets API용 계정 ID 조회
-            account_id = boto3.client('sts').get_caller_identity()['Account']
+            account_id = target_account_id or boto3.client('sts').get_caller_identity()['Account']
             resp = budgets.describe_budgets(AccountId=account_id)
             budget_list = [{"name": b["BudgetName"], "type": b["BudgetType"],
                 "limit": "{} {}".format(b["BudgetLimit"]["Amount"], b["BudgetLimit"]["Unit"]),

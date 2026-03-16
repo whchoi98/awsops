@@ -1,0 +1,128 @@
+{
+  "totalCalls": 9,
+  "successCalls": 9,
+  "failedCalls": 0,
+  "avgResponseTimeMs": 11017,
+  "totalToolsUsed": 15,
+  "uniqueToolsUsed": [
+    "list_roles",
+    "get_cost_and_usage",
+    "steampipe: aws_ec2_instance",
+    "list_db_instances",
+    "steampipe: aws_lambda_function"
+  ],
+  "callsByGateway": {
+    "steampipe": 9
+  },
+  "callsByRoute": {
+    "aws-data": 9
+  },
+  "recentCalls": [
+    {
+      "timestamp": "2026-03-16T15:20:38.498Z",
+      "route": "aws-data",
+      "gateway": "steampipe",
+      "responseTimeMs": 14960,
+      "usedTools": [
+        "steampipe: aws_lambda_function"
+      ],
+      "success": true,
+      "via": "Bedrock + Steampipe SQL (10 rows)"
+    },
+    {
+      "timestamp": "2026-03-16T15:20:02.761Z",
+      "route": "aws-data",
+      "gateway": "steampipe",
+      "responseTimeMs": 10392,
+      "usedTools": [
+        "get_cost_and_usage",
+        "steampipe: aws_ec2_instance"
+      ],
+      "success": true,
+      "via": "Bedrock + Steampipe SQL (1 rows)"
+    },
+    {
+      "timestamp": "2026-03-16T15:19:29.648Z",
+      "route": "aws-data",
+      "gateway": "steampipe",
+      "responseTimeMs": 7121,
+      "usedTools": [
+        "get_cost_and_usage",
+        "list_db_instances",
+        "steampipe: aws_ec2_instance"
+      ],
+      "success": true,
+      "via": "Bedrock + Steampipe SQL (1 rows)"
+    },
+    {
+      "timestamp": "2026-03-16T15:18:55.890Z",
+      "route": "aws-data",
+      "gateway": "steampipe",
+      "responseTimeMs": 7269,
+      "usedTools": [
+        "get_cost_and_usage",
+        "steampipe: aws_ec2_instance"
+      ],
+      "success": true,
+      "via": "Bedrock + Steampipe SQL (1 rows)"
+    },
+    {
+      "timestamp": "2026-03-16T14:48:35.798Z",
+      "route": "aws-data",
+      "gateway": "steampipe",
+      "responseTimeMs": 10136,
+      "usedTools": [
+        "steampipe: aws_ec2_instance"
+      ],
+      "success": true,
+      "via": "Bedrock + Steampipe SQL (1 rows)"
+    },
+    {
+      "timestamp": "2026-03-16T14:48:03.770Z",
+      "route": "aws-data",
+      "gateway": "steampipe",
+      "responseTimeMs": 11843,
+      "usedTools": [
+        "steampipe: aws_ec2_instance"
+      ],
+      "success": true,
+      "via": "Bedrock + Steampipe SQL (1 rows)"
+    },
+    {
+      "timestamp": "2026-03-16T14:46:58.319Z",
+      "route": "aws-data",
+      "gateway": "steampipe",
+      "responseTimeMs": 8097,
+      "usedTools": [
+        "steampipe: aws_ec2_instance"
+      ],
+      "success": true,
+      "via": "Bedrock + Steampipe SQL (1 rows)"
+    },
+    {
+      "timestamp": "2026-03-16T14:46:33.225Z",
+      "route": "aws-data",
+      "gateway": "steampipe",
+      "responseTimeMs": 12929,
+      "usedTools": [
+        "steampipe: aws_ec2_instance"
+      ],
+      "success": true,
+      "via": "Bedrock + Steampipe SQL (1 rows)"
+    },
+    {
+      "timestamp": "2026-03-16T01:16:39.308Z",
+      "route": "aws-data",
+      "gateway": "steampipe",
+      "responseTimeMs": 16402,
+      "usedTools": [
+        "list_roles",
+        "get_cost_and_usage",
+        "steampipe: aws_ec2_instance"
+      ],
+      "success": true,
+      "via": "Bedrock + Steampipe SQL (2 rows)"
+    }
+  ],
+  "lastUpdated": "2026-03-16T15:20:38.498Z"
+}

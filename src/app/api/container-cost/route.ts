@@ -9,12 +9,23 @@ import { writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
-const REGION = 'ap-northeast-2';
+const DEFAULT_REGION = 'ap-northeast-2';
+
+function getAccountProfile(accountId?: string | null): { region: string; profileArgs: string[] } {
+  if (!accountId) return { region: DEFAULT_REGION, profileArgs: [] };
+  const config = getConfig();
+  const account = config.accounts?.find((a: any) => a.accountId === accountId);
+  if (!account) return { region: DEFAULT_REGION, profileArgs: [] };
+  return {
+    region: account.region || DEFAULT_REGION,
+    profileArgs: account.profile ? ['--profile', account.profile] : [],
+  };
+}
 
 // AWS CLI helper — same pattern as msk/route.ts / AWS CLI 헬퍼 — msk/route.ts와 동일 패턴
-function awsCli(args: string[]): any | null {
+function awsCli(args: string[], region: string = DEFAULT_REGION, profileArgs: string[] = []): any | null {
   try {
-    const result = execFileSync('aws', [...args, '--region', REGION, '--output', 'json'], {
+    const result = execFileSync('aws', [...args, '--region', region, ...profileArgs, '--output', 'json'], {
       encoding: 'utf-8', timeout: 30000,
     });
     return JSON.parse(result);
@@ -37,7 +48,7 @@ function calculateFargateCost(cpuUnits: number, memoryMb: number, hours: number)
 }
 
 // Container Insights metrics query / Container Insights 메트릭 쿼리
-function getContainerInsightsMetrics(clusterName: string, serviceName?: string): any | null {
+function getContainerInsightsMetrics(clusterName: string, serviceName?: string, region: string = DEFAULT_REGION, profileArgs: string[] = []): any | null {
   const now = new Date();
   const start = new Date(now.getTime() - 3600 * 1000); // 1 hour ago / 1시간 전
 
@@ -74,7 +85,7 @@ function getContainerInsightsMetrics(clusterName: string, serviceName?: string):
   const tmpFile = join(tmpdir(), `container-cost-${Date.now()}.json`);
   try {
     writeFileSync(tmpFile, JSON.stringify(input));
-    const result = awsCli(['cloudwatch', 'get-metric-data', '--cli-input-json', `file://${tmpFile}`]);
+    const result = awsCli(['cloudwatch', 'get-metric-data', '--cli-input-json', `file://${tmpFile}`], region, profileArgs);
     unlinkSync(tmpFile);
 
     if (!result?.MetricDataResults) return null;
@@ -96,11 +107,14 @@ function getContainerInsightsMetrics(clusterName: string, serviceName?: string):
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action') || 'summary';
+  const accountId = searchParams.get('accountId');
+  const { region, profileArgs } = getAccountProfile(accountId);
+  const queryOpts = accountId ? { accountId } : {};
 
   try {
     if (action === 'tasks') {
       // ECS running tasks / ECS 실행 중 Task 목록
-      const result = await runQuery(queries.ecsRunningTasks);
+      const result = await runQuery(queries.ecsRunningTasks, queryOpts);
       if (result.error) return NextResponse.json({ error: result.error }, { status: 500 });
 
       // Calculate cost per task / Task별 비용 계산
@@ -127,7 +141,7 @@ export async function GET(request: NextRequest) {
       const serviceName = searchParams.get('service') || undefined;
       if (!clusterName) return NextResponse.json({ error: 'cluster required' }, { status: 400 });
 
-      const metrics = getContainerInsightsMetrics(clusterName, serviceName);
+      const metrics = getContainerInsightsMetrics(clusterName, serviceName, region, profileArgs);
       if (!metrics) {
         return NextResponse.json({
           metrics: null,
@@ -140,9 +154,9 @@ export async function GET(request: NextRequest) {
 
     // Default: summary / 기본: 요약
     const [tasksResult, servicesResult, clustersResult] = await Promise.all([
-      runQuery(queries.ecsRunningTasks),
-      runQuery(queries.ecsServiceSummary),
-      runQuery(queries.ecsClusters),
+      runQuery(queries.ecsRunningTasks, queryOpts),
+      runQuery(queries.ecsServiceSummary, queryOpts),
+      runQuery(queries.ecsClusters, queryOpts),
     ]);
 
     const tasks = (tasksResult.rows || []).map((t: any) => {

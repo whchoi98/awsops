@@ -7,10 +7,12 @@ import StatusBadge from '@/components/dashboard/StatusBadge';
 import DataTable from '@/components/table/DataTable';
 import { FileSearch, X, Shield, Settings, Tag, HardDrive } from 'lucide-react';
 import { queries as ctQ } from '@/lib/queries/cloudtrail';
+import { useAccountContext } from '@/contexts/AccountContext';
 
 type TabKey = 'trails' | 'events' | 'writes';
 
 export default function CloudTrailPage() {
+  const { currentAccountId, isMultiAccount } = useAccountContext();
   const [data, setData] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>('trails');
@@ -26,12 +28,13 @@ export default function CloudTrailPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          accountId: currentAccountId,
           queries: { summary: ctQ.summary, trailList: ctQ.trailList },
         }),
       });
       setData(await res.json());
     } catch {} finally { setLoading(false); }
-  }, []);
+  }, [currentAccountId]);
 
   const [eventsLoaded, setEventsLoaded] = useState(false);
   const fetchEvents = useCallback(async () => {
@@ -188,6 +191,9 @@ export default function CloudTrailPage() {
                     {selected.is_organization_trail && <span className="text-xs bg-accent-cyan/10 text-accent-cyan px-2 py-0.5 rounded-full">Organization</span>}
                   </div>
                   <Section title="Trail" icon={FileSearch}>
+                    {selected.account_id && isMultiAccount && (
+                      <Row label="Account" value={selected.account_id} />
+                    )}
                     <Row label="Name" value={selected.name} />
                     <Row label="ARN" value={selected.arn} />
                     <Row label="Home Region" value={selected.home_region} />

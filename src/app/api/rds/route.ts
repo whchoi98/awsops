@@ -2,13 +2,25 @@
 // RDS 인스턴스 메트릭 API — DB 인스턴스별 CloudWatch 메트릭 조회
 import { NextRequest, NextResponse } from 'next/server';
 import { execFileSync } from 'child_process';
+import { getConfig } from '@/lib/app-config';
 
-const REGION = 'ap-northeast-2';
+const DEFAULT_REGION = 'ap-northeast-2';
 const ID_PATTERN = /^[a-zA-Z0-9._-]+$/;
 
-function awsCli(args: string[], timeout = 15000): any {
+function getAccountProfile(accountId?: string | null): { region: string; profileArgs: string[] } {
+  if (!accountId) return { region: DEFAULT_REGION, profileArgs: [] };
+  const config = getConfig();
+  const account = config.accounts?.find(a => a.accountId === accountId);
+  if (!account) return { region: DEFAULT_REGION, profileArgs: [] };
+  return {
+    region: account.region || DEFAULT_REGION,
+    profileArgs: account.profile ? ['--profile', account.profile] : [],
+  };
+}
+
+function awsCli(args: string[], region: string, profileArgs: string[] = [], timeout = 15000): any {
   try {
-    const output = execFileSync('aws', [...args, '--region', REGION, '--output', 'json'],
+    const output = execFileSync('aws', [...args, '--region', region, ...profileArgs, '--output', 'json'],
       { encoding: 'utf-8', timeout });
     return JSON.parse(output);
   } catch { return null; }
@@ -52,6 +64,8 @@ function buildMetricQueries(instanceIds: string[]): any[] {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const instanceIdsParam = searchParams.get('instanceIds');
+  const accountId = searchParams.get('accountId');
+  const { region, profileArgs } = getAccountProfile(accountId);
 
   if (!instanceIdsParam) {
     return NextResponse.json({ error: 'Missing instanceIds' }, { status: 400 });
@@ -79,7 +93,7 @@ export async function GET(request: NextRequest) {
     const result = awsCli([
       'cloudwatch', 'get-metric-data',
       '--cli-input-json', `file://${tmpFile}`,
-    ], 20000);
+    ], region, profileArgs, 20000);
 
     try { execFileSync('rm', [tmpFile]); } catch {}
 

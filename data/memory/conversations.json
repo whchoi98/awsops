@@ -1,0 +1,137 @@
+{
+  "conversations": [
+    {
+      "id": "1773674438498",
+      "userId": "anonymous",
+      "timestamp": "2026-03-16T15:20:38.498Z",
+      "route": "aws-data",
+      "gateway": "steampipe",
+      "question": "Lambda 함수 목록과 런타임을 알려줘",
+      "summary": "# Lambda 함수 목록 (599078780687)\n\n**총 10개**의 Lambda 함수가 있습니다.\n\n---\n\n## 📋 함수 목록\n\n| # | 함수명 | 런타임 | 메모리 | 타임아웃 | 최종 수정일 |\n|---|--------|--------|--------|----------|-------------|\n| 1 | AmazonBedrockPrRev",
+      "usedTools": [
+        "steampipe: aws_lambda_function"
+      ],
+      "responseTimeMs": 14960,
+      "via": "Bedrock + Steampipe SQL (10 rows)"
+    },
+    {
+      "id": "1773674402761",
+      "userId": "anonymous",
+      "timestamp": "2026-03-16T15:20:02.761Z",
+      "route": "aws-data",
+      "gateway": "steampipe",
+      "question": "599078780687 어카운트에는 EC2가 몇대야?",
+      "summary": "# EC2 인스턴스 현황\n\n**599078780687** 어카운트에는 현재 **EC2 인스턴스가 총 4대** 운영 중입니다. 🖥️\n\n---\n\n더 자세한 정보가 필요하시면 말씀해 주세요! 예를 들어:\n- 📋 **인스턴스 목록** (ID, 이름, 타입 등)\n- 🌍 **리전별 분포**\n- ⚡ **인스턴스 상태** (running/stopped 등)\n- 💰",
+      "usedTools": [
+        "get_cost_and_usage",
+        "steampipe: aws_ec2_instance"
+      ],
+      "responseTimeMs": 10392,
+      "via": "Bedrock + Steampipe SQL (1 rows)"
+    },
+    {
+      "id": "1773674369649",
+      "userId": "anonymous",
+      "timestamp": "2026-03-16T15:19:29.649Z",
+      "route": "aws-data",
+      "gateway": "steampipe",
+      "question": "devops2 어카운트에 EC2가 몇대야?",
+      "summary": "# EC2 인스턴스 현황\n\n**devops2** 어카운트에는 현재 **EC2 인스턴스가 없습니다** (0대).\n\n---\n\n다른 정보가 필요하시면 말씀해 주세요! 예를 들어:\n- 🔍 **다른 어카운트의 EC2 현황**\n- 📦 **다른 리소스 확인** (RDS, S3, Lambda 등)\n- 💰 **비용 분석**\n- 🔒 **보안 설정 점검**",
+      "usedTools": [
+        "get_cost_and_usage",
+        "list_db_instances",
+        "steampipe: aws_ec2_instance"
+      ],
+      "responseTimeMs": 7121,
+      "via": "Bedrock + Steampipe SQL (1 rows)"
+    },
+    {
+      "id": "1773674335890",
+      "userId": "anonymous",
+      "timestamp": "2026-03-16T15:18:55.890Z",
+      "route": "aws-data",
+      "gateway": "steampipe",
+      "question": "939105814298 어카운트에 EC2가 몇대야?",
+      "summary": "# EC2 인스턴스 현황\n\n**939105814298** 어카운트에는 현재 **EC2 인스턴스가 총 2대** 운영 중입니다.\n\n---\n\n더 자세한 정보가 필요하시면 말씀해 주세요! 예를 들어:\n- 🔍 **인스턴스 상세 정보** (인스턴스 ID, 타입, 상태 등)\n- 🌍 **리전별 분포**\n- 💰 **비용 최적화 분석**\n- 🔒 **보안 설정 점검**",
+      "usedTools": [
+        "get_cost_and_usage",
+        "steampipe: aws_ec2_instance"
+      ],
+      "responseTimeMs": 7269,
+      "via": "Bedrock + Steampipe SQL (1 rows)"
+    },
+    {
+      "id": "1773672515798",
+      "userId": "anonymous",
+      "timestamp": "2026-03-16T14:48:35.798Z",
+      "route": "aws-data",
+      "gateway": "steampipe",
+      "question": "939105814298 어카운트에는 EC2가 몇대 운영되고 있지?",
+      "summary": "## 939105814298 어카운트 EC2 현황\n\n실시간 데이터 조회 결과, 현재 해당 어카운트에는 **EC2 인스턴스가 존재하지 않습니다.**\n\n| 상태 | 수량 |\n|------|------|\n| 🟢 Running (실행 중) | 0대 |\n| 🔴 Stopped (중지) | 0대 |\n| 🗑️ Terminated (종료) | 0대 |\n| **총합**",
+      "usedTools": [
+        "steampipe: aws_ec2_instance"
+      ],
+      "responseTimeMs": 10136,
+      "via": "Bedrock + Steampipe SQL (1 rows)"
+    },
+    {
+      "id": "1773672483770",
+      "userId": "anonymous",
+      "timestamp": "2026-03-16T14:48:03.770Z",
+      "route": "aws-data",
+      "gateway": "steampipe",
+      "question": "704421365565 계정에는 EC2가 총 몇대있어?",
+      "summary": "## EC2 인스턴스 현황\n\n**704421365565** 계정을 조회한 결과:\n\n| 항목 | 수량 |\n|------|------|\n| 🖥️ EC2 인스턴스 총 대수 | **0대** |\n\n> 현재 해당 계정에는 **실행 중이거나 존재하는 EC2 인스턴스가 없습니다.**\n\n### 💡 참고사항\n- 모든 리전을 대상으로 조회된 결과입니다.\n- 혹시 특정 리전",
+      "usedTools": [
+        "steampipe: aws_ec2_instance"
+      ],
+      "responseTimeMs": 11843,
+      "via": "Bedrock + Steampipe SQL (1 rows)"
+    },
+    {
+      "id": "1773672418319",
+      "userId": "anonymous",
+      "timestamp": "2026-03-16T14:46:58.319Z",
+      "route": "aws-data",
+      "gateway": "steampipe",
+      "question": "host 어카운트에는 ec2가 총 몇대지?",
+      "summary": "## Host 계정 EC2 현황\n\n**Host 계정의 EC2 인스턴스는 총 **0대** 입니다.**\n\n---\n\n### 📋 가능한 원인\n1. **인스턴스 미생성** - 아직 EC2를 생성하지 않은 상태\n2. **모두 종료(Terminated)** - 기존 인스턴스가 모두 삭제된 상태\n3. **다른 리전에 존재 가능성** - 현재 조회 리전 외 다른 리전에 ",
+      "usedTools": [
+        "steampipe: aws_ec2_instance"
+      ],
+      "responseTimeMs": 8097,
+      "via": "Bedrock + Steampipe SQL (1 rows)"
+    },
+    {
+      "id": "1773672393225",
+      "userId": "anonymous",
+      "timestamp": "2026-03-16T14:46:33.225Z",
+      "route": "aws-data",
+      "gateway": "steampipe",
+      "question": "devops 어카운트에 EC2가 모두 몇대지?",
+      "summary": "## DevOps 계정 EC2 현황\n\n현재 **DevOps 계정에 실행 중인 EC2 인스턴스가 없습니다** (총 **0대**).\n\n---\n\n### 📋 가능한 원인\n1. **인스턴스가 없는 경우** - 아직 EC2를 생성하지 않은 상태\n2. **모두 종료(Terminated)된 경우** - 인스턴스가 삭제된 상태\n3. **계정 매칭 문제** - 'devop",
+      "usedTools": [
+        "steampipe: aws_ec2_instance"
+      ],
+      "responseTimeMs": 12929,
+      "via": "Bedrock + Steampipe SQL (1 rows)"
+    },
+    {
+      "id": "1773623799308",
+      "userId": "anonymous",
+      "timestamp": "2026-03-16T01:16:39.308Z",
+      "route": "aws-data",
+      "gateway": "steampipe",
+      "question": "EC2 인스턴스 현황을 알려줘",
+      "summary": "# EC2 인스턴스 현황\n\n## 📊 요약\n| 항목 | 값 |\n|------|-----|\n| 전체 인스턴스 수 | **2개** |\n| 실행 중 (Running) | **2개** |\n| 중지됨 (Stopped) | **0개** |\n\n---\n\n## 🖥️ 인스턴스 상세 정보\n\n### 1. `path-agent-designer-Instance`\n| 항목 | 값 ",
+      "usedTools": [
+        "list_roles",
+        "get_cost_and_usage",
+        "steampipe: aws_ec2_instance"
+      ],
+      "responseTimeMs": 16402,
+      "via": "Bedrock + Steampipe SQL (2 rows)"
+    }
+  ],
+  "lastUpdated": "2026-03-16T15:20:38.498Z"
+}

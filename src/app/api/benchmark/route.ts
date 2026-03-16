@@ -33,9 +33,12 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const benchmark = searchParams.get('benchmark') || 'cis_v300';
   const action = searchParams.get('action') || 'status';
+  const accountId = searchParams.get('accountId');
 
-  const resultFile = join(RESULTS_DIR, `${benchmark}.json`);
-  const statusFile = join(RESULTS_DIR, `${benchmark}.status`);
+  // Account-scoped file names (backward compat: no accountId = original name)
+  const filePrefix = accountId && accountId !== '__all__' ? `${accountId}_${benchmark}` : benchmark;
+  const resultFile = join(RESULTS_DIR, `${filePrefix}.json`);
+  const statusFile = join(RESULTS_DIR, `${filePrefix}.status`);
 
   if (action === 'run') {
     // Start benchmark in background
@@ -49,7 +52,10 @@ export async function GET(request: NextRequest) {
     writeFileSync(statusFile, 'running', 'utf-8');
 
     const dbUrl = getDbUrl();
-    const cmd = `powerpipe benchmark run aws_compliance.benchmark.${benchmark} --database "${dbUrl}" --mod-location "${MOD_DIR}" --output json --progress=false > "${resultFile}" 2>/dev/null && echo "done" > "${statusFile}" || echo "error" > "${statusFile}"`;
+    const searchPathArg = accountId && accountId !== '__all__'
+      ? ` --search-path "public,aws_${accountId.replace(/[^0-9]/g, '')},kubernetes,trivy"`
+      : '';
+    const cmd = `powerpipe benchmark run aws_compliance.benchmark.${benchmark} --database "${dbUrl}" --mod-location "${MOD_DIR}"${searchPathArg} --output json --progress=false > "${resultFile}" 2>/dev/null && echo "done" > "${statusFile}" || echo "error" > "${statusFile}"`;
     exec(cmd);
 
     return NextResponse.json({ status: 'started', message: 'Benchmark started' });

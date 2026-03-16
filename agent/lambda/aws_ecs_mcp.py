@@ -7,6 +7,7 @@ AWS ECS MCP Lambda - 클러스터/서비스/태스크 관리, 트러블슈팅, E
 """
 import json
 import boto3
+from cross_account import get_client
 
 
 def lambda_handler(event, context):
@@ -14,6 +15,9 @@ def lambda_handler(event, context):
     params = event if isinstance(event, dict) else json.loads(event)
     t = params.get("tool_name", "")
     args = params.get("arguments", params)
+    region = args.get("region", "ap-northeast-2")
+    target_account_id = args.get('target_account_id')
+    role_arn = f'arn:aws:iam::{target_account_id}:role/AWSopsReadOnlyRole' if target_account_id else None
 
     # Auto-detect tool from parameters if tool_name not provided / tool_name이 없으면 파라미터로 도구를 자동 감지
     if not t:
@@ -31,11 +35,11 @@ def lambda_handler(event, context):
     try:
         # Route to appropriate handler / 적절한 핸들러로 라우팅
         if t == "ecs_resource_management":
-            return handle_resource(args)
+            return handle_resource(args, region, role_arn)
         elif t == "ecs_troubleshooting_tool":
-            return handle_troubleshoot(args)
+            return handle_troubleshoot(args, region, role_arn)
         elif t == "wait_for_service_ready":
-            return handle_wait_service(args)
+            return handle_wait_service(args, region, role_arn)
         return {"statusCode": 400, "body": json.dumps({"error": "Unknown tool: " + t})}
     except Exception as e:
         # Global error handler - return 500 with error message / 전역 오류 처리 - 오류 메시지와 함께 500 반환
@@ -43,8 +47,8 @@ def lambda_handler(event, context):
 
 
 # Handle ECS resource management operations / ECS 리소스 관리 작업 처리
-def handle_resource(args):
-    ecs = boto3.client('ecs')
+def handle_resource(args, region='ap-northeast-2', role_arn=None):
+    ecs = get_client('ecs', region, role_arn)
     op = args.get("operation", "list_clusters")
 
     # List all ECS clusters with running/pending task counts / 모든 ECS 클러스터를 실행/대기 중인 태스크 수와 함께 조회
@@ -116,7 +120,7 @@ def handle_resource(args):
 
     # List ECR repositories / ECR 리포지토리 목록 조회
     elif op == "list_ecr_repositories":
-        ecr = boto3.client('ecr')
+        ecr = get_client('ecr', region, role_arn)
         repos = ecr.describe_repositories().get('repositories', [])
         return ok({"repositories": [{"name": r['repositoryName'], "uri": r['repositoryUri'],
             "createdAt": str(r.get('createdAt', ''))} for r in repos[:20]]})
@@ -127,9 +131,9 @@ def handle_resource(args):
 
 
 # Handle ECS troubleshooting actions / ECS 트러블슈팅 작업 처리
-def handle_troubleshoot(args):
+def handle_troubleshoot(args, region='ap-northeast-2', role_arn=None):
     action = args.get("action", "get_ecs_troubleshooting_guidance")
-    ecs = boto3.client('ecs')
+    ecs = get_client('ecs', region, role_arn)
 
     # Return step-by-step troubleshooting guidance / 단계별 트러블슈팅 가이드 반환
     if action == "get_ecs_troubleshooting_guidance":
@@ -216,8 +220,8 @@ def handle_troubleshoot(args):
 
 
 # Check if ECS service has reached desired running count / ECS 서비스가 원하는 실행 수에 도달했는지 확인
-def handle_wait_service(args):
-    ecs = boto3.client('ecs')
+def handle_wait_service(args, region='ap-northeast-2', role_arn=None):
+    ecs = get_client('ecs', region, role_arn)
     cluster = args.get("cluster", "")
     service = args.get("service_name", args.get("service", ""))
     svc = ecs.describe_services(cluster=cluster, services=[service]).get('services', [{}])[0]

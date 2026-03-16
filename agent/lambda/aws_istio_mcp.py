@@ -9,6 +9,7 @@ import json
 import boto3
 import os
 import pg8000
+from cross_account import get_client
 
 
 # Steampipe PostgreSQL connection config (VPC-only, same as steampipe-query Lambda)
@@ -24,12 +25,16 @@ DB_CONFIG = {
 
 
 # Execute read-only SQL against Steampipe PostgreSQL / Steampipe PostgreSQL에 읽기 전용 SQL 실행
-def run_sql(sql):
+def run_sql(sql, account_id=None):
     """Execute SQL against Steampipe PostgreSQL. / Steampipe PostgreSQL에 SQL을 실행합니다."""
     try:
         # Connect via pg8000 (not psycopg2, for Lambda compatibility) / pg8000으로 연결 (Lambda 호환성을 위해 psycopg2 미사용)
         conn = pg8000.connect(**DB_CONFIG)
         cur = conn.cursor()
+        if account_id:
+            sanitized = ''.join(c for c in str(account_id) if c.isdigit())
+            if sanitized:
+                cur.execute(f"SET search_path TO public, aws_{sanitized}, kubernetes, trivy")
         cur.execute(sql)
         columns = [desc[0] for desc in cur.description] if cur.description else []
         rows = cur.fetchmany(100)
@@ -47,6 +52,8 @@ def lambda_handler(event, context):
     params = event if isinstance(event, dict) else json.loads(event)
     t = params.get("tool_name", "")
     args = params.get("arguments", params)
+    target_account_id = args.get('target_account_id')
+    role_arn = f'arn:aws:iam::{target_account_id}:role/AWSopsReadOnlyRole' if target_account_id else None
 
     # Auto-detect tool from parameters using keyword matching / 키워드 매칭을 통해 파라미터에서 도구를 자동 감지
     if not t:
@@ -73,61 +80,61 @@ def lambda_handler(event, context):
                 "pods": "SELECT name, namespace, phase FROM kubernetes_pod WHERE containers::text LIKE '%istio-proxy%' LIMIT 20",
             }
             for key, sql in queries.items():
-                results[key] = run_sql(sql)
+                results[key] = run_sql(sql, target_account_id)
             return ok(results)
 
         # List Istio VirtualService resources / Istio VirtualService 리소스 목록 조회
         elif t == "list_virtual_services":
             sql = "SELECT name, namespace, creation_timestamp, spec FROM kubernetes_virtualservice {}ORDER BY namespace, name".format(
                 ns_filter + " " if ns_filter else "")
-            return ok(run_sql(sql))
+            return ok(run_sql(sql, target_account_id))
 
         # List Istio DestinationRule resources / Istio DestinationRule 리소스 목록 조회
         elif t == "list_destination_rules":
             sql = "SELECT name, namespace, creation_timestamp, spec FROM kubernetes_destinationrule {}ORDER BY namespace, name".format(
                 ns_filter + " " if ns_filter else "")
-            return ok(run_sql(sql))
+            return ok(run_sql(sql, target_account_id))
 
         # List Istio Gateway resources (networking.istio.io API group) / Istio Gateway 리소스 목록 조회 (networking.istio.io API 그룹)
         elif t == "list_istio_gateways":
             sql = "SELECT name, namespace, creation_timestamp, spec FROM kubernetes_gateway WHERE api_version LIKE 'networking.istio.io%' {}ORDER BY namespace, name".format(
                 "AND " + ns_filter.replace("WHERE ", "") + " " if ns_filter else "")
-            return ok(run_sql(sql))
+            return ok(run_sql(sql, target_account_id))
 
         # List Istio ServiceEntry resources (external service registration) / Istio ServiceEntry 리소스 목록 조회 (외부 서비스 등록)
         elif t == "list_service_entries":
             sql = "SELECT name, namespace, creation_timestamp, spec FROM kubernetes_serviceentry {}ORDER BY namespace, name".format(
                 ns_filter + " " if ns_filter else "")
-            return ok(run_sql(sql))
+            return ok(run_sql(sql, target_account_id))
 
         # List Istio AuthorizationPolicy resources / Istio AuthorizationPolicy 리소스 목록 조회
         elif t == "list_authorization_policies":
             sql = "SELECT name, namespace, creation_timestamp, spec FROM kubernetes_authorizationpolicy {}ORDER BY namespace, name".format(
                 ns_filter + " " if ns_filter else "")
-            return ok(run_sql(sql))
+            return ok(run_sql(sql, target_account_id))
 
         # List Istio PeerAuthentication resources (mTLS config) / Istio PeerAuthentication 리소스 목록 조회 (mTLS 설정)
         elif t == "list_peer_authentications":
             sql = "SELECT name, namespace, creation_timestamp, spec FROM kubernetes_peerauthentication {}ORDER BY namespace, name".format(
                 ns_filter + " " if ns_filter else "")
-            return ok(run_sql(sql))
+            return ok(run_sql(sql, target_account_id))
 
         # Check sidecar injection status: injected namespaces, pods with/without sidecar
         # 사이드카 주입 상태 확인: 주입된 네임스페이스, 사이드카가 있는/없는 파드
         elif t == "check_sidecar_injection":
             results = {
                 "injectedNamespaces": run_sql(
-                    "SELECT name, labels FROM kubernetes_namespace WHERE labels::text LIKE '%istio-injection\":\"enabled%'"),
+                    "SELECT name, labels FROM kubernetes_namespace WHERE labels::text LIKE '%istio-injection\":\"enabled%'", target_account_id),
                 "podsWithSidecar": run_sql(
                     "SELECT name, namespace, phase FROM kubernetes_pod WHERE containers::text LIKE '%istio-proxy%' {}LIMIT 30".format(
-                        "AND " + ns_filter.replace("WHERE ", "") + " " if ns_filter else "")),
+                        "AND " + ns_filter.replace("WHERE ", "") + " " if ns_filter else ""), target_account_id),
                 "podsWithoutSidecar": run_sql(
                     "SELECT p.name, p.namespace, p.phase FROM kubernetes_pod p "
                     "JOIN kubernetes_namespace n ON p.namespace = n.name "
                     "WHERE n.labels::text LIKE '%istio-injection\":\"enabled%' "
                     "AND p.containers::text NOT LIKE '%istio-proxy%' "
                     "{}LIMIT 20".format(
-                        "AND " + ns_filter.replace("WHERE ", "p.") + " " if ns_filter else "")),
+                        "AND " + ns_filter.replace("WHERE ", "p.") + " " if ns_filter else ""), target_account_id),
             }
             return ok(results)
 
@@ -136,13 +143,13 @@ def lambda_handler(event, context):
             sql = ("SELECT name, \"group\", version, scope "
                    "FROM kubernetes_custom_resource_definition "
                    "WHERE \"group\" LIKE '%istio.io' ORDER BY \"group\", name")
-            return ok(run_sql(sql))
+            return ok(run_sql(sql, target_account_id))
 
         # List Istio EnvoyFilter resources (custom Envoy proxy config) / Istio EnvoyFilter 리소스 목록 조회 (커스텀 Envoy 프록시 설정)
         elif t == "list_envoy_filters":
             sql = "SELECT name, namespace, creation_timestamp, spec FROM kubernetes_envoyfilter {}ORDER BY namespace, name".format(
                 ns_filter + " " if ns_filter else "")
-            return ok(run_sql(sql))
+            return ok(run_sql(sql, target_account_id))
 
         # Return Istio troubleshooting guidance by issue type (general, 503, connection_refused, mtls)
         # 문제 유형별 Istio 트러블슈팅 가이드 반환 (일반, 503, 연결 거부, mTLS)
@@ -192,7 +199,7 @@ def lambda_handler(event, context):
             for kw in ["drop", "delete", "update", "insert", "alter", "create", "truncate"]:
                 if kw in sql.lower().split():
                     return err("Only SELECT queries allowed")
-            return ok(run_sql(sql))
+            return ok(run_sql(sql, target_account_id))
 
         return err("Unknown tool: " + t)
 

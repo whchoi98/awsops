@@ -68,11 +68,14 @@ aws iam put-role-policy --role-name AWSopsLambdaNetworkRole --policy-name FullSe
                 "cloudformation:DescribeStackEvents", "cloudformation:ListStacks",
                 "dynamodb:*", "rds:Describe*", "rds:List*", "rds-data:ExecuteStatement",
                 "elasticache:Describe*", "elasticache:List*",
-                "kafka:Describe*", "kafka:List*", "kafka:Get*"
+                "kafka:Describe*", "kafka:List*", "kafka:Get*",
+                "sts:AssumeRole"
             ],
             "Resource": "*"
         }]
     }' 2>/dev/null
+
+echo "  sts:AssumeRole included (multi-account: AWSopsReadOnlyRole in target accounts)"
 
 echo "  AWSopsLambdaNetworkRole: created + policies attached"
 echo "  Waiting for IAM propagation (10s)..."

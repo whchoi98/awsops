@@ -8,6 +8,7 @@ export const queries = {
 
   webAclList: `
     SELECT
+      account_id,
       name,
       id,
       arn,
@@ -24,6 +25,7 @@ export const queries = {
 
   detail: `
     SELECT
+      account_id,
       name,
       id,
       arn,

@@ -3,6 +3,7 @@ export const queries = {
   // Running tasks with metadata / 실행 중 Task 메타데이터
   ecsRunningTasks: `
     SELECT
+      t.account_id,
       t.task_arn,
       split_part(t.task_arn, '/', 2) AS task_id,
       split_part(t.cluster_arn, '/', 2) AS cluster_name,
@@ -36,6 +37,7 @@ export const queries = {
   // Cluster overview / 클러스터 개요
   ecsClusters: `
     SELECT
+      account_id,
       cluster_name,
       status,
       registered_container_instances_count,

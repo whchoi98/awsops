@@ -1,0 +1,96 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  AWSops Multi-Account: Creates a read-only IAM role in target accounts
+  that the AWSops host account can assume via STS AssumeRole.
+  Deploy this stack in each target account you want to monitor.
+
+Parameters:
+  HostAccountId:
+    Type: String
+    AllowedPattern: '^\d{12}$'
+    Description: AWS Account ID where AWSops is deployed (the host account)
+
+  RoleName:
+    Type: String
+    Default: AWSopsReadOnlyRole
+    Description: Name of the IAM role to create
+
+  ExternalId:
+    Type: String
+    Default: ''
+    Description: (Optional) External ID for additional security. Leave empty to skip.
+
+Conditions:
+  HasExternalId: !Not [!Equals [!Ref ExternalId, '']]
+
+Resources:
+  AWSopsReadOnlyRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref RoleName
+      Description: !Sub 'Read-only role for AWSops Dashboard in account ${HostAccountId}'
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${HostAccountId}:root'
+            Action: 'sts:AssumeRole'
+            Condition: !If
+              - HasExternalId
+              - StringEquals:
+                  'sts:ExternalId': !Ref ExternalId
+              - !Ref AWS::NoValue
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/ReadOnlyAccess
+      Policies:
+        - PolicyName: AWSopsAdditionalReadAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Cost Explorer (not covered by ReadOnlyAccess)
+              - Effect: Allow
+                Action:
+                  - ce:GetCostAndUsage
+                  - ce:GetCostForecast
+                  - ce:GetDimensionValues
+                  - ce:GetTags
+                  - budgets:ViewBudget
+                  - budgets:DescribeBudgets
+                Resource: '*'
+              # CloudWatch enhanced (for metric APIs)
+              - Effect: Allow
+                Action:
+                  - cloudwatch:GetMetricData
+                  - cloudwatch:ListMetrics
+                  - cloudwatch:GetMetricStatistics
+                  - logs:GetLogEvents
+                  - logs:FilterLogEvents
+                  - logs:StartQuery
+                  - logs:GetQueryResults
+                Resource: '*'
+      Tags:
+        - Key: ManagedBy
+          Value: AWSops
+        - Key: Purpose
+          Value: Cross-account read-only access for AWSops Dashboard
+
+Outputs:
+  RoleArn:
+    Description: ARN of the created role (use this in AWSops multi-account setup)
+    Value: !GetAtt AWSopsReadOnlyRole.Arn
+
+  RoleName:
+    Description: Name of the created role
+    Value: !Ref RoleName
+
+  HostAccountId:
+    Description: The host account ID that can assume this role
+    Value: !Ref HostAccountId
+
+  SetupCommand:
+    Description: Add this account in AWSops dashboard
+    Value: !Sub >
+      Open AWSops Dashboard > Accounts page > Add Account
+      Enter Account ID: ${AWS::AccountId}

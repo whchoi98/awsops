@@ -1,7 +1,12 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, unlinkSync } from 'fs';
 import { join, resolve } from 'path';
 
-const DATA_DIR = resolve(process.cwd(), 'data/inventory');
+const BASE_DIR = resolve(process.cwd(), 'data/inventory');
+
+function getDataDir(accountId?: string): string {
+  if (!accountId || accountId === '__all__') return BASE_DIR;
+  return join(BASE_DIR, accountId);
+}
 
 // Dashboard query key → field → inventory label 매핑
 // 대시보드의 기존 쿼리 결과에서 수량 추출 (추가 쿼리 0건)
@@ -51,9 +56,10 @@ export interface InventoryTrend {
   pct30: number | null;
 }
 
-function ensureDir(): void {
-  if (!existsSync(DATA_DIR)) {
-    mkdirSync(DATA_DIR, { recursive: true });
+function ensureDir(dir?: string): void {
+  const d = dir || BASE_DIR;
+  if (!existsSync(d)) {
+    mkdirSync(d, { recursive: true });
   }
 }
 
@@ -62,9 +68,11 @@ function dateStr(d: Date = new Date()): string {
 }
 
 export async function saveSnapshot(
-  dashboardData: Record<string, { rows: unknown[]; error?: string }>
+  dashboardData: Record<string, { rows: unknown[]; error?: string }>,
+  accountId?: string
 ): Promise<void> {
-  ensureDir();
+  const dataDir = getDataDir(accountId);
+  ensureDir(dataDir);
   const today = dateStr();
   const resources: Record<string, number> = {};
 
@@ -94,18 +102,19 @@ export async function saveSnapshot(
     resources,
   };
 
-  writeFileSync(join(DATA_DIR, `${today}.json`), JSON.stringify(snapshot, null, 2), 'utf-8');
-  cleanOldSnapshots(90);
+  writeFileSync(join(dataDir, `${today}.json`), JSON.stringify(snapshot, null, 2), 'utf-8');
+  cleanOldSnapshots(90, dataDir);
 }
 
-export async function getHistory(days: number = 90): Promise<InventorySnapshot[]> {
-  ensureDir();
+export async function getHistory(days: number = 90, accountId?: string): Promise<InventorySnapshot[]> {
+  const dataDir = getDataDir(accountId);
+  ensureDir(dataDir);
 
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
   const cutoffStr = dateStr(cutoff);
 
-  const files = readdirSync(DATA_DIR)
+  const files = readdirSync(dataDir)
     .filter(f => f.endsWith('.json'))
     .sort();
 
@@ -113,7 +122,7 @@ export async function getHistory(days: number = 90): Promise<InventorySnapshot[]
   for (const file of files) {
     if (file.replace('.json', '') < cutoffStr) continue;
     try {
-      const raw = readFileSync(join(DATA_DIR, file), 'utf-8');
+      const raw = readFileSync(join(dataDir, file), 'utf-8');
       history.push(JSON.parse(raw));
     } catch { /* skip corrupt files */ }
   }
@@ -162,15 +171,15 @@ export function calculateTrends(history: InventorySnapshot[]): InventoryTrend[] 
   });
 }
 
-function cleanOldSnapshots(maxDays: number): void {
+function cleanOldSnapshots(maxDays: number, dataDir: string = BASE_DIR): void {
   try {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - maxDays);
     const cutoffStr = dateStr(cutoff);
-    const files = readdirSync(DATA_DIR).filter(f => f.endsWith('.json'));
+    const files = readdirSync(dataDir).filter(f => f.endsWith('.json'));
     for (const file of files) {
       if (file.replace('.json', '') < cutoffStr) {
-        unlinkSync(join(DATA_DIR, file));
+        unlinkSync(join(dataDir, file));
       }
     }
   } catch { /* ignore cleanup errors */ }

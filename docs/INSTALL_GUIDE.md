@@ -77,3 +77,24 @@ curl -sL https://raw.githubusercontent.com/your-repo/awsops/main/scripts/install
 ```
 
 ### 또는 아래의 단계별 가이드를 따르세요. / Or follow the step-by-step guide below.
+
+---
+
+## 멀티 어카운트 추가 / Multi-Account Setup
+
+### 사전 조건 / Prerequisites
+- Host EC2 역할에 `sts:AssumeRole` 권한 (CDK 배포 시 자동 포함)
+- `01-install-base.sh`가 Steampipe aggregator 구조로 aws.spc 자동 생성
+- `02-setup-nextjs.sh`가 Host 어카운트를 config.json accounts[]에 자동 초기화
+
+### 어카운트 추가 / Add Account
+1. **Target 어카운트에서 CFN 배포**:
+   ```bash
+   aws cloudformation deploy \
+     --template-file infra-cdk/cfn-target-account-role.yaml \
+     --stack-name awsops-target-role \
+     --parameter-overrides HostAccountId=<HOST_ACCOUNT_ID> \
+     --capabilities CAPABILITY_NAMED_IAM
+   ```
+2. **AWSops Dashboard > Accounts 페이지 > Add Account**: Account ID, Alias, Role ARN 입력 → Test → Add
+3. **빌드**: `npm run build` → 서비스 재시작

@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import Header from '@/components/layout/Header';
+import { useAccountContext } from '@/contexts/AccountContext';
 import DataTable from '@/components/table/DataTable';
 import { TrendingUp, Info, BarChart3 } from 'lucide-react';
 
@@ -116,6 +117,7 @@ function MultiLineTooltip({ active, payload, label }: any) {
 }
 
 export default function InventoryPage() {
+  const { currentAccountId } = useAccountContext();
   const [history, setHistory] = useState<InventorySnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [visibleResources, setVisibleResources] = useState<Set<string>>(new Set(PRIMARY_RESOURCES));
@@ -124,11 +126,11 @@ export default function InventoryPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/awsops/api/steampipe?action=inventory&days=90');
+      const res = await fetch('/awsops/api/steampipe?action=inventory&days=90&accountId=' + currentAccountId);
       const data = await res.json();
       setHistory(data.history || []);
     } catch {} finally { setLoading(false); }
-  }, []);
+  }, [currentAccountId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

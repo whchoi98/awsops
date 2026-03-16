@@ -5,6 +5,7 @@ AWS Core MCP Lambda - prompt_understanding + call_aws + suggest_aws_commands
 import json
 import boto3
 import shlex
+from cross_account import get_client
 
 
 PROMPT_UNDERSTANDING = """# AWS Solution Design Guide
@@ -44,7 +45,7 @@ PROMPT_UNDERSTANDING = """# AWS Solution Design Guide
 """
 
 
-def call_aws(cli_command, max_results=None):
+def call_aws(cli_command, max_results=None, role_arn=None):
     """Execute an AWS CLI-style command via boto3. / boto3를 통해 AWS CLI 스타일 명령어를 실행합니다."""
     # Parse CLI command into parts / CLI 명령어를 부분으로 분리
     parts = shlex.split(cli_command)
@@ -80,7 +81,7 @@ def call_aws(cli_command, max_results=None):
 
     try:
         # Create boto3 client and invoke the API method / boto3 클라이언트 생성 후 API 메서드 호출
-        client = boto3.client(service)
+        client = get_client(service, 'ap-northeast-2', role_arn)
         method = getattr(client, action)
         response = method(**kwargs)
         response.pop("ResponseMetadata", None)
@@ -144,6 +145,8 @@ def lambda_handler(event, context):
     params = event if isinstance(event, dict) else json.loads(event)
     tool_name = params.get("tool_name", "")
     arguments = params.get("arguments", params)
+    target_account_id = arguments.get('target_account_id')
+    role_arn = f'arn:aws:iam::{target_account_id}:role/AWSopsReadOnlyRole' if target_account_id else None
 
     # Infer tool from parameters if not specified / 도구명이 없으면 파라미터로 추론
     if not tool_name:
@@ -166,9 +169,9 @@ def lambda_handler(event, context):
         max_res = arguments.get("max_results")
         # Support batch execution of up to 5 commands / 최대 5개 명령어 일괄 실행 지원
         if isinstance(cli_cmd, list):
-            results = [call_aws(c, max_res) for c in cli_cmd[:5]]
+            results = [call_aws(c, max_res, role_arn) for c in cli_cmd[:5]]
             return {"statusCode": 200, "body": json.dumps(results, default=str)[:50000]}
-        result = call_aws(cli_cmd, max_res)
+        result = call_aws(cli_cmd, max_res, role_arn)
         return {"statusCode": 200, "body": json.dumps(result, default=str)[:50000]}
 
     # Tool handler: suggest AWS CLI commands / 도구 핸들러: AWS CLI 명령어 추천

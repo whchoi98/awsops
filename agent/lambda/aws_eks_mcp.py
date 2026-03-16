@@ -7,6 +7,7 @@ AWS EKS MCP Lambda - EKS 클러스터 관리, K8s 리소스, CloudWatch, IAM
 """
 import json
 import boto3
+from cross_account import get_client
 
 
 def lambda_handler(event, context):
@@ -14,6 +15,9 @@ def lambda_handler(event, context):
     params = event if isinstance(event, dict) else json.loads(event)
     t = params.get("tool_name", "")
     args = params.get("arguments", params)
+    region = args.get("region", "ap-northeast-2")
+    target_account_id = args.get('target_account_id')
+    role_arn = f'arn:aws:iam::{target_account_id}:role/AWSopsReadOnlyRole' if target_account_id else None
 
     # Auto-detect tool from parameters if tool_name not provided / tool_name이 없으면 파라미터로 도구를 자동 감지
     if not t:
@@ -42,7 +46,7 @@ def lambda_handler(event, context):
     try:
         # List all EKS clusters with status and version / 모든 EKS 클러스터를 상태 및 버전과 함께 목록 조회
         if t == "list_eks_clusters":
-            eks = boto3.client('eks')
+            eks = get_client('eks', region, role_arn)
             clusters = eks.list_clusters().get('clusters', [])
             details = []
             for c in clusters[:10]:
@@ -53,7 +57,7 @@ def lambda_handler(event, context):
 
         # Get EKS cluster VPC/network configuration / EKS 클러스터 VPC/네트워크 구성 조회
         elif t == "get_eks_vpc_config":
-            eks = boto3.client('eks')
+            eks = get_client('eks', region, role_arn)
             # Describe cluster to extract VPC config / 클러스터 조회하여 VPC 설정 추출
             cluster = eks.describe_cluster(name=args['cluster_name'])['cluster']
             vpc = cluster.get('resourcesVpcConfig', {})
@@ -68,7 +72,7 @@ def lambda_handler(event, context):
 
         # Get EKS cluster insights (upgrade, security recommendations) / EKS 클러스터 인사이트 조회 (업그레이드, 보안 권장사항)
         elif t == "get_eks_insights":
-            eks = boto3.client('eks')
+            eks = get_client('eks', region, role_arn)
             cn = args['cluster_name']
             if args.get('insight_id'):
                 resp = eks.describe_insight(clusterName=cn, id=args['insight_id'])
@@ -83,7 +87,7 @@ def lambda_handler(event, context):
         elif t == "list_k8s_resources":
             return {"statusCode": 200, "body": json.dumps({
                 "message": "K8s resource listing requires kubectl/API access on EC2.",
-                "suggestion": "Use SSM: aws ssm send-command --parameters 'commands=[\"kubectl get {} -n {} --context arn:aws:eks:ap-northeast-2:605134447633:cluster/{}\"]'".format(
+                "suggestion": "Use SSM: aws ssm send-command --parameters 'commands=[\"kubectl get {} -n {} --cluster-name {}\"]'".format(
                     args.get('kind', 'pods'), args.get('namespace', 'default'), args.get('cluster_name', ''))})}
 
         # Get pod logs (requires kubectl on EC2) / 파드 로그 조회 (EC2에서 kubectl 필요)
@@ -104,7 +108,7 @@ def lambda_handler(event, context):
         # Get CloudWatch logs for EKS (application, host, performance, control-plane)
         # EKS CloudWatch 로그 조회 (애플리케이션, 호스트, 성능, 컨트롤 플레인)
         elif t == "get_cloudwatch_logs":
-            logs = boto3.client('logs')
+            logs = get_client('logs', region, role_arn)
             cn = args['cluster_name']
             log_type = args.get('log_type', 'application')
             # Map log type to CloudWatch log group name / 로그 유형을 CloudWatch 로그 그룹 이름으로 매핑
@@ -132,7 +136,7 @@ def lambda_handler(event, context):
 
         # Get CloudWatch metrics for EKS Container Insights / EKS Container Insights CloudWatch 메트릭 조회
         elif t == "get_cloudwatch_metrics":
-            cw = boto3.client('cloudwatch')
+            cw = get_client('cloudwatch', region, role_arn)
             import time, datetime
             minutes = args.get('minutes', 60)
             end = datetime.datetime.utcnow()
@@ -162,7 +166,7 @@ def lambda_handler(event, context):
 
         # Get IAM policies attached to an EKS role (managed + inline) / EKS 역할에 연결된 IAM 정책 조회 (관리형 + 인라인)
         elif t == "get_policies_for_role":
-            iam = boto3.client('iam')
+            iam = get_client('iam', region, role_arn)
             rn = args['role_name']
             # Fetch role details, managed policies, and inline policy names / 역할 상세, 관리형 정책, 인라인 정책 이름 조회
             role = iam.get_role(RoleName=rn)['Role']

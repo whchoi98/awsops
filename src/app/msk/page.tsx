@@ -7,12 +7,14 @@ import PieChartCard from '@/components/charts/PieChartCard';
 import DataTable from '@/components/table/DataTable';
 import { Radio, X, Shield, Search, Activity } from 'lucide-react';
 import { queries as mskQ } from '@/lib/queries/msk';
+import { useAccountContext } from '@/contexts/AccountContext';
 
 interface PageData {
   [key: string]: { rows: Record<string, unknown>[]; error?: string };
 }
 
 export default function MSKPage() {
+  const { currentAccountId, isMultiAccount } = useAccountContext();
   const [data, setData] = useState<PageData>({});
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<any>(null);
@@ -30,6 +32,7 @@ export default function MSKPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          accountId: currentAccountId,
           queries: {
             summary: mskQ.summary,
             list: mskQ.list,
@@ -73,7 +76,7 @@ export default function MSKPage() {
         setBrokerMetrics(metricsMap);
       }
     } catch {} finally { setLoading(false); }
-  }, []);
+  }, [currentAccountId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -325,7 +328,13 @@ export default function MSKPage() {
                   {/* Basic Info */}
                   <div className="bg-navy-900 rounded-lg p-4 space-y-2">
                     <h3 className="text-xs font-semibold text-accent-cyan uppercase tracking-wider mb-2">Cluster Info</h3>
-                    {[
+                    {selected.account_id && isMultiAccount && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Account</span>
+                      <span className="text-gray-200 font-mono text-xs">{selected.account_id}</span>
+                    </div>
+                  )}
+                  {[
                       ['Cluster Name', selected.cluster_name],
                       ['State', selected.state],
                       ['Type', selected.cluster_type],

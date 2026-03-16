@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { RefreshCw, Search, Timer, TimerOff } from 'lucide-react';
+import { useAccountContext } from '@/contexts/AccountContext';
 import K9sClusterHeader from '@/components/k8s/K9sClusterHeader';
 import K9sResourceTable from '@/components/k8s/K9sResourceTable';
 import K9sDetailPanel from '@/components/k8s/K9sDetailPanel';
@@ -167,6 +168,7 @@ const tabConfig: Record<string, { query: string; label: string; columns: { key: 
 const TAB_KEYS = Object.keys(tabConfig);
 
 export default function K8sExplorerPage() {
+  const { currentAccountId } = useAccountContext();
   const [activeTab, setActiveTab] = useState('pods');
   const [selectedNamespace, setSelectedNamespace] = useState('');
   const [searchText, setSearchText] = useState('');
@@ -191,6 +193,7 @@ export default function K8sExplorerPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          accountId: currentAccountId,
           queries: {
             resources: currentConfig?.query ?? '',
             nodes: NODE_QUERY,
@@ -205,7 +208,7 @@ export default function K8sExplorerPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeTab]);
+  }, [activeTab, currentAccountId]);
 
   useEffect(() => {
     fetchData();

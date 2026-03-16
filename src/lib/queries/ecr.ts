@@ -10,6 +10,7 @@ export const queries = {
 
   list: `
     SELECT
+      account_id,
       repository_name,
       repository_uri,
       image_tag_mutability,
@@ -25,6 +26,7 @@ export const queries = {
 
   detail: `
     SELECT
+      account_id,
       repository_name,
       repository_uri,
       arn,

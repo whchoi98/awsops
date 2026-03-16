@@ -4,6 +4,7 @@
 import json
 import logging
 import os
+import re
 from strands import Agent
 from strands.models import BedrockModel
 from strands.tools.mcp.mcp_client import MCPClient
@@ -256,7 +257,14 @@ SKILL_BASE = {
 }
 
 # Common footer appended to all prompts / 모든 프롬프트에 추가되는 공통 푸터
-COMMON_FOOTER = "\n\nFormat responses in markdown. Respond in the user's language."
+COMMON_FOOTER = """
+
+## Multi-Account Rules
+- If the user message contains [Target Account: XXXX], you MUST pass target_account_id='XXXX' to EVERY tool call.
+- This is mandatory — omitting target_account_id will query the wrong AWS account.
+- If no [Target Account] prefix, omit target_account_id (uses default account).
+
+Format responses in markdown. Respond in the user's language."""
 
 
 def build_skill_prompt(gateway_role, tools):
@@ -347,8 +355,11 @@ def handler(payload):
 
     gateway_role = payload.get("gateway", DEFAULT_GATEWAY)
     gateway_url = GATEWAYS.get(gateway_role, GATEWAYS[DEFAULT_GATEWAY])
+    target_account_id = payload.get("targetAccountId")
+    if target_account_id and not re.match(r'^\d{12}$', str(target_account_id)):
+        target_account_id = None
 
-    logging.info(f"Gateway: {gateway_role} -> {gateway_url} (history: {len(history)} messages)")
+    logging.info(f"Gateway: {gateway_role} -> {gateway_url} (history: {len(history)} messages, account: {target_account_id or 'default'})")
 
     try:
         mcp_client = MCPClient(lambda: create_gateway_transport(gateway_url))
@@ -360,6 +371,9 @@ def handler(payload):
 
             # Build skill prompt: static patterns + dynamic tool list / 스킬 프롬프트 구성: 정적 패턴 + 동적 도구 목록
             system_prompt = build_skill_prompt(gateway_role, tools)
+            if target_account_id:
+                system_prompt += f"\n\n## MANDATORY: Target Account = {target_account_id}\nYou MUST include target_account_id='{target_account_id}' in ALL tool calls. No exceptions."
+                user_input = f"[Target Account: {target_account_id}] {user_input}"
 
             agent = Agent(
                 model=model,
@@ -375,6 +389,8 @@ def handler(payload):
         logging.error(f"Gateway MCP error [{gateway_role}]: {e}")
         # Fallback: Bedrock direct with base prompt only / 폴백: 베이스 프롬프트만으로 Bedrock 직접 호출
         base_prompt = SKILL_BASE.get(gateway_role, SKILL_BASE[DEFAULT_GATEWAY]) + COMMON_FOOTER
+        if target_account_id:
+            base_prompt += f"\n\n## MANDATORY: Target Account = {target_account_id}"
         agent = Agent(
             model=model,
             system_prompt=base_prompt,

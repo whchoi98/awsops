@@ -5,6 +5,8 @@ import { runQuery } from '@/lib/steampipe';
 import { queries } from '@/lib/queries/eks-container-cost';
 import { getConfig } from '@/lib/app-config';
 
+
+
 // Parse K8s CPU (e.g. "8" -> 8, "500m" -> 0.5, "1000m" -> 1)
 // K8s CPU 파싱 (예: "8" -> 8, "500m" -> 0.5)
 function parseCpu(cpu: string | null): number {
@@ -60,6 +62,8 @@ function getNodeHourlyRate(instanceType: string | null): number {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action') || 'summary';
+  const accountId = searchParams.get('accountId');
+  const queryOpts = accountId ? { accountId } : {};
 
   try {
     // Auto-detect OpenCost: use it as primary if configured / OpenCost 자동 감지: 설정 시 우선 사용
@@ -151,10 +155,10 @@ export async function GET(request: NextRequest) {
 
     // Request-based cost estimation (fallback or no OpenCost) / 리소스 요청 기반 비용 추정 (폴백 또는 OpenCost 없음)
     const [podsResult, nodesResult, nodeAggResult, nsResult] = await Promise.all([
-      runQuery(queries.podResourceRequests),
-      runQuery(queries.nodeCapacity),
-      runQuery(queries.nodeRequestAggregation),
-      runQuery(queries.namespaceSummary),
+      runQuery(queries.podResourceRequests, queryOpts),
+      runQuery(queries.nodeCapacity, queryOpts),
+      runQuery(queries.nodeRequestAggregation, queryOpts),
+      runQuery(queries.namespaceSummary, queryOpts),
     ]);
 
     // Build node info map / 노드 정보 맵 구성

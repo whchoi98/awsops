@@ -15,6 +15,7 @@ export const queries = {
 
   list: `
     SELECT
+      account_id,
       cluster_name,
       arn AS cluster_arn,
       state,
@@ -49,6 +50,7 @@ export const queries = {
   // Cluster detail / 클러스터 상세
   detail: `
     SELECT
+      account_id,
       cluster_name,
       arn AS cluster_arn,
       state,

@@ -2,14 +2,26 @@
 // MSK 브로커 노드 + 메트릭 API — AWS CLI 사용
 import { NextRequest, NextResponse } from 'next/server';
 import { execFileSync } from 'child_process';
+import { getConfig } from '@/lib/app-config';
 
-const REGION = 'ap-northeast-2';
+const DEFAULT_REGION = 'ap-northeast-2';
 const ARN_PATTERN = /^arn:aws:kafka:[a-z0-9-]+:\d{12}:cluster\/[a-zA-Z0-9._-]+\/[a-z0-9-]+$/;
 const CLUSTER_NAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
 
-function awsCli(args: string[], timeout = 15000): any {
+function getAccountProfile(accountId?: string | null): { region: string; profileArgs: string[] } {
+  if (!accountId) return { region: DEFAULT_REGION, profileArgs: [] };
+  const config = getConfig();
+  const account = config.accounts?.find(a => a.accountId === accountId);
+  if (!account) return { region: DEFAULT_REGION, profileArgs: [] };
+  return {
+    region: account.region || DEFAULT_REGION,
+    profileArgs: account.profile ? ['--profile', account.profile] : [],
+  };
+}
+
+function awsCli(args: string[], region: string, profileArgs: string[] = [], timeout = 15000): any {
   try {
-    const output = execFileSync('aws', [...args, '--region', REGION, '--output', 'json'],
+    const output = execFileSync('aws', [...args, '--region', region, ...profileArgs, '--output', 'json'],
       { encoding: 'utf-8', timeout });
     return JSON.parse(output);
   } catch { return null; }
@@ -56,6 +68,8 @@ export async function GET(request: NextRequest) {
   const action = searchParams.get('action');
   const clusterArn = searchParams.get('clusterArn');
   const clusterName = searchParams.get('clusterName');
+  const accountId = searchParams.get('accountId');
+  const { region, profileArgs } = getAccountProfile(accountId);
 
   // Action: metrics — fetch CloudWatch metrics for brokers
   if (action === 'metrics') {
@@ -90,7 +104,7 @@ export async function GET(request: NextRequest) {
       const result = awsCli([
         'cloudwatch', 'get-metric-data',
         '--cli-input-json', `file://${tmpFile}`,
-      ], 20000);
+      ], region, profileArgs, 20000);
 
       // Clean up temp file
       try { execFileSync('rm', [tmpFile]); } catch {}
@@ -129,7 +143,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const data = awsCli(['kafka', 'list-nodes', '--cluster-arn', clusterArn]);
+    const data = awsCli(['kafka', 'list-nodes', '--cluster-arn', clusterArn], region, profileArgs);
     return NextResponse.json({ nodes: data?.NodeInfoList || [] });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to list MSK nodes';

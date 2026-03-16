@@ -15,6 +15,7 @@ export const queries = {
 
   list: `
     SELECT
+      account_id,
       domain_name,
       arn,
       engine_version,
@@ -56,6 +57,7 @@ export const queries = {
   // Domain detail / 도메인 상세
   detail: `
     SELECT
+      account_id,
       domain_name,
       arn,
       domain_id,

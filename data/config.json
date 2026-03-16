@@ -1,0 +1,24 @@
+{
+  "costEnabled": false,
+  "fargatePricing": {
+    "region": "ap-northeast-2",
+    "vcpuPerHour": 0.04048,
+    "gbMemPerHour": 0.004445,
+    "storagePerGbHour": 0.000111
+  },
+  "steampipePassword": "432e_4884_8aac",
+  "accounts": [
+    {
+      "accountId": "939105814298",
+      "alias": "Host",
+      "connectionName": "aws_939105814298",
+      "region": "ap-northeast-2",
+      "isHost": true,
+      "features": {
+        "costEnabled": true,
+        "eksEnabled": false,
+        "k8sEnabled": false
+      }
+    }
+  ]
+}

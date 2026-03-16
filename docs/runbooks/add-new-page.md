@@ -22,12 +22,17 @@ steampipe query "SELECT provisioned::text FROM aws_msk_cluster LIMIT 1" --output
 ```typescript
 export const queries = {
   summary: `SELECT COUNT(*) AS total FROM aws_new_table`,
-  list: `SELECT col1, col2 FROM aws_new_table ORDER BY col1`,
-  detail: `SELECT * FROM aws_new_table WHERE id = '{id}'`,
+  list: `SELECT account_id, col1, col2 FROM aws_new_table ORDER BY col1`,
+  detail: `SELECT account_id, * FROM aws_new_table WHERE id = '{id}'`,
   // 분포 차트용 / For distribution charts
   typeDistribution: `SELECT type AS name, COUNT(*) AS value FROM aws_new_table GROUP BY type`,
 };
 ```
+
+> **멀티 어카운트**: `list`와 `detail` 쿼리에 반드시 `account_id` 컬럼을 포함할 것.
+> DataTable이 멀티 어카운트 모드에서 자동으로 Account 컬럼을 표시함.
+> (Multi-account: Always include `account_id` in `list` and `detail` queries.
+> DataTable auto-displays Account column in multi-account mode.)
 
 ### 3. 페이지 생성 / Create Page
 `src/app/newservice/page.tsx` — 기존 페이지 패턴 참고:
@@ -38,9 +43,12 @@ export const queries = {
 
 필수 포함 / Must include:
 - `'use client'` 선언
-- `fetchData` + `useCallback` + `useEffect` 패턴
+- `import { useAccountContext } from '@/contexts/AccountContext'`
+- `const { currentAccountId, isMultiAccount } = useAccountContext()`
+- `fetchData`의 body에 `accountId: currentAccountId` 포함
+- `fetchData`의 `useCallback` 의존성에 `currentAccountId` 포함
 - StatsCard, DataTable, PieChartCard
-- 상세 패널 (슬라이드 오버 패턴 / slide-over pattern)
+- 상세 패널: `{selected.account_id && isMultiAccount && (<Row label="Account" value={selected.account_id} />)}`
 - 검색 필터 (Search input)
 
 ### 4. 사이드바에 추가 / Add to Sidebar
@@ -82,6 +90,11 @@ npm run build
 ## 체크리스트 / Checklist
 - [ ] `information_schema.columns`로 컬럼명 확인 (Verified column names)
 - [ ] JSONB 컬럼 내용 확인 (Checked JSONB column structure if applicable)
+- [ ] list/detail 쿼리에 `account_id` 포함 (list/detail queries include `account_id`)
+- [ ] `useAccountContext` import + `currentAccountId` 사용 (Uses account context)
+- [ ] fetch body에 `accountId: currentAccountId` 포함 (fetch body includes accountId)
+- [ ] `useCallback` 의존성에 `currentAccountId` 포함 (useCallback depends on currentAccountId)
+- [ ] 상세 패널에 Account Row 추가 (Detail panel shows Account row in multi-account mode)
 - [ ] fetch URL이 `/awsops/api/steampipe`를 사용 (fetch URL uses `/awsops/api/steampipe`)
 - [ ] 컴포넌트 임포트가 default (Component imports are default, not named)
 - [ ] StatsCard color에 이름('cyan') 사용 — hex 아님 (Uses name not hex)

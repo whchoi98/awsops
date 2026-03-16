@@ -10,6 +10,7 @@ import BarChartCard from '@/components/charts/BarChartCard';
 import DataTable from '@/components/table/DataTable';
 import { Box, Rocket, Network, Server, AlertTriangle } from 'lucide-react';
 import { queries as k8sQ } from '@/lib/queries/k8s';
+import { useAccountContext } from '@/contexts/AccountContext';
 
 // Format K8s memory values (e.g. "32986188Ki" → "31.5 GiB") / K8s 메모리 가독성 변환
 function formatK8sMemory(mem: any): string {
@@ -91,6 +92,7 @@ function parseMiB(mem: any): number {
 }
 
 export default function K8sOverviewPage() {
+  const { currentAccountId } = useAccountContext();
   const [data, setData] = useState<DashboardData>({});
   const [loading, setLoading] = useState(true);
   const [selectedClusters, setSelectedClusters] = useState<Set<string>>(new Set());
@@ -174,6 +176,7 @@ export default function K8sOverviewPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          accountId: currentAccountId,
           queries: {
             nodeSummary: k8sQ.nodeSummary,
             podSummary: k8sQ.podSummary,
@@ -194,7 +197,7 @@ export default function K8sOverviewPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentAccountId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

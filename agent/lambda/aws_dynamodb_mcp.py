@@ -4,6 +4,8 @@ AWS DynamoDB MCP 람다 - 테이블 관리, 쿼리, 스캔, 데이터 모델링
 """
 import json
 import boto3
+import cross_account
+from cross_account import get_client
 
 
 def lambda_handler(event, context):
@@ -12,6 +14,8 @@ def lambda_handler(event, context):
     t = params.get("tool_name", "")
     args = params.get("arguments", params)
     region = args.get("region", "ap-northeast-2")
+    target_account_id = args.get('target_account_id')
+    role_arn = f'arn:aws:iam::{target_account_id}:role/AWSopsReadOnlyRole' if target_account_id else None
 
     # Auto-detect tool from parameters if not specified / tool_name 미지정 시 파라미터로 도구 자동 감지
     if not t:
@@ -22,8 +26,17 @@ def lambda_handler(event, context):
         args = params
 
     try:
-        ddb = boto3.client('dynamodb', region_name=region)
-        ddb_r = boto3.resource('dynamodb', region_name=region)
+        ddb = get_client('dynamodb', region, role_arn)
+        if role_arn and role_arn in cross_account._credential_cache:
+            creds = cross_account._credential_cache[role_arn][0]
+            session = boto3.Session(
+                aws_access_key_id=creds['AccessKeyId'],
+                aws_secret_access_key=creds['SecretAccessKey'],
+                aws_session_token=creds['SessionToken'],
+            )
+            ddb_r = session.resource('dynamodb', region_name=region)
+        else:
+            ddb_r = boto3.resource('dynamodb', region_name=region)
 
         # List all DynamoDB tables with status and size / 모든 DynamoDB 테이블 상태 및 크기 조회
         if t == "list_tables":

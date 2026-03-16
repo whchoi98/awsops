@@ -6,8 +6,10 @@ import StatsCard from '@/components/dashboard/StatsCard';
 import DataTable from '@/components/table/DataTable';
 import { Package, X, Tag } from 'lucide-react';
 import { queries as ecrQ } from '@/lib/queries/ecr';
+import { useAccountContext } from '@/contexts/AccountContext';
 
 export default function ECRPage() {
+  const { currentAccountId, isMultiAccount } = useAccountContext();
   const [data, setData] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<any>(null);
@@ -18,11 +20,11 @@ export default function ECRPage() {
     try {
       const res = await fetch(bustCache ? '/awsops/api/steampipe?bustCache=true' : '/awsops/api/steampipe', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ queries: { summary: ecrQ.summary, list: ecrQ.list } }),
+        body: JSON.stringify({ accountId: currentAccountId, queries: { summary: ecrQ.summary, list: ecrQ.list } }),
       });
       setData(await res.json());
     } catch {} finally { setLoading(false); }
-  }, []);
+  }, [currentAccountId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -79,6 +81,9 @@ export default function ECRPage() {
             {detailLoading ? <div className="p-6 space-y-4">{[1,2,3].map(i => <div key={i} className="h-12 skeleton rounded" />)}</div> : selected ? (
               <div className="p-6 space-y-6">
                 <Section title="Repository" icon={Package}>
+                  {selected.account_id && isMultiAccount && (
+                    <Row label="Account" value={selected.account_id} />
+                  )}
                   <Row label="Name" value={selected.repository_name} />
                   <Row label="URI" value={selected.repository_uri} />
                   <Row label="ARN" value={selected.arn} />

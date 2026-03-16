@@ -10,8 +10,10 @@ import DataTable from '@/components/table/DataTable';
 import { Database, X, Network, Shield, Settings, Tag, Activity, Search } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
 import { queries as ecQ } from '@/lib/queries/elasticache';
+import { useAccountContext } from '@/contexts/AccountContext';
 
 export default function ElastiCachePage() {
+  const { currentAccountId, isMultiAccount } = useAccountContext();
   const [data, setData] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<any>(null);
@@ -28,6 +30,7 @@ export default function ElastiCachePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          accountId: currentAccountId,
           queries: {
             summary: ecQ.summary,
             engines: ecQ.engineDistribution,
@@ -51,7 +54,7 @@ export default function ElastiCachePage() {
         } catch {}
       }
     } catch {} finally { setLoading(false); }
-  }, []);
+  }, [currentAccountId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -344,6 +347,9 @@ export default function ElastiCachePage() {
                 </div>
 
                 <Section title="Cluster" icon={Database}>
+                  {selected.account_id && isMultiAccount && (
+                    <Row label="Account" value={selected.account_id} />
+                  )}
                   <Row label="Cluster ID" value={selected.cache_cluster_id} />
                   <Row label="ARN" value={selected.arn} />
                   <Row label="Engine" value={selected.engine} />

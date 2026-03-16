@@ -4,6 +4,7 @@ AWS Valkey/ElastiCache MCP 람다 - 클러스터 관리, 캐시 운영
 """
 import json
 import boto3
+from cross_account import get_client
 
 
 def lambda_handler(event, context):
@@ -12,6 +13,8 @@ def lambda_handler(event, context):
     t = params.get("tool_name", "")
     args = params.get("arguments", params)
     region = args.get("region", "ap-northeast-2")
+    target_account_id = args.get('target_account_id')
+    role_arn = f'arn:aws:iam::{target_account_id}:role/AWSopsReadOnlyRole' if target_account_id else None
 
     # Auto-detect tool from parameters if not specified / tool_name 미지정 시 파라미터로 도구 자동 감지
     if not t:
@@ -22,7 +25,7 @@ def lambda_handler(event, context):
         args = params
 
     try:
-        ec = boto3.client('elasticache', region_name=region)
+        ec = get_client('elasticache', region, role_arn)
 
         # List all ElastiCache clusters with node info / 모든 ElastiCache 클러스터 및 노드 정보 조회
         if t == "list_cache_clusters":

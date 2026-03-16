@@ -9,12 +9,14 @@ import BarChartCard from '@/components/charts/BarChartCard';
 import DataTable from '@/components/table/DataTable';
 import { Database, X, Shield, Settings, Tag, Search, Users } from 'lucide-react';
 import { queries as s3Q } from '@/lib/queries/s3';
+import { useAccountContext } from '@/contexts/AccountContext';
 
 interface PageData {
   [key: string]: { rows: Record<string, unknown>[]; error?: string };
 }
 
 export default function S3Page() {
+  const { currentAccountId, isMultiAccount } = useAccountContext();
   const [data, setData] = useState<PageData>({});
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<any>(null);
@@ -31,12 +33,13 @@ export default function S3Page() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          accountId: currentAccountId,
           queries: { summary: s3Q.summary, list: s3Q.list, publicBuckets: s3Q.publicBuckets },
         }),
       });
       setData(await res.json());
     } catch {} finally { setLoading(false); }
-  }, []);
+  }, [currentAccountId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -240,6 +243,9 @@ export default function S3Page() {
             ) : selected ? (
               <div className="p-6 space-y-6">
                 <Section title="Bucket Info" icon={Database}>
+                  {selected.account_id && isMultiAccount && (
+                    <Row label="Account" value={selected.account_id} />
+                  )}
                   <Row label="Name" value={selected.name} />
                   <Row label="Region" value={selected.region} />
                   <Row label="ARN" value={selected.arn} />

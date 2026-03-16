@@ -7,8 +7,10 @@ import PieChartCard from '@/components/charts/PieChartCard';
 import DataTable from '@/components/table/DataTable';
 import { Users, AlertTriangle, X, Shield, Tag, Clock } from 'lucide-react';
 import { queries as iamQ } from '@/lib/queries/iam';
+import { useAccountContext } from '@/contexts/AccountContext';
 
 export default function IAMPage() {
+  const { currentAccountId, isMultiAccount } = useAccountContext();
   const [data, setData] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<any>(null);
@@ -22,12 +24,13 @@ export default function IAMPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          accountId: currentAccountId,
           queries: { summary: iamQ.summary, userList: iamQ.userList, roleList: iamQ.roleList },
         }),
       });
       setData(await res.json());
     } catch {} finally { setLoading(false); }
-  }, []);
+  }, [currentAccountId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -151,6 +154,9 @@ export default function IAMPage() {
                 {/* User Detail */}
                 {detailType === 'user' && (<>
                   <Section title="User" icon={Users}>
+                    {selected.account_id && isMultiAccount && (
+                      <Row label="Account" value={selected.account_id} />
+                    )}
                     <Row label="Name" value={selected.name} />
                     <Row label="User ID" value={selected.user_id} />
                     <Row label="ARN" value={selected.arn} />
@@ -163,6 +169,9 @@ export default function IAMPage() {
                 {/* Role Detail */}
                 {detailType === 'role' && (<>
                   <Section title="Role" icon={Shield}>
+                    {selected.account_id && isMultiAccount && (
+                      <Row label="Account" value={selected.account_id} />
+                    )}
                     <Row label="Name" value={selected.name} />
                     <Row label="Role ID" value={selected.role_id} />
                     <Row label="ARN" value={selected.arn} />

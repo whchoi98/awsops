@@ -5,6 +5,7 @@ AWS CloudTrail MCP 람다 - 이벤트 조회, CloudTrail Lake 분석
 import json
 import boto3
 from datetime import datetime, timedelta
+from cross_account import get_client
 
 
 def lambda_handler(event, context):
@@ -13,6 +14,8 @@ def lambda_handler(event, context):
     t = params.get("tool_name", "")
     args = params.get("arguments", params)
     region = args.get("region", "ap-northeast-2")
+    target_account_id = args.get('target_account_id')
+    role_arn = f'arn:aws:iam::{target_account_id}:role/AWSopsReadOnlyRole' if target_account_id else None
 
     # Auto-detect tool from parameters if not specified / tool_name 미지정 시 파라미터로 도구 자동 감지
     if not t:
@@ -24,7 +27,7 @@ def lambda_handler(event, context):
         args = params
 
     try:
-        ct = boto3.client('cloudtrail', region_name=region)
+        ct = get_client('cloudtrail', region, role_arn)
 
         # Look up recent CloudTrail events with optional filters / 선택적 필터로 최근 CloudTrail 이벤트 조회
         if t == "lookup_events":

@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useAccountContext } from '@/contexts/AccountContext';
+import AccountSelector from './AccountSelector';
 import {
   LayoutDashboard,
   Server,
@@ -29,6 +31,7 @@ import {
   Radio,
   Search,
   LogOut,
+  Building2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -50,6 +53,7 @@ const navGroups: NavGroup[] = [
       { label: 'Dashboard', href: '/', icon: LayoutDashboard },
       { label: 'AI Assistant', href: '/ai', icon: BrainCircuit },
       { label: 'AgentCore', href: '/agentcore', icon: Activity },
+      { label: 'Accounts', href: '/accounts', icon: Building2 },
     ],
   },
   {
@@ -108,6 +112,8 @@ const navGroups: NavGroup[] = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { getFeatures, isMultiAccount } = useAccountContext();
+  const features = getFeatures();
   const [costEnabled, setCostEnabled] = useState(true);
 
   useEffect(() => {
@@ -166,6 +172,9 @@ export default function Sidebar() {
         </button>
       </div>
 
+      {/* Account Selector */}
+      <AccountSelector />
+
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-2">
         {navGroups.map((group, gi) => (
@@ -178,7 +187,11 @@ export default function Sidebar() {
             )}
             <div className="space-y-0.5">
               {group.items
-                .filter(item => costEnabled || item.href !== '/cost')
+                .filter(item => {
+                  if (item.href === '/cost') return costEnabled && (!isMultiAccount || features.costEnabled);
+                  if (item.href === '/k8s' || item.href === '/k8s/explorer') return !isMultiAccount || features.eksEnabled;
+                  return true;
+                })
                 .map(renderNavItem)}
             </div>
           </div>

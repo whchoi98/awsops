@@ -9,6 +9,7 @@ import StatsCard from '@/components/dashboard/StatsCard';
 import DataTable from '@/components/table/DataTable';
 import { DollarSign, Box, Server, TrendingUp } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { useAccountContext } from '@/contexts/AccountContext';
 
 interface PodCost {
   pod_name: string;
@@ -55,6 +56,7 @@ interface EksCostData {
 const CHART_COLORS = ['#00d4ff', '#00ff88', '#a855f7', '#f59e0b', '#ef4444', '#6366f1', '#14b8a6', '#f97316'];
 
 export default function EksContainerCostPage() {
+  const { currentAccountId } = useAccountContext();
   const [data, setData] = useState<EksCostData | null>(null);
   const [_loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +66,10 @@ export default function EksContainerCostPage() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch('/awsops/api/eks-container-cost');
+      const params = new URLSearchParams();
+      if (currentAccountId) params.set('accountId', currentAccountId);
+      const qs = params.toString();
+      const res = await fetch(`/awsops/api/eks-container-cost${qs ? `?${qs}` : ''}`);
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const json = await res.json();
       if (json.error) throw new Error(json.error);
@@ -75,7 +80,7 @@ export default function EksContainerCostPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentAccountId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -87,6 +92,7 @@ export default function EksContainerCostPage() {
       <Header
         title="EKS Container Cost"
         subtitle="Pod cost estimation based on resource requests and EC2 node pricing"
+        onRefresh={() => fetchData()}
       />
 
       {error && (

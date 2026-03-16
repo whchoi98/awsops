@@ -96,3 +96,25 @@ Route priority in `src/app/api/ai/route.ts`:
 10. General questions → Ops Gateway (fallback → Bedrock Direct)
 
 See also: `scripts/ARCHITECTURE.md` for detailed architecture diagrams.
+
+## Multi-Account Architecture
+
+```
+Target Account              Host Account (AWSops)
+┌───────────────┐           ┌──────────────────────────────────────┐
+│ AWSopsReadOnly │◄─AssumeRole─│ EC2 Role (sts:AssumeRole)           │
+│ Role           │           │                                      │
+│ ReadOnlyAccess │           │ Steampipe                            │
+│ + Cost/CW      │           │  aws (aggregator) → All              │
+│                │           │  aws_XXXX → Target only              │
+│ Trust: Host    │           │  search_path switching               │
+└───────────────┘           │                                      │
+                            │ AccountContext (React)                │
+                            │  → AccountSelector (Sidebar)          │
+                            │  → auto-refresh on switch             │
+                            └──────────────────────────────────────┘
+```
+
+- **search_path 메커니즘**: "All Accounts" = aggregator `aws`, 개별 = `aws_{accountId}`
+- **데이터 흐름**: UI → fetch(accountId) → API → SET search_path → Steampipe → AWS
+- **하위 호환**: accounts 미설정 = 기본 search_path = 싱글 어카운트 동작

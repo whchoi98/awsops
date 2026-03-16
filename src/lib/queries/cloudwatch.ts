@@ -11,6 +11,7 @@ export const queries = {
 
   detail: `
     SELECT
+      account_id,
       name,
       arn,
       state_value,
@@ -35,6 +36,7 @@ export const queries = {
 
   alarmList: `
     SELECT
+      account_id,
       name,
       namespace,
       metric_name,

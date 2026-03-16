@@ -9,6 +9,7 @@ import StatsCard from '@/components/dashboard/StatsCard';
 import DataTable from '@/components/table/DataTable';
 import { DollarSign, Container, Cpu, TrendingUp } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { useAccountContext } from '@/contexts/AccountContext';
 
 interface Task {
   task_id: string;
@@ -43,6 +44,7 @@ interface ContainerCostData {
 const CHART_COLORS = ['#00d4ff', '#00ff88', '#a855f7', '#f59e0b', '#ef4444', '#6366f1', '#14b8a6', '#f97316'];
 
 export default function ContainerCostPage() {
+  const { currentAccountId } = useAccountContext();
   const [data, setData] = useState<ContainerCostData | null>(null);
   const [_loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +53,10 @@ export default function ContainerCostPage() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch('/awsops/api/container-cost');
+      const params = new URLSearchParams();
+      if (currentAccountId) params.set('accountId', currentAccountId);
+      const qs = params.toString();
+      const res = await fetch(`/awsops/api/container-cost${qs ? `?${qs}` : ''}`);
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const json = await res.json();
       if (json.error) throw new Error(json.error);
@@ -62,7 +67,7 @@ export default function ContainerCostPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentAccountId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -74,6 +79,7 @@ export default function ContainerCostPage() {
       <Header
         title="Container Cost"
         subtitle="ECS Task cost analysis based on Fargate pricing and Container Insights"
+        onRefresh={() => fetchData()}
       />
 
       {error && (

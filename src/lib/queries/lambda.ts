@@ -23,6 +23,7 @@ export const queries = {
 
   detail: `
     SELECT
+      account_id,
       name,
       arn,
       description,
@@ -51,6 +52,7 @@ export const queries = {
 
   list: `
     SELECT
+      account_id,
       name,
       runtime,
       handler,

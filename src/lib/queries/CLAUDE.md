@@ -35,6 +35,8 @@ Steampipe용 SQL 쿼리 정의. 각 파일은 특정 AWS/K8s 서비스에 대한
 - `versioning_enabled` (S3), `class` AS alias (RDS), `"group"` (ECS 예약어)
 - 목록 쿼리에서 SCP 차단 컬럼 사용 금지
 - SQL에서 `$` 사용 금지
+- 멀티 어카운트: list/detail 쿼리에 `account_id` 컬럼 필수 포함 (SELECT 첫 번째, alias 있으면 `i.account_id`)
+- summary/집계 쿼리는 account_id 불필요 (search_path가 처리)
 
 ---
 
@@ -74,3 +76,5 @@ SQL query definitions for Steampipe. Each file exports queries for a specific AW
 - Watch JSONB nesting: MSK `provisioned`, OpenSearch `encryption_at_rest_options`, ElastiCache `cache_nodes`
 - `versioning_enabled` (S3), `class` AS alias (RDS), `"group"` (ECS reserved word)
 - Avoid SCP-blocked columns in list queries. No `$` in SQL.
+- Multi-account: list/detail queries must include `account_id` column (first in SELECT, use alias like `i.account_id`)
+- summary/aggregate queries don't need account_id (search_path handles scoping)

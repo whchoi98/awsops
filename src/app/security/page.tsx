@@ -9,10 +9,12 @@ import BarChartCard from '@/components/charts/BarChartCard';
 import DataTable from '@/components/table/DataTable';
 import { ShieldCheck, X, Database, Shield, HardDrive, Bug, Users } from 'lucide-react';
 import { queries as secQ } from '@/lib/queries/security';
+import { useAccountContext } from '@/contexts/AccountContext';
 
 type SecurityTab = 'publicBuckets' | 'mfa' | 'openSGs' | 'unencrypted' | 'cve';
 
 export default function SecurityPage() {
+  const { currentAccountId, isMultiAccount } = useAccountContext();
   const [data, setData] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<SecurityTab>('publicBuckets');
@@ -26,6 +28,7 @@ export default function SecurityPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          accountId: currentAccountId,
           queries: {
             summary: secQ.summary,
             publicBuckets: secQ.publicBuckets,
@@ -39,7 +42,7 @@ export default function SecurityPage() {
       });
       setData(await res.json());
     } catch {} finally { setLoading(false); }
-  }, []);
+  }, [currentAccountId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -195,6 +198,9 @@ export default function SecurityPage() {
               {/* Public Bucket Detail */}
               {detailType === 'bucket' && (<>
                 <Section title="S3 Bucket" icon={Database}>
+                  {selected.account_id && isMultiAccount && (
+                    <Row label="Account" value={selected.account_id} />
+                  )}
                   <Row label="Name" value={selected.name} />
                   <Row label="Region" value={selected.region} />
                   <Row label="Created" value={selected.creation_date ? new Date(selected.creation_date).toLocaleString() : '--'} />

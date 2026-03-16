@@ -1,7 +1,12 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, unlinkSync } from 'fs';
 import { join, resolve } from 'path';
 
-const DATA_DIR = resolve(process.cwd(), 'data/cost');
+const BASE_DIR = resolve(process.cwd(), 'data/cost');
+
+function getDataDir(accountId?: string): string {
+  if (!accountId || accountId === '__all__') return BASE_DIR;
+  return join(BASE_DIR, accountId);
+}
 
 export interface CostSnapshot {
   date: string;
@@ -11,9 +16,10 @@ export interface CostSnapshot {
   serviceCost: Record<string, unknown>[];
 }
 
-function ensureDir(): void {
-  if (!existsSync(DATA_DIR)) {
-    mkdirSync(DATA_DIR, { recursive: true });
+function ensureDir(dir?: string): void {
+  const d = dir || BASE_DIR;
+  if (!existsSync(d)) {
+    mkdirSync(d, { recursive: true });
   }
 }
 
@@ -26,7 +32,8 @@ function dateStr(d: Date = new Date()): string {
  * Called when cost queries succeed (dashboard or cost page).
  */
 export async function saveCostSnapshot(
-  batchResults: Record<string, { rows: unknown[]; error?: string }>
+  batchResults: Record<string, { rows: unknown[]; error?: string }>,
+  accountId?: string
 ): Promise<void> {
   // Extract cost-related results — accept both dashboard and cost page query keys
   const monthly = batchResults['monthlyCost'] || batchResults['costSummary'];
@@ -37,7 +44,8 @@ export async function saveCostSnapshot(
   const monthlyRows = monthly?.rows || [];
   if (monthlyRows.length === 0 || monthly?.error) return;
 
-  ensureDir();
+  const dataDir = getDataDir(accountId);
+  ensureDir(dataDir);
   const today = dateStr();
 
   const snapshot: CostSnapshot = {
@@ -48,39 +56,40 @@ export async function saveCostSnapshot(
     serviceCost: (service?.rows || []) as Record<string, unknown>[],
   };
 
-  writeFileSync(join(DATA_DIR, `${today}.json`), JSON.stringify(snapshot, null, 2), 'utf-8');
-  cleanOldSnapshots(180);
+  writeFileSync(join(dataDir, `${today}.json`), JSON.stringify(snapshot, null, 2), 'utf-8');
+  cleanOldSnapshots(180, dataDir);
 }
 
 /**
  * Get the latest cost snapshot (most recent date).
  */
-export async function getLatestCostSnapshot(): Promise<CostSnapshot | null> {
-  ensureDir();
+export async function getLatestCostSnapshot(accountId?: string): Promise<CostSnapshot | null> {
+  const dataDir = getDataDir(accountId);
+  ensureDir(dataDir);
 
-  const files = readdirSync(DATA_DIR)
+  const files = readdirSync(dataDir)
     .filter(f => f.endsWith('.json'))
     .sort();
 
   if (files.length === 0) return null;
 
   try {
-    const raw = readFileSync(join(DATA_DIR, files[files.length - 1]), 'utf-8');
+    const raw = readFileSync(join(dataDir, files[files.length - 1]), 'utf-8');
     return JSON.parse(raw);
   } catch {
     return null;
   }
 }
 
-function cleanOldSnapshots(maxDays: number): void {
+function cleanOldSnapshots(maxDays: number, dataDir: string = BASE_DIR): void {
   try {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - maxDays);
     const cutoffStr = dateStr(cutoff);
-    const files = readdirSync(DATA_DIR).filter(f => f.endsWith('.json'));
+    const files = readdirSync(dataDir).filter(f => f.endsWith('.json'));
     for (const file of files) {
       if (file.replace('.json', '') < cutoffStr) {
-        unlinkSync(join(DATA_DIR, file));
+        unlinkSync(join(dataDir, file));
       }
     }
   } catch { /* ignore cleanup errors */ }
