@@ -11,7 +11,7 @@
 - `agentcore-stats.ts` — AgentCore 호출 통계 (data/agentcore-stats.json)
 - `agentcore-memory.ts` — 대화 이력 저장/검색, 사용자별 분리 (data/memory/)
 - `auth-utils.ts` — Cognito JWT에서 사용자 정보 추출 (Lambda@Edge 검증 후 payload 디코딩)
-- `queries/*.ts` — 22개 SQL 쿼리 파일 (ebs, msk, opensearch 포함)
+- `queries/*.ts` — 23개 SQL 쿼리 파일 (ebs, msk, opensearch, container-cost 포함)
 
 ## 규칙
 - 모든 DB 접근은 `steampipe.ts`의 `runQuery()` 또는 `batchQuery()`를 통해 수행
@@ -37,7 +37,7 @@ Core libraries: Steampipe database connection, SQL query definitions, inventory,
 - `agentcore-stats.ts` — AgentCore call stats (data/agentcore-stats.json)
 - `agentcore-memory.ts` — Conversation history save/search, per-user isolation (data/memory/)
 - `auth-utils.ts` — Extract Cognito user from JWT (payload decode after Lambda@Edge verification)
-- `queries/*.ts` — 22 SQL query files (incl. ebs, msk, opensearch)
+- `queries/*.ts` — 23 SQL query files (incl. ebs, msk, opensearch, container-cost)
 
 ## Rules
 - ALL database access through `runQuery()` or `batchQuery()` in steampipe.ts
