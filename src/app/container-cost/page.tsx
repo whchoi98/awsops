@@ -5,8 +5,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Header from '@/components/layout/Header';
-import StatsCard from '@/components/common/StatsCard';
-import DataTable from '@/components/common/DataTable';
+import StatsCard from '@/components/dashboard/StatsCard';
+import DataTable from '@/components/table/DataTable';
 import { DollarSign, Container, Cpu, TrendingUp } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
@@ -44,7 +44,7 @@ const CHART_COLORS = ['#00d4ff', '#00ff88', '#a855f7', '#f59e0b', '#ef4444', '#6
 
 export default function ContainerCostPage() {
   const [data, setData] = useState<ContainerCostData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -130,7 +130,7 @@ export default function ContainerCostPage() {
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value: number) => formatCost(value)} />
+                <Tooltip contentStyle={{ backgroundColor: '#0f1629', border: '1px solid #1a2540', borderRadius: '8px' }} />
               </PieChart>
             </ResponsiveContainer>
           ) : (
