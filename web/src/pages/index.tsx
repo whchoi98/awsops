@@ -1,5 +1,5 @@
 import {Redirect} from '@docusaurus/router';
 
 export default function Home(): JSX.Element {
-  return <Redirect to="/guide/intro" />;
+  return <Redirect to="/intro" />;
 }
