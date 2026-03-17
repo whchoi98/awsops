@@ -4,11 +4,13 @@ title: AI 어시스턴트
 description: AWSops AI 어시스턴트 상세 가이드 - 10단계 라우팅 및 고급 기능
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # AI 어시스턴트
 
 AI 어시스턴트는 Amazon Bedrock AgentCore를 기반으로 자연어로 AWS 인프라를 분석하고 관리할 수 있는 기능입니다.
 
-![AI 어시스턴트](/screenshots/overview/ai-assistant.png)
+<Screenshot src="/screenshots/overview/ai-assistant.png" alt="AI 어시스턴트" />
 
 ## 아키텍처
 

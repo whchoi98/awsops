@@ -1,4 +1,4 @@
-import { chromium, type Page, type Browser } from 'playwright';
+import { chromium, type Page, type Browser, type BrowserContext } from 'playwright';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -6,6 +6,13 @@ const BASE_URL = 'https://awsops.whchoi.net/awsops';
 const LOGIN_EMAIL = 'admin@awsops.local';
 const LOGIN_PASSWORD = '!234Qwer';
 const OUTPUT_DIR = path.join(__dirname, '..', 'static', 'screenshots');
+
+// DPR resolution map: viewport stays 1920x1080, only pixel density changes
+const DPR_MAP: Record<string, { dpr: number; suffix: string }> = {
+  fhd:  { dpr: 1,   suffix: '' },        // 1920x1080
+  qhd:  { dpr: 1.5, suffix: '@1.5x' },   // 2880x1620
+  '4k': { dpr: 2,   suffix: '@2x' },      // 3840x2160
+};
 
 interface PageCapture {
   category: string;
@@ -56,6 +63,29 @@ const pages: PageCapture[] = [
   { category: 'security', name: 'security', path: '/security' },
   { category: 'security', name: 'compliance', path: '/compliance' },
 ];
+
+function parseDprArg(): string[] {
+  const dprArg = process.argv.find(a => a.startsWith('--dpr='));
+  const value = dprArg ? dprArg.split('=')[1] : 'all';
+
+  if (value === 'all') {
+    return Object.keys(DPR_MAP);
+  }
+
+  // Support comma-separated: --dpr=1,2 or single: --dpr=1.5
+  const requested = value.split(',');
+  const keys: string[] = [];
+  for (const r of requested) {
+    const dprNum = parseFloat(r.trim());
+    const match = Object.entries(DPR_MAP).find(([, v]) => v.dpr === dprNum);
+    if (match) {
+      keys.push(match[0]);
+    } else {
+      console.warn(`Unknown DPR value: ${r} (valid: 1, 1.5, 2)`);
+    }
+  }
+  return keys.length > 0 ? keys : Object.keys(DPR_MAP);
+}
 
 async function login(page: Page): Promise<void> {
   console.log('Navigating to login page...');
@@ -131,59 +161,96 @@ async function login(page: Page): Promise<void> {
   await page.waitForTimeout(5000);
 }
 
-async function captureScreenshot(page: Page, capture: PageCapture): Promise<void> {
-  const url = `${BASE_URL}${capture.path}`;
+async function captureScreenshot(
+  page: Page,
+  capture: PageCapture,
+  suffix: string,
+): Promise<void> {
   const dir = path.join(OUTPUT_DIR, capture.category);
-
   fs.mkdirSync(dir, { recursive: true });
 
-  console.log(`Capturing: ${capture.category}/${capture.name} (${url})`);
+  // Viewport screenshot
+  await page.screenshot({
+    path: path.join(dir, `${capture.name}${suffix}.png`),
+    fullPage: false,
+  });
 
-  try {
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+  // Full page screenshot
+  await page.screenshot({
+    path: path.join(dir, `${capture.name}-full${suffix}.png`),
+    fullPage: true,
+  });
+}
 
-    // Wait for charts and data to render
-    await page.waitForTimeout(3000);
+async function captureAllDprs(
+  browser: Browser,
+  dprKeys: string[],
+  cookies: { name: string; value: string; domain: string; path: string }[],
+): Promise<void> {
+  for (const key of dprKeys) {
+    const { dpr, suffix } = DPR_MAP[key];
+    const label = `${key.toUpperCase()} (DPR ${dpr}${suffix || ''})`;
+    console.log(`\n=== Capturing at ${label} ===`);
 
-    if (capture.waitSelector) {
-      await page.waitForSelector(capture.waitSelector, { timeout: 10000 }).catch(() => {});
+    const context: BrowserContext = await browser.newContext({
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: dpr,
+      ignoreHTTPSErrors: true,
+    });
+
+    // Restore session cookies so we don't need to login again per DPR
+    if (cookies.length > 0) {
+      await context.addCookies(cookies);
     }
 
-    // Viewport screenshot
-    await page.screenshot({
-      path: path.join(dir, `${capture.name}.png`),
-      fullPage: false,
-    });
+    const page = await context.newPage();
 
-    // Full page screenshot
-    await page.screenshot({
-      path: path.join(dir, `${capture.name}-full.png`),
-      fullPage: true,
-    });
+    for (const capture of pages) {
+      const url = `${BASE_URL}${capture.path}`;
+      console.log(`  ${capture.category}/${capture.name}${suffix} (${url})`);
 
-    console.log(`  Done: ${capture.category}/${capture.name}`);
-  } catch (err) {
-    console.error(`  Error capturing ${capture.category}/${capture.name}:`, err);
+      try {
+        await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+        await page.waitForTimeout(3000);
+
+        if (capture.waitSelector) {
+          await page.waitForSelector(capture.waitSelector, { timeout: 10000 }).catch(() => {});
+        }
+
+        await captureScreenshot(page, capture, suffix);
+        console.log(`    Done`);
+      } catch (err) {
+        console.error(`    Error: ${err}`);
+      }
+    }
+
+    await context.close();
   }
 }
 
 async function main(): Promise<void> {
+  const dprKeys = parseDprArg();
   console.log('Starting screenshot capture...');
+  console.log(`DPR targets: ${dprKeys.map(k => `${k} (${DPR_MAP[k].dpr}x)`).join(', ')}`);
   console.log(`Output directory: ${OUTPUT_DIR}`);
 
+  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+
   const browser: Browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({
+
+  // Login once with DPR 1, then reuse cookies for other DPRs
+  const loginContext = await browser.newContext({
     viewport: { width: 1920, height: 1080 },
     ignoreHTTPSErrors: true,
   });
-  const page = await context.newPage();
+  const loginPage = await loginContext.newPage();
 
   try {
-    await login(page);
+    await login(loginPage);
+    const cookies = await loginContext.cookies();
+    await loginContext.close();
 
-    for (const capture of pages) {
-      await captureScreenshot(page, capture);
-    }
+    await captureAllDprs(browser, dprKeys, cookies);
 
     console.log(`\nAll screenshots captured to ${OUTPUT_DIR}`);
   } catch (err) {

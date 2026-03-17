@@ -4,11 +4,13 @@ title: EKS Deployments
 description: Kubernetes Deployment 목록, 레플리카 상태, 업데이트 전략
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # EKS Deployments
 
 Kubernetes Deployment의 레플리카 상태와 가용성을 확인할 수 있는 페이지입니다.
 
-![EKS Deployments](/screenshots/compute/eks-deployments.png)
+<Screenshot src="/screenshots/compute/eks-deployments.png" alt="EKS Deployments" />
 
 ## 주요 기능
 

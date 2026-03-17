@@ -4,11 +4,13 @@ title: Monitoring Overview
 description: Monitor CPU, memory, network, and Disk I/O metrics for EC2, RDS, EBS, and K8s resources in real-time.
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # Monitoring Overview
 
 A comprehensive monitoring page that displays performance metrics across your AWS infrastructure in a single view.
 
-![Monitoring](/screenshots/monitoring/monitoring.png)
+<Screenshot src="/screenshots/monitoring/monitoring.png" alt="Monitoring" />
 
 ## Key Features
 

@@ -4,11 +4,13 @@ title: CloudWatch
 description: CloudWatch 알람을 모니터링하고 상태 변화를 추적합니다.
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # CloudWatch
 
 AWS CloudWatch 알람의 상태를 한눈에 파악하고 세부 설정을 확인할 수 있는 페이지입니다.
 
-![CloudWatch](/screenshots/monitoring/cloudwatch.png)
+<Screenshot src="/screenshots/monitoring/cloudwatch.png" alt="CloudWatch" />
 
 ## 주요 기능
 

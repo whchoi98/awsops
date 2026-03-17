@@ -4,11 +4,13 @@ title: AWSops 소개
 description: AWS + Kubernetes 운영 대시보드 개요 및 주요 기능
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # AWSops 소개
 
 AWSops는 AWS 및 Kubernetes 인프라를 실시간으로 모니터링하고 관리할 수 있는 통합 운영 대시보드입니다. Steampipe, Next.js 14, Amazon Bedrock AgentCore를 기반으로 구축되어 강력한 데이터 조회와 AI 기반 분석 기능을 제공합니다.
 
-![대시보드](/screenshots/overview/dashboard.png)
+<Screenshot src="/screenshots/overview/dashboard.png" alt="대시보드" />
 
 ## 주요 기능
 

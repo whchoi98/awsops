@@ -4,11 +4,13 @@ title: Monitoring Overview
 description: EC2, RDS, EBS, K8s 리소스의 CPU, 메모리, 네트워크, Disk I/O 메트릭을 실시간으로 모니터링합니다.
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # Monitoring Overview
 
 AWS 인프라 전반의 성능 메트릭을 한 화면에서 종합적으로 모니터링할 수 있는 페이지입니다.
 
-![Monitoring](/screenshots/monitoring/monitoring.png)
+<Screenshot src="/screenshots/monitoring/monitoring.png" alt="Monitoring" />
 
 ## 주요 기능
 

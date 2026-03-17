@@ -4,11 +4,13 @@ title: AgentCore
 description: Amazon Bedrock AgentCore 아키텍처 및 MCP 도구 상세
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # AgentCore
 
 AgentCore는 Amazon Bedrock AgentCore Runtime과 Gateway를 기반으로 AI 어시스턴트의 도구 실행을 담당합니다.
 
-![AgentCore](/screenshots/overview/agentcore.png)
+<Screenshot src="/screenshots/overview/agentcore.png" alt="AgentCore" />
 
 ## 아키텍처
 

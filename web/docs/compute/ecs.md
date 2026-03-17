@@ -4,11 +4,13 @@ title: ECS
 description: ECS 클러스터, 서비스, 태스크 모니터링
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # ECS (Elastic Container Service)
 
 ECS 클러스터, 서비스, 태스크의 상태를 모니터링할 수 있는 페이지입니다.
 
-![ECS](/screenshots/compute/ecs.png)
+<Screenshot src="/screenshots/compute/ecs.png" alt="ECS" />
 
 ## 주요 기능
 

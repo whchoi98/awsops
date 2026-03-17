@@ -4,11 +4,13 @@ title: EKS Services
 description: Kubernetes Service list, types, endpoint information
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # EKS Services
 
 A page for viewing the list and network configuration of Kubernetes Services.
 
-![EKS Services](/screenshots/compute/eks-services.png)
+<Screenshot src="/screenshots/compute/eks-services.png" alt="EKS Services" />
 
 ## Key Features
 

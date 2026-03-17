@@ -2,11 +2,13 @@
 sidebar_position: 5
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # ElastiCache
 
 Monitor ElastiCache clusters (Valkey, Redis, Memcached) and check performance metrics.
 
-![ElastiCache](/screenshots/storage/elasticache.png)
+<Screenshot src="/screenshots/storage/elasticache.png" alt="ElastiCache" />
 
 ## Key Features
 

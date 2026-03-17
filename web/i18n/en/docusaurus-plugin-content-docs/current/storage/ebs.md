@@ -2,11 +2,13 @@
 sidebar_position: 1
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # EBS
 
 Manage and monitor EBS (Elastic Block Store) volumes and snapshots.
 
-![EBS](/screenshots/storage/ebs.png)
+<Screenshot src="/screenshots/storage/ebs.png" alt="EBS" />
 
 ## Key Features
 

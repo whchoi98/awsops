@@ -4,11 +4,13 @@ title: EKS Explorer
 description: Explore Kubernetes resources with K9s-style terminal UI
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # EKS Explorer
 
 A page for exploring Kubernetes resources with a K9s-style terminal UI.
 
-![EKS Explorer](/screenshots/compute/eks-explorer.png)
+<Screenshot src="/screenshots/compute/eks-explorer.png" alt="EKS Explorer" />
 
 ## Key Features
 

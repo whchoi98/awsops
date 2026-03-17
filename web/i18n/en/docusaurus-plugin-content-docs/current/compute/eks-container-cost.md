@@ -4,11 +4,13 @@ title: EKS Container Cost
 description: EKS Pod cost analysis, OpenCost integration, CPU/Memory/Network/Storage/GPU 5 cost columns
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # EKS Container Cost
 
 A page for analyzing EKS Pod costs. It supports two data sources: OpenCost (default) or Request-based estimation (fallback).
 
-![EKS Container Cost](/screenshots/compute/eks-container-cost.png)
+<Screenshot src="/screenshots/compute/eks-container-cost.png" alt="EKS Container Cost" />
 
 ## Key Features
 

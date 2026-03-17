@@ -4,11 +4,13 @@ title: ECS Container Cost
 description: ECS Fargate task cost analysis, CloudWatch Container Insights metrics
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # ECS Container Cost
 
 A page for analyzing the cost of ECS Fargate tasks. Costs are calculated based on Fargate pricing and CloudWatch Container Insights metrics.
 
-![ECS Container Cost](/screenshots/compute/ecs-container-cost.png)
+<Screenshot src="/screenshots/compute/ecs-container-cost.png" alt="ECS Container Cost" />
 
 ## Key Features
 

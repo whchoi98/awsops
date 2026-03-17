@@ -4,11 +4,13 @@ title: ECR
 description: ECR 리포지토리, 이미지, 취약점 스캔 정보
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # ECR (Elastic Container Registry)
 
 ECR 리포지토리와 이미지 정보를 확인할 수 있는 페이지입니다.
 
-![ECR](/screenshots/compute/ecr.png)
+<Screenshot src="/screenshots/compute/ecr.png" alt="ECR" />
 
 ## 주요 기능
 

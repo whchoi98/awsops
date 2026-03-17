@@ -4,11 +4,13 @@ title: Lambda Functions
 description: Lambda function list, runtime distribution, memory/timeout settings
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # Lambda Functions
 
 A page for viewing the list and configuration information of AWS Lambda functions.
 
-![Lambda Functions](/screenshots/compute/lambda.png)
+<Screenshot src="/screenshots/compute/lambda.png" alt="Lambda Functions" />
 
 ## Key Features
 

@@ -4,11 +4,13 @@ title: EC2 Instances
 description: EC2 instance list, status monitoring, detailed information
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # EC2 Instances
 
 A page for monitoring the real-time status of EC2 instances and viewing detailed information.
 
-![EC2 Instances](/screenshots/compute/ec2.png)
+<Screenshot src="/screenshots/compute/ec2.png" alt="EC2 Instances" />
 
 ## Key Features
 

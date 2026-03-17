@@ -4,11 +4,13 @@ title: EKS Nodes
 description: Kubernetes node list, capacity, allocated resources, status
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # EKS Nodes
 
 A page for viewing detailed information about Kubernetes node capacity, allocatable resources, and Pod requests.
 
-![EKS Nodes](/screenshots/compute/eks-nodes.png)
+<Screenshot src="/screenshots/compute/eks-nodes.png" alt="EKS Nodes" />
 
 ## Key Features
 

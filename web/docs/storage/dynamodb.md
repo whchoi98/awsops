@@ -2,11 +2,13 @@
 sidebar_position: 4
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # DynamoDB
 
 DynamoDB 테이블을 관리하고 용량 및 설정을 모니터링합니다.
 
-![DynamoDB](/screenshots/storage/dynamodb.png)
+<Screenshot src="/screenshots/storage/dynamodb.png" alt="DynamoDB" />
 
 ## 주요 기능
 

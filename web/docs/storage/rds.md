@@ -2,11 +2,13 @@
 sidebar_position: 3
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # RDS
 
 RDS(Relational Database Service) 인스턴스를 모니터링하고 성능 메트릭을 확인합니다.
 
-![RDS](/screenshots/storage/rds.png)
+<Screenshot src="/screenshots/storage/rds.png" alt="RDS" />
 
 ## 주요 기능
 

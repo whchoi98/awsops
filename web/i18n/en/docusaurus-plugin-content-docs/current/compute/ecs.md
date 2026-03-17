@@ -4,11 +4,13 @@ title: ECS
 description: ECS cluster, service, and task monitoring
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # ECS (Elastic Container Service)
 
 A page for monitoring the status of ECS clusters, services, and tasks.
 
-![ECS](/screenshots/compute/ecs.png)
+<Screenshot src="/screenshots/compute/ecs.png" alt="ECS" />
 
 ## Key Features
 

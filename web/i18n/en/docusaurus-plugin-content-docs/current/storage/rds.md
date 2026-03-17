@@ -2,11 +2,13 @@
 sidebar_position: 3
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # RDS
 
 Monitor RDS (Relational Database Service) instances and check performance metrics.
 
-![RDS](/screenshots/storage/rds.png)
+<Screenshot src="/screenshots/storage/rds.png" alt="RDS" />
 
 ## Key Features
 

@@ -2,11 +2,13 @@
 sidebar_position: 5
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # ElastiCache
 
 ElastiCache 클러스터(Valkey, Redis, Memcached)를 모니터링하고 성능 메트릭을 확인합니다.
 
-![ElastiCache](/screenshots/storage/elasticache.png)
+<Screenshot src="/screenshots/storage/elasticache.png" alt="ElastiCache" />
 
 ## 주요 기능
 

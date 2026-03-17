@@ -4,11 +4,13 @@ title: Introduction to AWSops
 description: Overview and key features of the AWS + Kubernetes operations dashboard
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # Introduction to AWSops
 
 AWSops is an integrated operations dashboard for real-time monitoring and management of AWS and Kubernetes infrastructure. Built on Steampipe, Next.js 14, and Amazon Bedrock AgentCore, it provides powerful data querying and AI-powered analysis capabilities.
 
-![Dashboard](/screenshots/overview/dashboard.png)
+<Screenshot src="/screenshots/overview/dashboard.png" alt="Dashboard" />
 
 ## Key Features
 

@@ -4,11 +4,13 @@ title: CloudWatch
 description: Monitor CloudWatch alarms and track state changes.
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # CloudWatch
 
 A page for viewing AWS CloudWatch alarm states at a glance and examining detailed configurations.
 
-![CloudWatch](/screenshots/monitoring/cloudwatch.png)
+<Screenshot src="/screenshots/monitoring/cloudwatch.png" alt="CloudWatch" />
 
 ## Key Features
 

@@ -4,11 +4,13 @@ title: Resource Inventory
 description: Track AWS resource count trends and estimate cost impact.
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # Resource Inventory
 
 A page for tracking daily changes in AWS resource counts and estimating cost impact.
 
-![Inventory](/screenshots/monitoring/inventory.png)
+<Screenshot src="/screenshots/monitoring/inventory.png" alt="Inventory" />
 
 ## Key Features
 

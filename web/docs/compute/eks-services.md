@@ -4,11 +4,13 @@ title: EKS Services
 description: Kubernetes Service 목록, 타입, 엔드포인트 정보
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # EKS Services
 
 Kubernetes Service의 목록과 네트워크 설정을 확인할 수 있는 페이지입니다.
 
-![EKS Services](/screenshots/compute/eks-services.png)
+<Screenshot src="/screenshots/compute/eks-services.png" alt="EKS Services" />
 
 ## 주요 기능
 

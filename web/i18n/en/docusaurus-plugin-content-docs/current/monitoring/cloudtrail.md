@@ -4,11 +4,13 @@ title: CloudTrail
 description: Query AWS API activity logs and analyze audit events.
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # CloudTrail
 
 A page for viewing CloudTrail trails and events that record API activity in your AWS account.
 
-![CloudTrail](/screenshots/monitoring/cloudtrail.png)
+<Screenshot src="/screenshots/monitoring/cloudtrail.png" alt="CloudTrail" />
 
 ## Key Features
 

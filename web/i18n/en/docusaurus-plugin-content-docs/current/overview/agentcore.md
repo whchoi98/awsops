@@ -4,11 +4,13 @@ title: AgentCore
 description: Amazon Bedrock AgentCore architecture and MCP tool details
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # AgentCore
 
 AgentCore handles tool execution for the AI Assistant, powered by Amazon Bedrock AgentCore Runtime and Gateway.
 
-![AgentCore](/screenshots/overview/agentcore.png)
+<Screenshot src="/screenshots/overview/agentcore.png" alt="AgentCore" />
 
 ## Architecture
 

@@ -4,11 +4,13 @@ title: AI Assistant
 description: AWSops AI Assistant detailed guide - 10-route classification and advanced features
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # AI Assistant
 
 The AI Assistant is powered by Amazon Bedrock AgentCore, enabling you to analyze and manage AWS infrastructure using natural language.
 
-![AI Assistant](/screenshots/overview/ai-assistant.png)
+<Screenshot src="/screenshots/overview/ai-assistant.png" alt="AI Assistant" />
 
 ## Architecture
 

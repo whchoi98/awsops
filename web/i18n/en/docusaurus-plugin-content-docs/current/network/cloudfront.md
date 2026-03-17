@@ -4,11 +4,13 @@ title: CloudFront
 description: Monitoring CloudFront distribution status, domains, origins, and cache policies
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # CloudFront
 
 A page to monitor and manage Amazon CloudFront CDN distributions.
 
-![CloudFront](/screenshots/network/cloudfront.png)
+<Screenshot src="/screenshots/network/cloudfront.png" alt="CloudFront" />
 
 ## Key Features
 

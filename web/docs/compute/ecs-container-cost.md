@@ -4,11 +4,13 @@ title: ECS Container Cost
 description: ECS Fargate 태스크 비용 분석, CloudWatch Container Insights 메트릭
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # ECS Container Cost
 
 ECS Fargate 태스크의 비용을 분석하는 페이지입니다. Fargate 가격과 CloudWatch Container Insights 메트릭을 기반으로 비용을 계산합니다.
 
-![ECS Container Cost](/screenshots/compute/ecs-container-cost.png)
+<Screenshot src="/screenshots/compute/ecs-container-cost.png" alt="ECS Container Cost" />
 
 ## 주요 기능
 

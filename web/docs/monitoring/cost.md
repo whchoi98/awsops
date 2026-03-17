@@ -4,11 +4,13 @@ title: Cost Explorer
 description: AWS 비용을 서비스별, 일별, 월별로 분석하고 트렌드를 파악합니다.
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # Cost Explorer
 
 AWS 비용 데이터를 다양한 관점에서 분석하고 시각화하는 페이지입니다.
 
-![Cost](/screenshots/monitoring/cost.png)
+<Screenshot src="/screenshots/monitoring/cost.png" alt="Cost" />
 
 ## 주요 기능
 

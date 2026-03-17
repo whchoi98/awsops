@@ -4,11 +4,13 @@ title: CloudTrail
 description: AWS API 활동 로그를 조회하고 감사 이벤트를 분석합니다.
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # CloudTrail
 
 AWS 계정의 API 활동을 기록하는 CloudTrail 트레일과 이벤트를 조회할 수 있는 페이지입니다.
 
-![CloudTrail](/screenshots/monitoring/cloudtrail.png)
+<Screenshot src="/screenshots/monitoring/cloudtrail.png" alt="CloudTrail" />
 
 ## 주요 기능
 

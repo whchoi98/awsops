@@ -4,11 +4,13 @@ title: EKS Container Cost
 description: EKS Pod 비용 분석, OpenCost 통합, CPU/Memory/Network/Storage/GPU 5개 비용 컬럼
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # EKS Container Cost
 
 EKS Pod의 비용을 분석하는 페이지입니다. OpenCost (기본) 또는 Request 기반 추정 (폴백)의 두 가지 데이터 소스를 지원합니다.
 
-![EKS Container Cost](/screenshots/compute/eks-container-cost.png)
+<Screenshot src="/screenshots/compute/eks-container-cost.png" alt="EKS Container Cost" />
 
 ## 주요 기능
 

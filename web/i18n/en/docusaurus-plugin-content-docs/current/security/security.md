@@ -2,11 +2,13 @@
 sidebar_position: 2
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # Security
 
 The Security page provides comprehensive monitoring of security vulnerabilities in your AWS environment. You can view public S3 buckets, open Security Groups, unencrypted EBS volumes, and container CVE vulnerabilities in one place.
 
-![Security](/screenshots/security/security.png)
+<Screenshot src="/screenshots/security/security.png" alt="Security" />
 
 ## Summary Statistics
 

@@ -2,11 +2,13 @@
 sidebar_position: 7
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # MSK
 
 Monitor Amazon MSK (Managed Streaming for Apache Kafka) clusters and check broker performance.
 
-![MSK](/screenshots/storage/msk.png)
+<Screenshot src="/screenshots/storage/msk.png" alt="MSK" />
 
 ## Key Features
 

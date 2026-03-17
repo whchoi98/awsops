@@ -4,11 +4,13 @@ title: EKS Overview
 description: EKS cluster status, node resources, Pod status summary
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # EKS Overview
 
 A page for viewing the overall status of EKS clusters, node resources, and Pod status at a glance.
 
-![EKS Overview](/screenshots/compute/eks.png)
+<Screenshot src="/screenshots/compute/eks.png" alt="EKS Overview" />
 
 ## Key Features
 

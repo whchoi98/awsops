@@ -2,11 +2,13 @@
 sidebar_position: 1
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # IAM
 
 IAM(Identity and Access Management) 페이지에서는 AWS 계정의 사용자, 역할, 정책을 한눈에 확인하고 관리할 수 있습니다.
 
-![IAM](/screenshots/security/iam.png)
+<Screenshot src="/screenshots/security/iam.png" alt="IAM" />
 
 ## 주요 기능
 

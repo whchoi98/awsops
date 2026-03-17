@@ -4,11 +4,13 @@ title: Lambda 함수
 description: Lambda 함수 목록, 런타임 분포, 메모리/타임아웃 설정 확인
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # Lambda 함수
 
 AWS Lambda 함수의 목록과 구성 정보를 확인할 수 있는 페이지입니다.
 
-![Lambda 함수](/screenshots/compute/lambda.png)
+<Screenshot src="/screenshots/compute/lambda.png" alt="Lambda 함수" />
 
 ## 주요 기능
 

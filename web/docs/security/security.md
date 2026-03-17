@@ -2,11 +2,13 @@
 sidebar_position: 2
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # Security
 
 Security 페이지에서는 AWS 환경의 보안 취약점을 종합적으로 모니터링합니다. Public S3 버킷, 개방된 Security Group, 암호화되지 않은 EBS 볼륨, 컨테이너 CVE 취약점을 한 곳에서 확인할 수 있습니다.
 
-![Security](/screenshots/security/security.png)
+<Screenshot src="/screenshots/security/security.png" alt="Security" />
 
 ## 요약 통계
 

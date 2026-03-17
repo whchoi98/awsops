@@ -4,11 +4,13 @@ title: EKS Nodes
 description: Kubernetes 노드 목록, 용량, 할당 리소스, 상태
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # EKS Nodes
 
 Kubernetes 노드의 용량, 할당 가능 리소스, Pod 요청량을 상세히 확인할 수 있는 페이지입니다.
 
-![EKS Nodes](/screenshots/compute/eks-nodes.png)
+<Screenshot src="/screenshots/compute/eks-nodes.png" alt="EKS Nodes" />
 
 ## 주요 기능
 

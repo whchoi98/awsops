@@ -2,11 +2,13 @@
 sidebar_position: 6
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # OpenSearch
 
 Monitor Amazon OpenSearch Service domains and check cluster health.
 
-![OpenSearch](/screenshots/storage/opensearch.png)
+<Screenshot src="/screenshots/storage/opensearch.png" alt="OpenSearch" />
 
 ## Key Features
 

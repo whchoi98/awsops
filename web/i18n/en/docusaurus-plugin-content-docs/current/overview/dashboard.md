@@ -4,11 +4,13 @@ title: Dashboard
 description: AWSops main dashboard detailed guide
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # Dashboard
 
 The Dashboard is the main page of AWSops, providing an at-a-glance view of your entire AWS and Kubernetes infrastructure.
 
-![Dashboard](/screenshots/overview/dashboard.png)
+<Screenshot src="/screenshots/overview/dashboard.png" alt="Dashboard" />
 
 ## Screen Layout
 

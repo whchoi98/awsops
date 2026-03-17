@@ -2,11 +2,13 @@
 sidebar_position: 4
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # DynamoDB
 
 Manage DynamoDB tables and monitor capacity and settings.
 
-![DynamoDB](/screenshots/storage/dynamodb.png)
+<Screenshot src="/screenshots/storage/dynamodb.png" alt="DynamoDB" />
 
 ## Key Features
 

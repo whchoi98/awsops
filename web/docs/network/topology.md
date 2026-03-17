@@ -4,11 +4,13 @@ title: Topology
 description: React Flow 기반 AWS 인프라 및 Kubernetes 클러스터 시각화
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # Topology
 
 AWS 인프라와 Kubernetes 클러스터의 관계를 시각적으로 탐색하는 페이지입니다.
 
-![Topology](/screenshots/network/topology.png)
+<Screenshot src="/screenshots/network/topology.png" alt="Topology" />
 
 ## 주요 기능
 

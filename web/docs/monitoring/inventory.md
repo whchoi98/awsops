@@ -4,11 +4,13 @@ title: Resource Inventory
 description: AWS 리소스 수량 추이를 추적하고 비용 영향을 추정합니다.
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # Resource Inventory
 
 AWS 리소스의 수량 변화를 일별로 추적하고 비용 영향을 추정하는 페이지입니다.
 
-![Inventory](/screenshots/monitoring/inventory.png)
+<Screenshot src="/screenshots/monitoring/inventory.png" alt="Inventory" />
 
 ## 주요 기능
 

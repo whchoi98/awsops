@@ -4,11 +4,13 @@ title: EKS Explorer
 description: K9s 스타일 터미널 UI로 Kubernetes 리소스 탐색
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # EKS Explorer
 
 K9s 스타일의 터미널 UI로 Kubernetes 리소스를 탐색할 수 있는 페이지입니다.
 
-![EKS Explorer](/screenshots/compute/eks-explorer.png)
+<Screenshot src="/screenshots/compute/eks-explorer.png" alt="EKS Explorer" />
 
 ## 주요 기능
 

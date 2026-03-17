@@ -4,11 +4,13 @@ title: VPC / Network
 description: VPC, Subnet, Security Group, Transit Gateway, ELB, NAT Gateway, Internet Gateway 모니터링
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # VPC / Network
 
 AWS 네트워크 인프라를 한눈에 파악할 수 있는 통합 모니터링 페이지입니다.
 
-![VPC](/screenshots/network/vpc.png)
+<Screenshot src="/screenshots/network/vpc.png" alt="VPC" />
 
 ## 주요 기능
 

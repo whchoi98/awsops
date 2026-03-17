@@ -4,11 +4,13 @@ title: EKS Deployments
 description: Kubernetes Deployment list, replica status, update strategy
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # EKS Deployments
 
 A page for viewing the replica status and availability of Kubernetes Deployments.
 
-![EKS Deployments](/screenshots/compute/eks-deployments.png)
+<Screenshot src="/screenshots/compute/eks-deployments.png" alt="EKS Deployments" />
 
 ## Key Features
 

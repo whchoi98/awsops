@@ -2,11 +2,13 @@
 sidebar_position: 3
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # CIS Compliance
 
 The CIS Compliance page evaluates security compliance status based on the AWS CIS (Center for Internet Security) benchmarks. It uses Powerpipe to automatically check hundreds of controls.
 
-![Compliance](/screenshots/security/compliance.png)
+<Screenshot src="/screenshots/security/compliance.png" alt="Compliance" />
 
 ## Supported Benchmarks
 

@@ -4,11 +4,13 @@ title: WAF
 description: AWS WAF Web ACL, 규칙 그룹, IP Sets 모니터링
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # WAF
 
 AWS Web Application Firewall을 모니터링하고 규칙을 확인하는 페이지입니다.
 
-![WAF](/screenshots/network/waf.png)
+<Screenshot src="/screenshots/network/waf.png" alt="WAF" />
 
 ## 주요 기능
 

@@ -4,11 +4,13 @@ title: Topology
 description: React Flow-based AWS infrastructure and Kubernetes cluster visualization
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # Topology
 
 A page to visually explore relationships between AWS infrastructure and Kubernetes clusters.
 
-![Topology](/screenshots/network/topology.png)
+<Screenshot src="/screenshots/network/topology.png" alt="Topology" />
 
 ## Key Features
 

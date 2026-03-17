@@ -4,11 +4,13 @@ title: 대시보드
 description: AWSops 메인 대시보드 상세 가이드
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # 대시보드
 
 대시보드는 AWSops의 메인 페이지로, AWS 및 Kubernetes 인프라의 전체 현황을 한눈에 파악할 수 있습니다.
 
-![대시보드](/screenshots/overview/dashboard.png)
+<Screenshot src="/screenshots/overview/dashboard.png" alt="대시보드" />
 
 ## 화면 구성
 

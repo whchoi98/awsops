@@ -4,11 +4,13 @@ title: EC2 인스턴스
 description: EC2 인스턴스 목록, 상태 모니터링, 상세 정보 확인
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # EC2 인스턴스
 
 EC2 인스턴스의 실시간 상태를 모니터링하고 상세 정보를 확인할 수 있는 페이지입니다.
 
-![EC2 인스턴스](/screenshots/compute/ec2.png)
+<Screenshot src="/screenshots/compute/ec2.png" alt="EC2 인스턴스" />
 
 ## 주요 기능
 

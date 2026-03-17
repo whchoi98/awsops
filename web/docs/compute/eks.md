@@ -4,11 +4,13 @@ title: EKS Overview
 description: EKS 클러스터 현황, 노드 리소스, Pod 상태 요약
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # EKS Overview
 
 EKS 클러스터의 전체 현황과 노드 리소스, Pod 상태를 한눈에 확인할 수 있는 페이지입니다.
 
-![EKS Overview](/screenshots/compute/eks.png)
+<Screenshot src="/screenshots/compute/eks.png" alt="EKS Overview" />
 
 ## 주요 기능
 

@@ -4,11 +4,13 @@ title: CloudFront
 description: CloudFront 배포 상태, 도메인, 오리진, 캐시 정책 모니터링
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # CloudFront
 
 Amazon CloudFront CDN 배포를 모니터링하고 관리하는 페이지입니다.
 
-![CloudFront](/screenshots/network/cloudfront.png)
+<Screenshot src="/screenshots/network/cloudfront.png" alt="CloudFront" />
 
 ## 주요 기능
 

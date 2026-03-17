@@ -2,11 +2,13 @@
 sidebar_position: 3
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # CIS Compliance
 
 CIS Compliance 페이지에서는 AWS CIS(Center for Internet Security) 벤치마크를 기반으로 보안 컴플라이언스 상태를 평가합니다. Powerpipe를 사용하여 수백 개의 컨트롤을 자동으로 검사합니다.
 
-![Compliance](/screenshots/security/compliance.png)
+<Screenshot src="/screenshots/security/compliance.png" alt="Compliance" />
 
 ## 지원 벤치마크
 

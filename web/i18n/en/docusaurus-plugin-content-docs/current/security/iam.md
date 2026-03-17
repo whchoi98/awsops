@@ -2,11 +2,13 @@
 sidebar_position: 1
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # IAM
 
 The IAM (Identity and Access Management) page allows you to view and manage users, roles, and policies in your AWS account at a glance.
 
-![IAM](/screenshots/security/iam.png)
+<Screenshot src="/screenshots/security/iam.png" alt="IAM" />
 
 ## Key Features
 

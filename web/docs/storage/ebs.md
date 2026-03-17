@@ -2,11 +2,13 @@
 sidebar_position: 1
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # EBS
 
 EBS(Elastic Block Store) 볼륨 및 스냅샷을 관리하고 모니터링합니다.
 
-![EBS](/screenshots/storage/ebs.png)
+<Screenshot src="/screenshots/storage/ebs.png" alt="EBS" />
 
 ## 주요 기능
 

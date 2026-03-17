@@ -2,11 +2,13 @@
 sidebar_position: 7
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # MSK
 
 Amazon MSK(Managed Streaming for Apache Kafka) 클러스터를 모니터링하고 브로커 성능을 확인합니다.
 
-![MSK](/screenshots/storage/msk.png)
+<Screenshot src="/screenshots/storage/msk.png" alt="MSK" />
 
 ## 주요 기능
 

@@ -4,11 +4,13 @@ title: EKS Pods
 description: Kubernetes Pod list, status, container information
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # EKS Pods
 
 A page for viewing the detailed list and status of Kubernetes Pods.
 
-![EKS Pods](/screenshots/compute/eks-pods.png)
+<Screenshot src="/screenshots/compute/eks-pods.png" alt="EKS Pods" />
 
 ## Key Features
 
