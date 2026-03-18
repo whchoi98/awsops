@@ -1,7 +1,8 @@
-// Bedrock Model Usage Metrics API — CloudWatch metrics per model
-// Bedrock 모델 사용량 메트릭 API — 모델별 CloudWatch 메트릭 조회
+// Bedrock Model Usage Metrics API — CloudWatch metrics per model + AWSops app stats
+// Bedrock 모델 사용량 메트릭 API — 모델별 CloudWatch 메트릭 + AWSops 앱 통계
 import { NextRequest, NextResponse } from 'next/server';
 import { execFileSync } from 'child_process';
+import { getStats } from '@/lib/agentcore-stats';
 
 const REGION = 'ap-northeast-2';
 
@@ -259,6 +260,15 @@ export async function GET(request: NextRequest) {
       const totalCost = metricsArray.reduce((s: number, m: any) => s + m.totalCost, 0);
       const totalCacheSavings = metricsArray.reduce((s: number, m: any) => s + m.cacheSavings, 0);
 
+      // AWSops app-level token stats / AWSops 앱 수준 토큰 통계
+      const appStats = getStats();
+      const awsopsUsage = {
+        totalInputTokens: appStats.totalInputTokens || 0,
+        totalOutputTokens: appStats.totalOutputTokens || 0,
+        totalCalls: appStats.totalCalls || 0,
+        tokensByModel: appStats.tokensByModel || {},
+      };
+
       return NextResponse.json({
         metrics: metricsArray,
         totalCost,
@@ -266,6 +276,7 @@ export async function GET(request: NextRequest) {
         range,
         startTime: startTime.toISOString(),
         endTime: now.toISOString(),
+        awsopsUsage,
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to get Bedrock metrics';

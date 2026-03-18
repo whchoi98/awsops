@@ -36,10 +36,18 @@ interface ModelMetric {
   };
 }
 
+interface AwsopsUsage {
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCalls: number;
+  tokensByModel: Record<string, { inputTokens: number; outputTokens: number; calls: number }>;
+}
+
 export default function BedrockPage() {
   const [metrics, setMetrics] = useState<ModelMetric[]>([]);
   const [totalCost, setTotalCost] = useState(0);
   const [totalCacheSavings, setTotalCacheSavings] = useState(0);
+  const [awsopsUsage, setAwsopsUsage] = useState<AwsopsUsage>({ totalInputTokens: 0, totalOutputTokens: 0, totalCalls: 0, tokensByModel: {} });
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<RangeKey>('7d');
   const [selected, setSelected] = useState<ModelMetric | null>(null);
@@ -52,6 +60,7 @@ export default function BedrockPage() {
       setMetrics(data.metrics || []);
       setTotalCost(data.totalCost || 0);
       setTotalCacheSavings(data.totalCacheSavings || 0);
+      setAwsopsUsage(data.awsopsUsage || { totalInputTokens: 0, totalOutputTokens: 0, totalCalls: 0, tokensByModel: {} });
     } catch {} finally { setLoading(false); }
   }, [range]);
 
@@ -175,6 +184,77 @@ export default function BedrockPage() {
           change={totalCacheSavings > 0 ? `${cacheHitRate}% hit rate` : undefined} />
         <StatsCard label="Models Used" value={metrics.length} icon={Sparkles} color="purple" />
       </div>
+
+      {/* AWSops vs Account Usage Comparison / AWSops vs 계정 전체 사용량 비교 */}
+      {(totals.invocations > 0 || awsopsUsage.totalCalls > 0) && (
+        <div className="bg-navy-800 rounded-lg border border-navy-600 p-4">
+          <h3 className="text-xs font-mono uppercase text-accent-cyan tracking-wider mb-4 flex items-center gap-2">
+            <Zap size={14} />
+            Account Total vs AWSops Usage / 계정 전체 vs AWSops 사용량
+          </h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Account Total (CloudWatch) / 계정 전체 (CloudWatch) */}
+            <div className="bg-navy-900 rounded-lg border border-navy-600 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="w-2 h-2 rounded-full bg-accent-purple" />
+                <h4 className="text-xs font-mono uppercase text-accent-purple tracking-wider">Account Total ({range})</h4>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase">Invocations</p>
+                  <p className="text-lg font-bold font-mono text-white">{totals.invocations.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase">Input Tokens</p>
+                  <p className="text-lg font-bold font-mono text-white">{formatTokens(totals.inputTokens)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase">Output Tokens</p>
+                  <p className="text-lg font-bold font-mono text-white">{formatTokens(totals.outputTokens)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase">Est. Cost</p>
+                  <p className="text-lg font-bold font-mono text-accent-orange">{formatCost(totalCost)}</p>
+                </div>
+              </div>
+            </div>
+            {/* AWSops App Usage / AWSops 앱 사용량 */}
+            <div className="bg-navy-900 rounded-lg border border-accent-cyan/30 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="w-2 h-2 rounded-full bg-accent-cyan" />
+                <h4 className="text-xs font-mono uppercase text-accent-cyan tracking-wider">AWSops App (Cumulative)</h4>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase">AI Queries</p>
+                  <p className="text-lg font-bold font-mono text-white">{awsopsUsage.totalCalls.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase">Input Tokens</p>
+                  <p className="text-lg font-bold font-mono text-white">{formatTokens(awsopsUsage.totalInputTokens)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase">Output Tokens</p>
+                  <p className="text-lg font-bold font-mono text-white">{formatTokens(awsopsUsage.totalOutputTokens)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase">Models</p>
+                  <div className="space-y-0.5 mt-1">
+                    {Object.entries(awsopsUsage.tokensByModel).map(([model, data]) => (
+                      <p key={model} className="text-[10px] font-mono text-gray-400">
+                        {model}: <span className="text-accent-cyan">{data.calls}</span> calls
+                      </p>
+                    ))}
+                    {Object.keys(awsopsUsage.tokensByModel).length === 0 && (
+                      <p className="text-[10px] text-gray-600">No data yet</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Charts / 차트 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
