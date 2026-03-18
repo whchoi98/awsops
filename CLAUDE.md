@@ -14,10 +14,10 @@ Steampipe, Next.js 14, Amazon Bedrock AgentCore로 구축.
 ## 현황 (v1.6.0)
 | 항목 | 수치 |
 |------|------|
-| 페이지 | 34 |
-| 라우트 | 49 |
-| SQL 쿼리 파일 | 24 |
-| API 라우트 | 12 |
+| 페이지 | 35 |
+| 라우트 | 50 |
+| SQL 쿼리 파일 | 25 |
+| API 라우트 | 13 |
 | 컴포넌트 | 14 |
 | MCP 도구 | 125 (8 Gateway, 19 Lambda) |
 | ADR | 7 (001-007) |
@@ -71,15 +71,15 @@ Steampipe, Next.js 14, Amazon Bedrock AgentCore로 구축.
 
 ### 핵심 라이브러리 (`src/lib/`)
 - `steampipe.ts` — pg 풀 + 배치 쿼리 + 캐시 + Cost 가용성 probe
-- `queries/*.ts` — 24개 SQL 쿼리 파일 (ebs, msk, opensearch, container-cost, eks-container-cost 포함)
+- `queries/*.ts` — 25개 SQL 쿼리 파일 (ebs, msk, opensearch, container-cost, eks-container-cost, bedrock 포함)
 - `resource-inventory.ts` — 리소스 인벤토리 스냅샷 (data/inventory/, 추가 쿼리 0건)
 - `cost-snapshot.ts` — Cost 데이터 스냅샷 폴백 (data/cost/)
 - `app-config.ts` — 앱 설정 (costEnabled, agentRuntimeArn, codeInterpreterName, memoryId)
-- `agentcore-stats.ts` — AgentCore 호출 통계 (총 호출, 평균 응답시간, 게이트웨이별)
+- `agentcore-stats.ts` — AgentCore 호출 통계 (총 호출, 평균 응답시간, 게이트웨이별, 모델별 토큰 사용량)
 - `agentcore-memory.ts` — 대화 이력 영구 저장/검색 (사용자별 분리, data/memory/)
 - `auth-utils.ts` — Cognito JWT에서 사용자 정보 추출 (email, sub)
 
-### API 라우트 (`src/app/api/`, 12개)
+### API 라우트 (`src/app/api/`, 13개)
 - `ai/route.ts` — AI 라우팅 (10 routes, 멀티 라우트, SSE 스트리밍, 도구 추론)
 - `steampipe/route.ts` — Steampipe 쿼리 + Cost 가용성 + 인벤토리 (POST/GET/PUT)
 - `auth/route.ts` — 로그아웃 (HttpOnly 쿠키 서버 사이드 삭제)
@@ -92,6 +92,7 @@ Steampipe, Next.js 14, Amazon Bedrock AgentCore로 구축.
 - `benchmark/route.ts` — CIS 컴플라이언스 벤치마크
 - `container-cost/route.ts` — ECS 컨테이너 비용 (CloudWatch Container Insights + Fargate 가격)
 - `eks-container-cost/route.ts` — EKS 컨테이너 비용 (OpenCost API + Request 기반 폴백)
+- `bedrock-metrics/route.ts` — Bedrock 모델 사용량 메트릭 (CloudWatch + AWSops 앱 토큰 통계)
 
 ### 인프라
 - `infra-cdk/lib/awsops-stack.ts` — CDK 인프라 (VPC, EC2, ALB, CloudFront)
@@ -170,10 +171,10 @@ AWS + Kubernetes operations dashboard with real-time resource monitoring, networ
 ## Stats (v1.6.0)
 | Item | Count |
 |------|-------|
-| Pages | 34 |
-| Routes | 49 |
-| SQL Query Files | 24 |
-| API Routes | 12 |
+| Pages | 35 |
+| Routes | 50 |
+| SQL Query Files | 25 |
+| API Routes | 13 |
 | Components | 14 |
 | MCP Tools | 125 (8 Gateways, 19 Lambda) |
 | ADRs | 7 (001-007) |
@@ -225,15 +226,15 @@ AWS + Kubernetes operations dashboard with real-time resource monitoring, networ
 
 ### Core Libraries (`src/lib/`)
 - `steampipe.ts` — pg Pool + batchQuery + cache + checkCostAvailability
-- `queries/*.ts` — 24 SQL query files (incl. ebs, msk, opensearch, container-cost, eks-container-cost)
+- `queries/*.ts` — 25 SQL query files (incl. ebs, msk, opensearch, container-cost, eks-container-cost, bedrock)
 - `resource-inventory.ts` — Resource inventory snapshots (data/inventory/, zero extra queries)
 - `cost-snapshot.ts` — Cost data snapshot fallback (data/cost/)
 - `app-config.ts` — App config (costEnabled, agentRuntimeArn, codeInterpreterName, memoryId)
-- `agentcore-stats.ts` — AgentCore call stats (total calls, avg time, per-gateway)
+- `agentcore-stats.ts` — AgentCore call stats (total calls, avg time, per-gateway, per-model token usage)
 - `agentcore-memory.ts` — Conversation history persistence/search (per-user, data/memory/)
 - `auth-utils.ts` — Extract Cognito user info from JWT (email, sub)
 
-### API Routes (`src/app/api/`, 12 routes)
+### API Routes (`src/app/api/`, 13 routes)
 - `ai/route.ts` — AI routing (10 routes, multi-route, SSE streaming, tool inference)
 - `steampipe/route.ts` — Steampipe queries + Cost availability + Inventory (POST/GET/PUT)
 - `auth/route.ts` — Logout (server-side HttpOnly cookie deletion)
@@ -246,6 +247,7 @@ AWS + Kubernetes operations dashboard with real-time resource monitoring, networ
 - `benchmark/route.ts` — CIS compliance benchmark
 - `container-cost/route.ts` — ECS Container Cost (CloudWatch Container Insights + Fargate pricing)
 - `eks-container-cost/route.ts` — EKS Container Cost (OpenCost API + request-based fallback)
+- `bedrock-metrics/route.ts` — Bedrock model usage metrics (CloudWatch + AWSops app token stats)
 
 ### Infrastructure
 - `infra-cdk/lib/awsops-stack.ts` — CDK infra (VPC, EC2, ALB, CloudFront)

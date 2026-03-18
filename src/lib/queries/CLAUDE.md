@@ -3,7 +3,8 @@
 ## 역할
 Steampipe용 SQL 쿼리 정의. 각 파일은 특정 AWS/K8s 서비스에 대한 쿼리를 내보냄.
 
-## 주요 파일 (24개)
+## 주요 파일 (25개)
+- `bedrock.ts` — Bedrock 파운데이션 모델 (참고용, 주요 메트릭은 CloudWatch API)
 - `ebs.ts` — EBS 볼륨/스냅샷 (암호화, 어태치먼트, 인스턴스 조회)
 - `ec2.ts` — EC2 인스턴스
 - `msk.ts` — MSK 클러스터 (`provisioned` JSONB에서 Kafka 버전/브로커/암호화 추출)
@@ -43,7 +44,8 @@ Steampipe용 SQL 쿼리 정의. 각 파일은 특정 AWS/K8s 서비스에 대한
 ## Role
 SQL query definitions for Steampipe. Each file exports queries for a specific AWS/K8s service.
 
-## Key Files (24)
+## Key Files (25)
+- `bedrock.ts` — Bedrock foundation models (reference only, main metrics via CloudWatch API)
 - `ebs.ts` — EBS volumes/snapshots (encryption, attachments, instance lookup)
 - `ec2.ts` — EC2 instances
 - `msk.ts` — MSK clusters (extract Kafka version/brokers/encryption from `provisioned` JSONB)

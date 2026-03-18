@@ -8,10 +8,10 @@
 - `resource-inventory.ts` — 리소스 인벤토리 스냅샷 (data/inventory/, 추가 쿼리 0건)
 - `cost-snapshot.ts` — Cost 데이터 스냅샷 폴백 (data/cost/)
 - `app-config.ts` — 앱 설정 (costEnabled, agentRuntimeArn, codeInterpreterName, memoryId)
-- `agentcore-stats.ts` — AgentCore 호출 통계 (data/agentcore-stats.json)
+- `agentcore-stats.ts` — AgentCore 호출 통계 + 모델별 토큰 사용량 추적 (data/agentcore-stats.json)
 - `agentcore-memory.ts` — 대화 이력 저장/검색, 사용자별 분리 (data/memory/)
 - `auth-utils.ts` — Cognito JWT에서 사용자 정보 추출 (Lambda@Edge 검증 후 payload 디코딩)
-- `queries/*.ts` — 24개 SQL 쿼리 파일 (ebs, msk, opensearch, container-cost, eks-container-cost 포함)
+- `queries/*.ts` — 25개 SQL 쿼리 파일 (ebs, msk, opensearch, container-cost, eks-container-cost, bedrock 포함)
 
 ## 규칙
 - 모든 DB 접근은 `steampipe.ts`의 `runQuery()` 또는 `batchQuery()`를 통해 수행
@@ -34,10 +34,10 @@ Core libraries: Steampipe database connection, SQL query definitions, inventory,
 - `resource-inventory.ts` — Resource inventory snapshots (data/inventory/, zero extra queries)
 - `cost-snapshot.ts` — Cost data snapshot fallback (data/cost/)
 - `app-config.ts` — App config (costEnabled, agentRuntimeArn, codeInterpreterName, memoryId)
-- `agentcore-stats.ts` — AgentCore call stats (data/agentcore-stats.json)
+- `agentcore-stats.ts` — AgentCore call stats + per-model token usage tracking (data/agentcore-stats.json)
 - `agentcore-memory.ts` — Conversation history save/search, per-user isolation (data/memory/)
 - `auth-utils.ts` — Extract Cognito user from JWT (payload decode after Lambda@Edge verification)
-- `queries/*.ts` — 24 SQL query files (incl. ebs, msk, opensearch, container-cost, eks-container-cost)
+- `queries/*.ts` — 25 SQL query files (incl. ebs, msk, opensearch, container-cost, eks-container-cost, bedrock)
 
 ## Rules
 - ALL database access through `runQuery()` or `batchQuery()` in steampipe.ts

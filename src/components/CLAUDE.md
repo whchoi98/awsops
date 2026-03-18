@@ -6,7 +6,7 @@
 ## 주요 파일 (14개)
 
 ### layout/ — 레이아웃 (2)
-- `layout/Sidebar.tsx` — 메인 네비게이션 (6개 그룹) + Sign Out 버튼 (로고 우측)
+- `layout/Sidebar.tsx` — 메인 네비게이션 (6개 그룹, Bedrock 포함) + Sign Out 버튼 (로고 우측)
 - `layout/Header.tsx` — 페이지 헤더 (새로고침, ONLINE 상태)
 
 ### dashboard/ — 대시보드 카드 (4)
@@ -42,7 +42,7 @@ Shared React components across pages: layout, cards, charts, tables, K8s UI.
 ## Key Files (14)
 
 ### layout/ — Layout (2)
-- `layout/Sidebar.tsx` — Main navigation (6 groups) + Sign Out button (next to logo)
+- `layout/Sidebar.tsx` — Main navigation (6 groups, incl. Bedrock) + Sign Out button (next to logo)
 - `layout/Header.tsx` — Page header (refresh, ONLINE status)
 
 ### dashboard/ — Dashboard Cards (4)
