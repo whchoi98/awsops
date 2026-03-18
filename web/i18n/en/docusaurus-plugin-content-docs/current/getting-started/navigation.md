@@ -4,61 +4,41 @@ title: Navigation Guide
 description: AWSops dashboard layout and navigation methods
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # Navigation Guide
 
-The AWSops dashboard provides sidebar-based navigation. With 34 pages organized into 6 groups, you can quickly find the information you need.
+The AWSops dashboard provides sidebar-based navigation. With 35 pages organized into 6 groups, you can quickly find the information you need.
+
+<Screenshot src="/screenshots/overview/dashboard.png" alt="AWSops dashboard full screen — sidebar, header, and main content area" />
 
 ## Screen Layout
 
-### Sidebar (Left)
+The screen is divided into 3 main areas.
+
+### ① Sidebar (Left)
 
 A fixed navigation area on the left side of the screen.
 
-```
-┌─────────────────────┐
-│  AWSops    [Sign Out]│  ← Logo + Sign Out button
-│  v1.6.0             │
-├─────────────────────┤
-│  Dashboard          │  ← Overview group
-│  AI Assistant       │
-│  AgentCore          │
-├─────────────────────┤
-│  COMPUTE            │  ← Compute group
-│  EC2                │
-│  Lambda             │
-│  ...                │
-├─────────────────────┤
-│  NETWORK & CDN      │  ← Network group
-│  ...                │
-├─────────────────────┤
-│  STORAGE & DB       │  ← Storage group
-│  ...                │
-├─────────────────────┤
-│  MONITORING         │  ← Monitoring group
-│  ...                │
-├─────────────────────┤
-│  SECURITY           │  ← Security group
-│  ...                │
-├─────────────────────┤
-│  $ Cost: ON/OFF     │  ← Cost toggle
-│  v1.6.0             │  ← Version info
-└─────────────────────┘
-```
+- **Top**: AWSops logo + Sign Out button
+- **Center**: 6 menu groups (Overview, Compute, Network & CDN, Storage & DB, Monitoring, Security)
+- **Bottom**: Cost ON/OFF toggle + version info (v1.6.0)
+- The current page is indicated with a **cyan highlight** on the left
 
-### Header (Top)
+### ② Header (Top)
 
 The area displayed at the top of each page.
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  Page Name                          [Refresh]  ONLINE   │
-│  Page Description                                       │
-└─────────────────────────────────────────────────────────┘
-```
 
 - **Page Name**: Title of the current page
 - **Refresh Button**: Click to refresh data (bypasses cache)
 - **ONLINE Status**: Server connection status indicator (green dot = normal)
+
+### ③ Main Content (Center)
+
+The area where data for the selected page is displayed.
+
+- **Dashboard**: StatsCards, warning status, charts
+- **Service pages**: Resource tables, detail panels, CloudWatch metrics
 
 ## Menu Groups
 
@@ -104,13 +84,14 @@ The area displayed at the top of each page.
 | **OpenSearch** | OpenSearch domains |
 | **MSK** | MSK Kafka clusters |
 
-### Monitoring (5 pages)
+### Monitoring (6 pages)
 
 | Menu | Description |
 |------|-------------|
 | **Monitoring** | Integrated CPU, Memory, Network, Disk I/O |
 | **CloudWatch** | CloudWatch alarm status |
 | **CloudTrail** | CloudTrail trails and events |
+| **Bedrock** | Bedrock model usage, cost, and token monitoring |
 | **Cost** | Cost Explorer, cost analysis |
 | **Resource Inventory** | Resource inventory trends |
 

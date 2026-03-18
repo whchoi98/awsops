@@ -4,61 +4,41 @@ title: 네비게이션 가이드
 description: AWSops 대시보드 화면 구성 및 네비게이션 방법
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # 네비게이션 가이드
 
-AWSops 대시보드는 사이드바 기반 네비게이션을 제공합니다. 34개의 페이지가 6개 그룹으로 구성되어 있어 원하는 정보를 빠르게 찾을 수 있습니다.
+AWSops 대시보드는 사이드바 기반 네비게이션을 제공합니다. 35개의 페이지가 6개 그룹으로 구성되어 있어 원하는 정보를 빠르게 찾을 수 있습니다.
+
+<Screenshot src="/screenshots/overview/dashboard.png" alt="AWSops 대시보드 전체 화면 — 사이드바, 헤더, 메인 콘텐츠 영역" />
 
 ## 화면 구성
 
-### 사이드바 (왼쪽)
+화면은 크게 3개 영역으로 나뉩니다.
+
+### ① 사이드바 (왼쪽)
 
 화면 왼쪽에 고정된 네비게이션 영역입니다.
 
-```
-┌─────────────────────┐
-│  AWSops    [로그아웃]│  ← 로고 + Sign Out 버튼
-│  v1.6.0             │
-├─────────────────────┤
-│  Dashboard          │  ← Overview 그룹
-│  AI Assistant       │
-│  AgentCore          │
-├─────────────────────┤
-│  COMPUTE            │  ← Compute 그룹
-│  EC2                │
-│  Lambda             │
-│  ...                │
-├─────────────────────┤
-│  NETWORK & CDN      │  ← Network 그룹
-│  ...                │
-├─────────────────────┤
-│  STORAGE & DB       │  ← Storage 그룹
-│  ...                │
-├─────────────────────┤
-│  MONITORING         │  ← Monitoring 그룹
-│  ...                │
-├─────────────────────┤
-│  SECURITY           │  ← Security 그룹
-│  ...                │
-├─────────────────────┤
-│  $ Cost: ON/OFF     │  ← Cost 토글
-│  v1.6.0             │  ← 버전 정보
-└─────────────────────┘
-```
+- **상단**: AWSops 로고 + Sign Out 버튼
+- **중앙**: 6개 메뉴 그룹 (Overview, Compute, Network & CDN, Storage & DB, Monitoring, Security)
+- **하단**: Cost ON/OFF 토글 + 버전 정보 (v1.6.0)
+- 현재 페이지는 왼쪽에 **청록색(cyan) 하이라이트**로 표시됩니다
 
-### 헤더 (상단)
+### ② 헤더 (상단)
 
 각 페이지 상단에 표시되는 영역입니다.
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  페이지 이름                        [새로고침]  ONLINE  │
-│  페이지 설명                                            │
-└─────────────────────────────────────────────────────────┘
-```
 
 - **페이지 이름**: 현재 보고 있는 페이지 제목
 - **새로고침 버튼**: 클릭 시 데이터 새로고침 (캐시 무시)
 - **ONLINE 상태**: 서버 연결 상태 표시 (녹색 점 = 정상)
+
+### ③ 메인 콘텐츠 (중앙)
+
+선택한 페이지의 데이터가 표시되는 영역입니다.
+
+- **대시보드**: StatsCard, 경고 현황, 차트
+- **서비스 페이지**: 리소스 테이블, 상세 패널, CloudWatch 메트릭
 
 ## 메뉴 그룹
 
@@ -104,13 +84,14 @@ AWSops 대시보드는 사이드바 기반 네비게이션을 제공합니다. 3
 | **OpenSearch** | OpenSearch 도메인 |
 | **MSK** | MSK Kafka 클러스터 |
 
-### Monitoring (5개 페이지)
+### Monitoring (6개 페이지)
 
 | 메뉴 | 설명 |
 |------|------|
 | **Monitoring** | CPU, Memory, Network, Disk I/O 통합 |
 | **CloudWatch** | CloudWatch 알람 현황 |
 | **CloudTrail** | CloudTrail 트레일 및 이벤트 |
+| **Bedrock** | Bedrock 모델 사용량, 비용, 토큰 모니터링 |
 | **Cost** | Cost Explorer, 비용 분석 |
 | **Resource Inventory** | 리소스 인벤토리 추이 |
 
