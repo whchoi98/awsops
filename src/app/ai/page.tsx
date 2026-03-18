@@ -15,6 +15,20 @@ interface Message {
   route?: string;         // Classified intent route / 분류된 의도 라우트
   statusMessage?: string; // SSE progress status / SSE 진행 상태 메시지
   responseTime?: number;  // Response time in seconds / 응답 시간 (초)
+  inputTokens?: number;   // Bedrock input token count / 입력 토큰 수
+  outputTokens?: number;  // Bedrock output token count / 출력 토큰 수
+}
+
+// Bedrock pricing (USD per 1M tokens) / Bedrock 가격 (USD / 100만 토큰)
+const TOKEN_PRICING: Record<string, { input: number; output: number }> = {
+  'sonnet-4.6': { input: 3, output: 15 },
+  'opus-4.6': { input: 15, output: 75 },
+};
+
+function calcTokenCost(model: string, inputTokens: number, outputTokens: number): string {
+  const pricing = TOKEN_PRICING[model] || TOKEN_PRICING['sonnet-4.6'];
+  const cost = (inputTokens * pricing.input + outputTokens * pricing.output) / 1_000_000;
+  return cost < 0.001 ? `$${cost.toFixed(5)}` : `$${cost.toFixed(4)}`;
 }
 
 export default function AIPage() {
@@ -126,6 +140,7 @@ export default function AIPage() {
                     usedTools: data.usedTools,
                     via: data.via, route: data.route,
                     responseTime: Math.round((Date.now() - startTime) / 100) / 10,
+                    inputTokens: data.inputTokens, outputTokens: data.outputTokens,
                   }]);
                 } else if (eventType === 'error') {
                   setMessages([...newMessages, { role: 'assistant', content: `Error: ${data.error}`, model }]);
@@ -324,6 +339,16 @@ export default function AIPage() {
                       Queried: {msg.queriedResources.join(', ')}
                     </div>
                   )}
+                </div>
+              )}
+              {/* Token usage & cost / 토큰 사용량 및 비용 */}
+              {msg.role === 'assistant' && (msg.inputTokens || msg.outputTokens) && (
+                <div className="mt-2 pt-2 border-t border-navy-600/30 flex items-center gap-3 text-[10px] font-mono text-gray-500">
+                  <span className="text-gray-600">Tokens:</span>
+                  <span>In <span className="text-accent-cyan">{(msg.inputTokens || 0).toLocaleString()}</span></span>
+                  <span>Out <span className="text-accent-green">{(msg.outputTokens || 0).toLocaleString()}</span></span>
+                  <span className="text-gray-600">|</span>
+                  <span>Cost <span className="text-accent-orange">{calcTokenCost(msg.model || 'sonnet-4.6', msg.inputTokens || 0, msg.outputTokens || 0)}</span></span>
                 </div>
               )}
             </div>
