@@ -28,6 +28,7 @@ import {
   HardDrive,
   Radio,
   Search,
+  Sparkles,
   LogOut,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -90,6 +91,7 @@ const navGroups: NavGroup[] = [
     title: 'Monitoring',
     items: [
       { label: 'Monitoring', href: '/monitoring', icon: Activity },
+      { label: 'Bedrock', href: '/bedrock', icon: Sparkles },
       { label: 'CloudWatch', href: '/cloudwatch', icon: Bell },
       { label: 'CloudTrail', href: '/cloudtrail', icon: FileSearch },
       { label: 'Cost', href: '/cost', icon: DollarSign },

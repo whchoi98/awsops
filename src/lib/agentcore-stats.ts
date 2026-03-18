@@ -13,6 +13,9 @@ export interface AgentCoreCallRecord {
   usedTools: string[];
   success: boolean;
   via: string;
+  inputTokens?: number;   // Bedrock input tokens / 입력 토큰
+  outputTokens?: number;  // Bedrock output tokens / 출력 토큰
+  model?: string;         // Model used / 사용 모델
 }
 
 export interface AgentCoreStats {
@@ -26,6 +29,10 @@ export interface AgentCoreStats {
   callsByRoute: Record<string, number>;
   recentCalls: AgentCoreCallRecord[];
   lastUpdated: string;
+  // AWSops token usage tracking / AWSops 토큰 사용량 추적
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  tokensByModel: Record<string, { inputTokens: number; outputTokens: number; calls: number }>;
 }
 
 const DEFAULT_STATS: AgentCoreStats = {
@@ -33,6 +40,7 @@ const DEFAULT_STATS: AgentCoreStats = {
   avgResponseTimeMs: 0, totalToolsUsed: 0, uniqueToolsUsed: [],
   callsByGateway: {}, callsByRoute: {},
   recentCalls: [], lastUpdated: new Date().toISOString(),
+  totalInputTokens: 0, totalOutputTokens: 0, tokensByModel: {},
 };
 
 // 인메모리 캐시 — 디스크 읽기 최소화 / In-memory cache to minimize disk reads
@@ -93,6 +101,20 @@ export function recordCall(record: AgentCoreCallRecord): void {
 
   _stats.recentCalls.unshift(record);
   if (_stats.recentCalls.length > 50) _stats.recentCalls = _stats.recentCalls.slice(0, 50);
+
+  // Token usage tracking / 토큰 사용량 추적
+  if (record.inputTokens || record.outputTokens) {
+    _stats.totalInputTokens = (_stats.totalInputTokens || 0) + (record.inputTokens || 0);
+    _stats.totalOutputTokens = (_stats.totalOutputTokens || 0) + (record.outputTokens || 0);
+    if (record.model) {
+      if (!_stats.tokensByModel) _stats.tokensByModel = {};
+      const m = _stats.tokensByModel[record.model] || { inputTokens: 0, outputTokens: 0, calls: 0 };
+      m.inputTokens += record.inputTokens || 0;
+      m.outputTokens += record.outputTokens || 0;
+      m.calls++;
+      _stats.tokensByModel[record.model] = m;
+    }
+  }
 
   _stats.lastUpdated = new Date().toISOString();
 
