@@ -41,7 +41,7 @@ export default function BedrockPage() {
   const [totalCost, setTotalCost] = useState(0);
   const [totalCacheSavings, setTotalCacheSavings] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [range, setRange] = useState<RangeKey>('24h');
+  const [range, setRange] = useState<RangeKey>('7d');
   const [selected, setSelected] = useState<ModelMetric | null>(null);
 
   const fetchData = useCallback(async (r?: RangeKey) => {
