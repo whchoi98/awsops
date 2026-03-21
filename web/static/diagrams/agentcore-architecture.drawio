@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-03-18T00:00:00.000Z" agent="Claude" version="24.0.0" type="device">
+  <diagram id="agentcore-arch" name="AgentCore Architecture">
+    <mxGraphModel dx="1200" dy="820" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1200" pageHeight="820" math="0" shadow="0" background="none">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Tier 1: AgentCore Runtime -->
+        <mxCell id="runtime-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0f1629;strokeColor=#a855f7;strokeWidth=2;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="100" y="20" width="800" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="runtime-icon" value="" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock;sketch=0;fillColor=#01A88D;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="120" y="35" width="50" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="runtime-label" value="&lt;font color='#FFFFFF' style='font-size:15px'&gt;&lt;b&gt;AgentCore Runtime&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;font color='#aaaaaa' style='font-size:11px'&gt;Strands Agent Framework | Docker arm64 | Claude Sonnet/Opus 4.6&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;" vertex="1" parent="1">
+          <mxGeometry x="180" y="35" width="500" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrow Runtime -> Gateways -->
+        <mxCell id="arrow-rg" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#a855f7;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1" source="runtime-box" target="gw-container">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Tier 2: 8 MCP Gateways (2x4 grid) -->
+        <mxCell id="gw-container" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0f1629;strokeColor=#00d4ff;strokeWidth=2;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="100" y="140" width="800" height="260" as="geometry"/>
+        </mxCell>
+        <mxCell id="gw-title" value="&lt;font color='#00d4ff' style='font-size:13px'&gt;&lt;b&gt;8 MCP Gateways&lt;/b&gt;&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;" vertex="1" parent="1">
+          <mxGeometry x="110" y="145" width="200" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Row 1: Network, Container, IaC, Data -->
+        <mxCell id="gw-network" value="&lt;font color='#FFFFFF' style='font-size:12px'&gt;&lt;b&gt;Network&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;font color='#00d4ff' style='font-size:18px'&gt;&lt;b&gt;17&lt;/b&gt;&lt;/font&gt;&lt;font color='#aaaaaa' style='font-size:10px'&gt; tools&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a2540;strokeColor=#00d4ff;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="120" y="175" width="180" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="gw-container-gw" value="&lt;font color='#FFFFFF' style='font-size:12px'&gt;&lt;b&gt;Container&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;font color='#00ff88' style='font-size:18px'&gt;&lt;b&gt;24&lt;/b&gt;&lt;/font&gt;&lt;font color='#aaaaaa' style='font-size:10px'&gt; tools&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a2540;strokeColor=#00ff88;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="310" y="175" width="180" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="gw-iac" value="&lt;font color='#FFFFFF' style='font-size:12px'&gt;&lt;b&gt;IaC&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;font color='#f59e0b' style='font-size:18px'&gt;&lt;b&gt;12&lt;/b&gt;&lt;/font&gt;&lt;font color='#aaaaaa' style='font-size:10px'&gt; tools&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a2540;strokeColor=#f59e0b;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="500" y="175" width="180" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="gw-data" value="&lt;font color='#FFFFFF' style='font-size:12px'&gt;&lt;b&gt;Data&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;font color='#a855f7' style='font-size:18px'&gt;&lt;b&gt;24&lt;/b&gt;&lt;/font&gt;&lt;font color='#aaaaaa' style='font-size:10px'&gt; tools&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a2540;strokeColor=#a855f7;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="690" y="175" width="180" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- Row 2: Security, Monitoring, Cost, Ops -->
+        <mxCell id="gw-security" value="&lt;font color='#FFFFFF' style='font-size:12px'&gt;&lt;b&gt;Security&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;font color='#ef4444' style='font-size:18px'&gt;&lt;b&gt;14&lt;/b&gt;&lt;/font&gt;&lt;font color='#aaaaaa' style='font-size:10px'&gt; tools&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a2540;strokeColor=#ef4444;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="120" y="270" width="180" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="gw-monitoring" value="&lt;font color='#FFFFFF' style='font-size:12px'&gt;&lt;b&gt;Monitoring&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;font color='#00d4ff' style='font-size:18px'&gt;&lt;b&gt;16&lt;/b&gt;&lt;/font&gt;&lt;font color='#aaaaaa' style='font-size:10px'&gt; tools&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a2540;strokeColor=#00d4ff;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="310" y="270" width="180" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="gw-cost" value="&lt;font color='#FFFFFF' style='font-size:12px'&gt;&lt;b&gt;Cost&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;font color='#f59e0b' style='font-size:18px'&gt;&lt;b&gt;9&lt;/b&gt;&lt;/font&gt;&lt;font color='#aaaaaa' style='font-size:10px'&gt; tools&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a2540;strokeColor=#f59e0b;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="500" y="270" width="180" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="gw-ops" value="&lt;font color='#FFFFFF' style='font-size:12px'&gt;&lt;b&gt;Ops&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;font color='#00ff88' style='font-size:18px'&gt;&lt;b&gt;9&lt;/b&gt;&lt;/font&gt;&lt;font color='#aaaaaa' style='font-size:10px'&gt; tools&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a2540;strokeColor=#00ff88;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="690" y="270" width="180" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrow Gateways -> Lambda -->
+        <mxCell id="arrow-gl" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#00d4ff;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1" source="gw-container" target="lambda-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Tier 3: Lambda Functions -->
+        <mxCell id="lambda-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0f1629;strokeColor=#f59e0b;strokeWidth=2;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="100" y="440" width="800" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="lambda-icon" value="" style="shape=mxgraph.aws4.lambda;sketch=0;fillColor=#ED7100;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="120" y="455" width="50" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="lambda-label" value="&lt;font color='#FFFFFF' style='font-size:15px'&gt;&lt;b&gt;19 Lambda Functions&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;font color='#aaaaaa' style='font-size:11px'&gt;VPC Internal | Direct AWS API Calls&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;" vertex="1" parent="1">
+          <mxGeometry x="180" y="455" width="400" height="50" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

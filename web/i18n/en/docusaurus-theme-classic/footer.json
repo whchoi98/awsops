@@ -1,0 +1,38 @@
+{
+  "link.title.가이드": {
+    "message": "Guide",
+    "description": "The title of the footer links column with title=가이드 in the footer"
+  },
+  "link.title.리소스": {
+    "message": "Resources",
+    "description": "The title of the footer links column with title=리소스 in the footer"
+  },
+  "link.title.AWS 서비스": {
+    "message": "AWS Services",
+    "description": "The title of the footer links column with title=AWS 서비스 in the footer"
+  },
+  "link.item.label.시작하기": {
+    "message": "Getting Started",
+    "description": "The label of footer link with label=시작하기 linking to /getting-started/login"
+  },
+  "link.item.label.AI 어시스턴트": {
+    "message": "AI Assistant",
+    "description": "The label of footer link with label=AI 어시스턴트 linking to /getting-started/ai-assistant"
+  },
+  "link.item.label.Dashboard": {
+    "message": "Dashboard",
+    "description": "The label of footer link with label=Dashboard linking to https://awsops.whchoi.net/awsops/"
+  },
+  "link.item.label.Amazon Bedrock": {
+    "message": "Amazon Bedrock",
+    "description": "The label of footer link with label=Amazon Bedrock linking to https://aws.amazon.com/bedrock/"
+  },
+  "link.item.label.Steampipe": {
+    "message": "Steampipe",
+    "description": "The label of footer link with label=Steampipe linking to https://steampipe.io/"
+  },
+  "copyright": {
+    "message": "Copyright © 2026 AWSops. Built with Docusaurus.",
+    "description": "The footer copyright"
+  }
+}

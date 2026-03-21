@@ -1,0 +1,18 @@
+{
+  "title": {
+    "message": "AWSops Guide",
+    "description": "The title in the navbar"
+  },
+  "item.label.가이드": {
+    "message": "Guide",
+    "description": "Navbar item with label 가이드"
+  },
+  "item.label.FAQ": {
+    "message": "FAQ",
+    "description": "Navbar item with label FAQ"
+  },
+  "item.label.대시보드": {
+    "message": "Dashboard",
+    "description": "Navbar item with label 대시보드"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "version.label": {
+    "message": "Next",
+    "description": "The label for version current"
+  },
+  "sidebar.guideSidebar.category.시작하기": {
+    "message": "Getting Started",
+    "description": "The label for category '시작하기' in sidebar 'guideSidebar'"
+  },
+  "sidebar.guideSidebar.category.Overview": {
+    "message": "Overview",
+    "description": "The label for category 'Overview' in sidebar 'guideSidebar'"
+  },
+  "sidebar.guideSidebar.category.Compute": {
+    "message": "Compute",
+    "description": "The label for category 'Compute' in sidebar 'guideSidebar'"
+  },
+  "sidebar.guideSidebar.category.Network & CDN": {
+    "message": "Network & CDN",
+    "description": "The label for category 'Network & CDN' in sidebar 'guideSidebar'"
+  },
+  "sidebar.guideSidebar.category.Storage & DB": {
+    "message": "Storage & DB",
+    "description": "The label for category 'Storage & DB' in sidebar 'guideSidebar'"
+  },
+  "sidebar.guideSidebar.category.Monitoring": {
+    "message": "Monitoring",
+    "description": "The label for category 'Monitoring' in sidebar 'guideSidebar'"
+  },
+  "sidebar.guideSidebar.category.Security": {
+    "message": "Security",
+    "description": "The label for category 'Security' in sidebar 'guideSidebar'"
+  },
+  "sidebar.guideSidebar.category.FAQ": {
+    "message": "FAQ",
+    "description": "The label for category 'FAQ' in sidebar 'guideSidebar'"
+  }
+}

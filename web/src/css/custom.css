@@ -1,0 +1,175 @@
+/**
+ * AWSops Navy Theme for Docusaurus
+ * Matches the dashboard's dark navy color scheme
+ */
+
+:root {
+  --ifm-color-primary: #00d4ff;
+  --ifm-color-primary-dark: #00bfe6;
+  --ifm-color-primary-darker: #00b4d9;
+  --ifm-color-primary-darkest: #0094b3;
+  --ifm-color-primary-light: #1adaff;
+  --ifm-color-primary-lighter: #26ddff;
+  --ifm-color-primary-lightest: #4de3ff;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 212, 255, 0.1);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #00d4ff;
+  --ifm-color-primary-dark: #00bfe6;
+  --ifm-color-primary-darker: #00b4d9;
+  --ifm-color-primary-darkest: #0094b3;
+  --ifm-color-primary-light: #1adaff;
+  --ifm-color-primary-lighter: #26ddff;
+  --ifm-color-primary-lightest: #4de3ff;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 212, 255, 0.15);
+
+  --ifm-background-color: #0a0e1a;
+  --ifm-background-surface-color: #0f1629;
+  --ifm-navbar-background-color: #0f1629;
+  --ifm-footer-background-color: #0a0e1a;
+  --ifm-card-background-color: #151d30;
+  --ifm-toc-border-color: #1a2540;
+  --ifm-color-emphasis-300: #1a2540;
+  --ifm-menu-color-background-active: #151d30;
+  --ifm-menu-color-background-hover: #151d30;
+}
+
+/* Sidebar styling */
+[data-theme='dark'] .menu {
+  background-color: #0f1629;
+}
+
+[data-theme='dark'] .menu__link--active {
+  color: #00d4ff;
+  border-left: 2px solid #00d4ff;
+}
+
+[data-theme='dark'] .menu__link:hover {
+  background-color: #151d30;
+  color: #e2e8f0;
+}
+
+[data-theme='dark'] .menu__list-item-collapsible:hover {
+  background-color: #151d30;
+}
+
+/* Navbar */
+[data-theme='dark'] .navbar {
+  border-bottom: 1px solid #1a2540;
+}
+
+[data-theme='dark'] .navbar__title {
+  color: #00d4ff;
+  font-weight: 700;
+}
+
+/* Footer */
+[data-theme='dark'] .footer {
+  border-top: 1px solid #1a2540;
+}
+
+/* Screenshot styling */
+.screenshot {
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  border: 1px solid #1a2540;
+  margin: 1.5rem 0;
+  max-width: 100%;
+}
+
+/* Admonition custom colors */
+[data-theme='dark'] .alert--info {
+  --ifm-alert-background-color: rgba(0, 212, 255, 0.08);
+  --ifm-alert-border-color: #00d4ff;
+}
+
+[data-theme='dark'] .alert--success {
+  --ifm-alert-background-color: rgba(0, 255, 136, 0.08);
+  --ifm-alert-border-color: #00ff88;
+}
+
+[data-theme='dark'] .alert--warning {
+  --ifm-alert-background-color: rgba(245, 158, 11, 0.08);
+  --ifm-alert-border-color: #f59e0b;
+}
+
+[data-theme='dark'] .alert--danger {
+  --ifm-alert-background-color: rgba(239, 68, 68, 0.08);
+  --ifm-alert-border-color: #ef4444;
+}
+
+/* Table styling */
+[data-theme='dark'] table {
+  border-color: #1a2540;
+}
+
+[data-theme='dark'] table thead tr {
+  background-color: #151d30;
+  border-bottom-color: #1a2540;
+}
+
+[data-theme='dark'] table tbody tr {
+  border-bottom-color: #1a2540;
+}
+
+[data-theme='dark'] table tbody tr:nth-child(2n) {
+  background-color: rgba(15, 22, 41, 0.5);
+}
+
+/* Code block */
+[data-theme='dark'] .prism-code {
+  background-color: #0a0e1a !important;
+  border: 1px solid #1a2540;
+}
+
+/* Badge colors for AI routes */
+.badge--code { background-color: #a855f7; }
+.badge--network { background-color: #00d4ff; }
+.badge--container { background-color: #00ff88; }
+.badge--security { background-color: #ef4444; }
+.badge--cost { background-color: #f59e0b; }
+.badge--data { background-color: #3b82f6; }
+.badge--monitoring { background-color: #8b5cf6; }
+
+/* Details/FAQ styling */
+details {
+  border: 1px solid #1a2540;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+[data-theme='dark'] details {
+  background-color: #0f1629;
+}
+
+details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #00d4ff;
+}
+
+details summary:hover {
+  color: #4de3ff;
+}
+
+/* Scrollbar */
+[data-theme='dark'] ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+[data-theme='dark'] ::-webkit-scrollbar-track {
+  background: #0a0e1a;
+}
+
+[data-theme='dark'] ::-webkit-scrollbar-thumb {
+  background: #1a2540;
+  border-radius: 3px;
+}
+
+[data-theme='dark'] ::-webkit-scrollbar-thumb:hover {
+  background: #2a3550;
+}

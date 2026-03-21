@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-03-18T00:00:00.000Z" agent="Claude" version="24.0.0" type="device">
+  <diagram id="system-arch" name="System Architecture">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1200" pageHeight="800" math="0" shadow="0" background="none">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- CloudFront -->
+        <mxCell id="cf-group" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a2540;strokeColor=#00d4ff;strokeWidth=2;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="200" y="20" width="600" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="cf-icon" value="" style="shape=mxgraph.aws4.cloudfront;sketch=0;fillColor=#8C4FFF;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;" vertex="1" parent="1">
+          <mxGeometry x="220" y="30" width="50" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="cf-label" value="&lt;font color='#FFFFFF' style='font-size:14px'&gt;&lt;b&gt;CloudFront&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;font color='#00d4ff' style='font-size:11px'&gt;Lambda@Edge Auth&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;" vertex="1" parent="1">
+          <mxGeometry x="280" y="30" width="200" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrow CF -> ALB -->
+        <mxCell id="arrow1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeColor=#00d4ff;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1" source="cf-group" target="alb-group">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ALB -->
+        <mxCell id="alb-group" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a2540;strokeColor=#a855f7;strokeWidth=2;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="200" y="130" width="600" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="alb-icon" value="" style="shape=mxgraph.aws4.application_load_balancer;sketch=0;fillColor=#8C4FFF;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="220" y="140" width="50" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="alb-label" value="&lt;font color='#FFFFFF' style='font-size:14px'&gt;&lt;b&gt;Application Load Balancer&lt;/b&gt;&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;" vertex="1" parent="1">
+          <mxGeometry x="280" y="145" width="300" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrow ALB -> EC2 -->
+        <mxCell id="arrow2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;strokeColor=#a855f7;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1" source="alb-group" target="ec2-group">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- EC2 Private Subnet -->
+        <mxCell id="ec2-group" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0f1629;strokeColor=#00ff88;strokeWidth=2;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="200" y="240" width="600" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="ec2-title" value="&lt;font color='#00ff88' style='font-size:12px'&gt;&lt;b&gt;EC2 (Private Subnet)&lt;/b&gt;&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;" vertex="1" parent="1">
+          <mxGeometry x="210" y="245" width="200" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Next.js box -->
+        <mxCell id="nextjs" value="&lt;font color='#FFFFFF' style='font-size:12px'&gt;&lt;b&gt;Next.js 14&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;font color='#aaaaaa' style='font-size:10px'&gt;App Router&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a2540;strokeColor=#00d4ff;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="230" y="275" width="160" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="nextjs-icon" value="" style="shape=mxgraph.aws4.ec2;sketch=0;fillColor=#ED7100;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="240" y="280" width="30" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrow Next.js -> Steampipe -->
+        <mxCell id="arrow-ns" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#00d4ff;strokeWidth=1.5;endArrow=block;endFill=1;" edge="1" parent="1" source="nextjs" target="steampipe">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Steampipe box -->
+        <mxCell id="steampipe" value="&lt;font color='#FFFFFF' style='font-size:12px'&gt;&lt;b&gt;Steampipe PostgreSQL&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;font color='#aaaaaa' style='font-size:10px'&gt;Port 9193 | 380+ AWS / 60+ K8s Tables&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a2540;strokeColor=#f59e0b;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="460" y="275" width="310" height="70" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrow EC2 -> AgentCore -->
+        <mxCell id="arrow3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;strokeColor=#00ff88;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1" source="ec2-group" target="ac-group">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- AgentCore -->
+        <mxCell id="ac-group" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0f1629;strokeColor=#a855f7;strokeWidth=2;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="200" y="410" width="600" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="ac-title" value="&lt;font color='#a855f7' style='font-size:12px'&gt;&lt;b&gt;Amazon Bedrock AgentCore&lt;/b&gt;&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;" vertex="1" parent="1">
+          <mxGeometry x="210" y="415" width="250" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Runtime box -->
+        <mxCell id="runtime" value="&lt;font color='#FFFFFF' style='font-size:12px'&gt;&lt;b&gt;Runtime&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;font color='#aaaaaa' style='font-size:10px'&gt;Strands Agent&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a2540;strokeColor=#a855f7;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="230" y="445" width="140" height="70" as="geometry"/>
+        </mxCell>
+
+        <!-- Gateways box -->
+        <mxCell id="gateways" value="&lt;font color='#FFFFFF' style='font-size:12px'&gt;&lt;b&gt;8 Gateways (125 MCP Tools)&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;font color='#aaaaaa' style='font-size:10px'&gt;Network, Container, Security, IaC, Data, Monitoring, Cost, Ops&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a2540;strokeColor=#a855f7;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="400" y="445" width="370" height="70" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
