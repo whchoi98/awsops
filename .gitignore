@@ -69,3 +69,8 @@ docs/COMPARISON_VS_FAST.md
 
 # CDK 컨텍스트 (계정 종속, 자동 생성) / CDK context (account-specific)
 infra-cdk/cdk.context.json
+powerpipe/.mod.cache.json
+.gitignore
+data/config.json
+data/agentcore-stats.json
+data/memory/
