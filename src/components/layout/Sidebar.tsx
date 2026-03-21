@@ -166,10 +166,10 @@ export default function Sidebar() {
           {/* Language toggle / 언어 전환 */}
           <button
             onClick={toggleLang}
-            className="p-2 rounded-lg text-gray-500 hover:text-accent-cyan hover:bg-navy-700 transition-colors"
+            className="px-2 py-1 rounded-md text-accent-cyan border border-accent-cyan/30 bg-accent-cyan/10 hover:bg-accent-cyan/20 transition-colors"
             title={lang === 'ko' ? 'Switch to English' : '한국어로 전환'}
           >
-            <span className="text-xs font-bold font-mono">{lang === 'ko' ? 'EN' : '한'}</span>
+            <span className="text-[11px] font-bold font-mono">{lang === 'ko' ? 'EN' : '한'}</span>
           </button>
           {/* Sign Out / 로그아웃 */}
           <button
