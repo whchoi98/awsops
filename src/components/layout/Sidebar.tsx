@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
@@ -166,13 +165,11 @@ export default function Sidebar() {
       {/* Customer Logo (from config) / 고객 로고 (config에서 읽기) */}
       {customerLogo && (
         <div className="px-5 py-3 border-b border-navy-600 flex items-center justify-center bg-white/95">
-          <Image
-            src={`/logos/${customerLogo}`}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`/awsops/logos/${customerLogo}`}
             alt={customerName || 'Customer'}
-            width={180}
-            height={40}
-            className="object-contain max-h-[40px]"
-            priority
+            className="object-contain max-h-[40px] max-w-[180px]"
           />
         </div>
       )}
