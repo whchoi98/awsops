@@ -35,7 +35,8 @@ function validateQuery(sql: string): void {
 
 export async function runQuery<T = Record<string, unknown>>(
   sql: string,
-  bustCache = false
+  bustCache = false,
+  ttl?: number // Custom TTL in seconds (default: 300s) / 커스텀 TTL (기본: 300초)
 ): Promise<{ rows: T[]; error?: string }> {
   const cacheKey = `sp:${sql}`;
 
@@ -49,7 +50,11 @@ export async function runQuery<T = Record<string, unknown>>(
     const result = await pool.query(sql);
     const rows: T[] = result.rows || [];
     const data = { rows };
-    cache.set(cacheKey, data);
+    if (ttl) {
+      cache.set(cacheKey, data, ttl);
+    } else {
+      cache.set(cacheKey, data);
+    }
     return data;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
@@ -59,7 +64,8 @@ export async function runQuery<T = Record<string, unknown>>(
 
 export async function batchQuery(
   queries: Record<string, string>,
-  bustCache = false
+  bustCache = false,
+  ttl?: number // Custom TTL in seconds / 커스텀 TTL (초)
 ): Promise<Record<string, { rows: unknown[]; error?: string }>> {
   const results: Record<string, { rows: unknown[]; error?: string }> = {};
   const entries = Object.entries(queries);
@@ -69,7 +75,7 @@ export async function batchQuery(
   for (let i = 0; i < entries.length; i += BATCH_SIZE) {
     const batch = entries.slice(i, i + BATCH_SIZE);
     const settled = await Promise.allSettled(
-      batch.map(([, sql]) => runQuery(sql, bustCache))
+      batch.map(([, sql]) => runQuery(sql, bustCache, ttl))
     );
     batch.forEach(([key], j) => {
       const s = settled[j];

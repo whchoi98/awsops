@@ -27,6 +27,7 @@ import { queries as osQ } from '@/lib/queries/opensearch';
 import { queries as metQ } from '@/lib/queries/metrics';
 
 const WARM_INTERVAL_MS = 4 * 60 * 1000; // 4 minutes / 4분
+const METRIC_CACHE_TTL = 600; // 10 minutes for CloudWatch metric queries / CloudWatch 메트릭 쿼리는 10분
 let warmingTimer: ReturnType<typeof setInterval> | null = null;
 let isWarming = false;
 
@@ -89,8 +90,9 @@ async function warmCache(): Promise<void> {
     // 2. Run dashboard queries / 대시보드 쿼리 실행
     await batchQuery(getDashboardQueries(includeCost));
 
-    // 3. Run monitoring queries / 모니터링 쿼리 실행
-    await batchQuery(getMonitoringQueries());
+    // 3. Run monitoring queries with longer TTL (CloudWatch metrics are slow)
+    // 모니터링 쿼리는 CloudWatch API 호출이 느리므로 TTL을 10분으로 설정
+    await batchQuery(getMonitoringQueries(), false, METRIC_CACHE_TTL);
 
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
     console.log(`[CacheWarmer] Warmed dashboard + monitoring cache in ${elapsed}s`);
