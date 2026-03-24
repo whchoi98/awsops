@@ -19,11 +19,13 @@ Parameters:
 
   ExternalId:
     Type: String
-    Default: ''
-    Description: External ID for STS AssumeRole confused deputy protection. Leave blank to skip.
-
-Conditions:
-  HasExternalId: !Not [!Equals [!Ref ExternalId, '']]
+    MinLength: 8
+    MaxLength: 128
+    AllowedPattern: '^[a-zA-Z0-9+=,.@:/-]+$'
+    ConstraintDescription: ExternalId is REQUIRED (min 8 chars). Use a unique value per deployment for confused deputy protection.
+    Description: >
+      REQUIRED. External ID for STS AssumeRole confused deputy protection.
+      Use a unique random string (e.g. UUID). Set matching AWSOPS_EXTERNAL_ID env var on Lambda functions.
 
 Resources:
   AWSopsReadOnlyRole:
@@ -39,11 +41,9 @@ Resources:
             Principal:
               AWS: !Sub 'arn:aws:iam::${HostAccountId}:root'
             Action: 'sts:AssumeRole'
-            Condition: !If
-              - HasExternalId
-              - StringEquals:
-                  'sts:ExternalId': !Ref ExternalId
-              - !Ref 'AWS::NoValue'
+            Condition:
+              StringEquals:
+                'sts:ExternalId': !Ref ExternalId
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/ReadOnlyAccess
       Tags:
