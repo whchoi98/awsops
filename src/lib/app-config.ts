@@ -41,6 +41,7 @@ export interface AppConfig {
   customerLogo?: string;       // Customer logo path in public/logos/ (e.g. "autoever.png") / 고객 로고 경로
   customerName?: string;       // Customer name displayed next to logo / 로고 옆에 표시할 고객명
   customerLogoBg?: string;     // Logo background: "light" (white bg) or "dark" (transparent) / 로고 배경: light=흰색, dark=투명
+  adminEmails?: string[];      // Admin user emails allowed to access /accounts / 계정 관리 접근 허용 이메일
   accounts?: AccountConfig[];
 }
 

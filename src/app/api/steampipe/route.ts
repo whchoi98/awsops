@@ -53,6 +53,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ accounts: getAccounts() });
   }
 
+  // Admin check — client calls before rendering /accounts page / 클라이언트에서 /accounts 접근 전 확인
+  if (action === 'admin-check') {
+    const user = getUserFromRequest(request);
+    const config = getConfig();
+    const adminEmails = config.adminEmails || [];
+    const isAdmin = user.email !== 'anonymous' && (adminEmails.length === 0 || adminEmails.includes(user.email));
+    return NextResponse.json({ isAdmin, email: user.email });
+  }
+
   if (action === 'inventory') {
     try {
       const days = parseInt(searchParams.get('days') || '90');
@@ -101,6 +110,12 @@ export async function PUT(request: NextRequest) {
       const user = getUserFromRequest(request);
       if (user.email === 'anonymous') {
         return NextResponse.json({ error: 'Authentication required for account management.' }, { status: 401 });
+      }
+      // Admin email check — only adminEmails in config can manage accounts / adminEmails만 계정 관리 가능
+      const config = getConfig();
+      const adminEmails = config.adminEmails || [];
+      if (adminEmails.length > 0 && !adminEmails.includes(user.email)) {
+        return NextResponse.json({ error: 'Access denied. Admin privileges required.' }, { status: 403 });
       }
       // Rate limit: max 5 admin actions per minute per user / 사용자당 분당 5회 제한
       if (!checkRateLimit(user.email)) {

@@ -34,6 +34,7 @@ export default function AccountsPage() {
   const { refetchAccounts } = useAccountContext();
   const [accounts, setAccounts] = useState<AccountEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   // Form states
   const [newAccountId, setNewAccountId] = useState('');
@@ -67,9 +68,39 @@ export default function AccountsPage() {
     }
   }, []);
 
+  // Admin access check / 관리자 접근 확인
   useEffect(() => {
-    fetchAccounts();
-  }, [fetchAccounts]);
+    fetch('/awsops/api/steampipe?action=admin-check')
+      .then(r => r.json())
+      .then(d => {
+        if (!d.isAdmin) setAccessDenied(true);
+      })
+      .catch(() => setAccessDenied(true));
+  }, []);
+
+  useEffect(() => {
+    if (!accessDenied) fetchAccounts();
+  }, [fetchAccounts, accessDenied]);
+
+  // Access denied screen / 접근 거부 화면
+  if (accessDenied) {
+    return (
+      <div className="p-6 animate-fade-in">
+        <Header title="Account Management" subtitle="Multi-account configuration" />
+        <div className="flex flex-col items-center justify-center mt-20">
+          <Shield size={48} className="text-accent-red mb-4" />
+          <h2 className="text-xl font-bold text-white mb-2">Access Denied</h2>
+          <p className="text-gray-400 text-sm text-center max-w-md">
+            You do not have permission to access this page.<br />
+            Contact your administrator to request access.
+          </p>
+          <p className="text-gray-500 text-xs mt-4 font-mono">
+            Admin access is configured via <code className="text-accent-cyan">adminEmails</code> in data/config.json
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const testConnection = async (accountId: string, source: 'table' | 'form') => {
     setTesting(accountId);
