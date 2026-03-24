@@ -1,11 +1,17 @@
 """
 Cross-account credential helper for AWSops Lambda functions.
 Uses STS AssumeRole with 50-minute TTL credential caching.
+크로스 어카운트 자격증명 헬퍼. STS AssumeRole + 50분 캐싱.
 """
 import boto3
 import os
 import time
 import re
+import logging
+import json
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 _ARN_PATTERN = re.compile(r'^arn:aws:iam::\d{12}:role/[\w+=,.@-]+$')
 _credential_cache = {}  # {role_arn: (credentials_dict, timestamp)}
@@ -39,6 +45,14 @@ def _assume_role(role_arn, session_suffix=None):
     if _EXTERNAL_ID:
         assume_params['ExternalId'] = _EXTERNAL_ID
     resp = sts.assume_role(**assume_params)
+    # Audit log for cross-account access / 크로스 어카운트 접근 감사 로그
+    logger.info(json.dumps({
+        'event': 'assume_role',
+        'role_arn': role_arn,
+        'session_name': session_name,
+        'expiration': resp['Credentials']['Expiration'].isoformat(),
+        'timestamp': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+    }))
     creds = {
         'aws_access_key_id': resp['Credentials']['AccessKeyId'],
         'aws_secret_access_key': resp['Credentials']['SecretAccessKey'],

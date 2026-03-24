@@ -12,6 +12,23 @@ import { getUserFromRequest } from '@/lib/auth-utils';
 
 const COST_QUERY_KEYS = ['monthlyCost', 'costSummary', 'dailyCost', 'serviceCost', 'costDetail'];
 
+// Rate limiting for admin actions / 관리자 액션 레이트 제한
+const adminRateLimit = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_MAX = 5;       // Max requests per window / 윈도우당 최대 요청
+const RATE_LIMIT_WINDOW = 60000; // 1 minute window / 1분 윈도우
+
+function checkRateLimit(userId: string): boolean {
+  const now = Date.now();
+  const entry = adminRateLimit.get(userId);
+  if (!entry || now > entry.resetAt) {
+    adminRateLimit.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    return true;
+  }
+  if (entry.count >= RATE_LIMIT_MAX) return false;
+  entry.count++;
+  return true;
+}
+
 export async function GET(request: NextRequest) {
   // Auto-start cache warmer on first request / 첫 요청 시 캐시 워머 자동 시작
   ensureCacheWarmerStarted();
@@ -84,6 +101,10 @@ export async function PUT(request: NextRequest) {
       const user = getUserFromRequest(request);
       if (user.email === 'anonymous') {
         return NextResponse.json({ error: 'Authentication required for account management.' }, { status: 401 });
+      }
+      // Rate limit: max 5 admin actions per minute per user / 사용자당 분당 5회 제한
+      if (!checkRateLimit(user.email)) {
+        return NextResponse.json({ error: 'Too many requests. Please wait before retrying.' }, { status: 429 });
       }
       console.log(`[ADMIN] ${action} by ${user.email} (${user.sub})`);
     }
@@ -166,13 +187,17 @@ export async function PUT(request: NextRequest) {
         return NextResponse.json({ error: 'Alias is required.' }, { status: 400 });
       }
 
-      // Alias character validation (Section 6)
+      // Alias validation: characters + length / Alias 검증: 문자 + 길이
       const ALIAS_PATTERN = /^[\w\s-]+$/;
-      if (!ALIAS_PATTERN.test(alias.trim())) {
+      const trimmedAlias = alias.trim();
+      if (trimmedAlias.length > 64) {
+        return NextResponse.json({ error: 'Alias too long. Maximum 64 characters.' }, { status: 400 });
+      }
+      if (!ALIAS_PATTERN.test(trimmedAlias)) {
         return NextResponse.json({ error: 'Alias contains invalid characters. Use letters, numbers, spaces, hyphens, underscores only.' }, { status: 400 });
       }
 
-      // Region format validation (Section 6)
+      // Region validation: format + allowlist / Region 검증: 형식 + 허용 목록
       const REGION_PATTERN = /^[a-z]{2}-[a-z]+-\d$/;
       if (region && !REGION_PATTERN.test(region)) {
         return NextResponse.json({ error: 'Invalid region format. Example: ap-northeast-2' }, { status: 400 });
