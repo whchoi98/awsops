@@ -4,7 +4,7 @@
 
 실시간 AWS/K8s 리소스 모니터링, 네트워크 트러블슈팅, CIS 컴플라이언스 스캔, AI 기반 분석을 단일 대시보드에서 제공합니다.
 
-**현황**: 34 페이지 · 49 라우트 · 24 쿼리 파일 · 12 API 라우트 · 125 MCP 도구 (8 Gateway) · 14 컴포넌트
+**현황**: 35 페이지 · 50 라우트 · 25 쿼리 파일 · 13 API 라우트 · 125 MCP 도구 (8 Gateway) · 14 컴포넌트
 
 ---
 
@@ -41,8 +41,8 @@
 │                                                                              │
 │  ┌─────────────────┐  ┌──────────────────┐  ┌────────────────────────────┐  │
 │  │  Next.js :3000  │  │  Steampipe :9193 │  │  VSCode :8888             │  │
-│  │  (34 Pages)     │──│  (Embedded PG)   │  │  (code-server)            │  │
-│  │  (12 APIs)      │  │  aws / k8s / trivy│  │                           │  │
+│  │  (35 Pages)     │──│  (Embedded PG)   │  │  (code-server)            │  │
+│  │  (13 APIs)      │  │  aws / k8s / trivy│  │                           │  │
 │  └─────────────────┘  └──────────────────┘  └────────────────────────────┘  │
 │  ┌─────────────────┐  ┌──────────────────────────────────────────────────┐  │
 │  │  Powerpipe      │  │  Docker (빌드 전용, 실행은 AgentCore 서비스)   │  │
@@ -68,13 +68,14 @@
 
 ## 기능
 
-### 대시보드 페이지 (34개) / Dashboard Pages (34 pages)
+### 대시보드 페이지 (35개) / Dashboard Pages (35 pages)
 
 | Category | Page | Path | Features / 기능 |
 |----------|------|------|-----------------|
 | **Overview** | Dashboard | `/awsops` | 18 StatsCards, Live Resources, Charts, Warnings |
 | | AI Assistant | `/awsops/ai` | Claude Sonnet/Opus 4.6, SSE streaming, multi-route |
 | | AgentCore | `/awsops/agentcore` | Runtime status, 8 Gateways, 125 tools |
+| | Bedrock | `/awsops/bedrock` | Model usage, token costs, prompt caching, Account vs AWSops |
 | **Compute** | EC2 | `/awsops/ec2` | Instances + detail panel |
 | | Lambda | `/awsops/lambda` | Functions, runtimes, memory/timeout |
 | | ECS | `/awsops/ecs` | Clusters, services, tasks |
@@ -274,7 +275,7 @@ bash scripts/10-verify.sh       # Health check
 ```
 awsops/
 ├── src/
-│   ├── app/                      # 34 pages + 12 API routes
+│   ├── app/                      # 35 pages + 13 API routes
 │   │   ├── page.tsx              # Dashboard home (18 StatsCards)
 │   │   ├── ai/                   # AI Assistant (SSE streaming)
 │   │   ├── ec2/                  # EC2 instances
@@ -303,13 +304,13 @@ awsops/
 │   │   ├── iam/                  # IAM users/roles
 │   │   ├── security/             # Security findings
 │   │   ├── compliance/           # CIS v1.5~v4.0 benchmarks
-│   │   └── api/                  # 12 API routes (ai, steampipe, auth, msk, rds, elasticache, opensearch, agentcore, code, benchmark, container-cost, eks-container-cost)
+│   │   └── api/                  # 13 API routes (ai, steampipe, auth, msk, rds, elasticache, opensearch, agentcore, code, benchmark, container-cost, eks-container-cost, bedrock-metrics)
 │   ├── components/               # 14 shared components (Sidebar, Charts, Table, K9s)
 │   ├── lib/steampipe.ts          # pg Pool (NOT CLI) — max 5, 120s timeout, 5min cache
 │   ├── lib/resource-inventory.ts  # 리소스 인벤토리 스냅샷 (resource snapshots)
 │   ├── lib/cost-snapshot.ts      # Cost 데이터 스냅샷 (cost data fallback)
 │   ├── lib/app-config.ts         # 앱 설정 (app config: costEnabled)
-│   ├── lib/queries/              # 24 SQL query files (ec2, ebs, msk, opensearch, vpc, s3, rds, k8s, container-cost, eks-container-cost...)
+│   ├── lib/queries/              # 25 SQL query files (ec2, ebs, msk, opensearch, vpc, s3, rds, k8s, container-cost, eks-container-cost, bedrock...)
 │   └── types/aws.ts              # TypeScript type definitions
 ├── agent/                        # Strands Agent 소스 (EC2에서 빌드 → ECR → AgentCore에서 실행)
 │   ├── agent.py                  # Main entrypoint with dynamic gateway selection
@@ -330,7 +331,8 @@ awsops/
 │   ├── 05-setup-cognito.sh       # Step 5: Cognito auth
 │   ├── 06-setup-agentcore.sh     # Step 6: Wrapper (6a->6b->6c->6d->6e)
 │   ├── 06a~06e-setup-agentcore-* # Step 6a-6e: AgentCore (split)
-│   ├── 06f-setup-opencost.sh    # Step 6f: Prometheus + OpenCost (EKS cost)
+│   ├── 06e-setup-agentcore-memory.sh  # Step 6e: Memory Store (365-day retention)
+│   ├── 06f-setup-opencost.sh           # Step 6f: Prometheus + OpenCost (EKS cost)
 │   ├── 07-setup-cloudfront-auth.sh # Step 7: Lambda@Edge
 │   ├── 08-start-all.sh           # Start all services
 │   ├── 09-stop-all.sh            # Stop all services
@@ -434,7 +436,7 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for details.
 
 Real-time AWS/K8s resource monitoring, network troubleshooting, CIS compliance scanning, and AI-powered analysis in a single dashboard.
 
-**Stats**: 34 pages · 49 routes · 24 query files · 12 API routes · 125 MCP tools (8 Gateways) · 14 components
+**Stats**: 35 pages · 50 routes · 25 query files · 13 API routes · 125 MCP tools (8 Gateways) · 14 components
 
 ## Documentation
 

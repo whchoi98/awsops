@@ -29,7 +29,6 @@ Steampipe용 SQL 쿼리 정의. 각 파일은 특정 AWS/K8s 서비스에 대한
 - `relationships.ts` — 리소스 관계 (토폴로지 그래프)
 - `container-cost.ts` — ECS 컨테이너 비용 (Task 메타데이터, 서비스 요약)
 - `eks-container-cost.ts` — EKS 컨테이너 비용 (Pod 리소스 요청, 노드 용량)
-- `bedrock.ts` — Bedrock 파운데이션 모델 목록 (메트릭은 CloudWatch API 사용)
 
 ## 규칙
 - 쿼리 작성 전 `information_schema.columns`로 컬럼명 확인
@@ -71,7 +70,6 @@ SQL query definitions for Steampipe. Each file exports queries for a specific AW
 - `relationships.ts` — Resource relationships (topology graph)
 - `container-cost.ts` — ECS container cost (task metadata, service summary)
 - `eks-container-cost.ts` — EKS container cost (pod resource requests, node capacity)
-- `bedrock.ts` — Bedrock foundation model list (metrics via CloudWatch API)
 
 ## Rules
 - Verify column names via `information_schema.columns` before writing queries

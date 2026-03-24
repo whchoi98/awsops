@@ -10,14 +10,15 @@ AWSops Dashboard is an AWS + Kubernetes operations dashboard providing real-time
 - **Styling**: Tailwind CSS dark navy theme with custom accent colors
 - **Charts**: Recharts for metrics visualization
 - **Topology**: React Flow for network topology diagrams
-- **페이지**: 31개 리소스 페이지 (EC2, EBS, S3, VPC, IAM, Lambda, RDS, ECS, MSK, OpenSearch, Inventory 등)
-  (31 resource pages)
+- **페이지**: 35개 리소스 페이지 (EC2, EBS, S3, VPC, IAM, Lambda, RDS, ECS, MSK, OpenSearch, Inventory 등)
+  (35 resource pages)
+- Bedrock 모델 사용량 모니터링, i18n 다국어(ko/en) 지원
 
 ### Data Layer (`src/lib/`)
 - **Steampipe**: Embedded PostgreSQL on port 9193 — 380+ AWS tables, 60+ K8s tables
 - **Connection**: pg Pool (max 5, 120s timeout, sequential batch of 5)
 - **Cache**: node-cache with 5-minute TTL
-- **쿼리**: `src/lib/queries/`에 22개 SQL 쿼리 파일 (22 SQL query files)
+- **쿼리**: `src/lib/queries/`에 25개 SQL 쿼리 파일 (25 SQL query files)
 - **Inventory**: Resource count snapshots (data/inventory/, zero extra queries)
 - **Cost Snapshot**: Cost data fallback for MSP accounts (data/cost/)
 - **Config**: App config (data/config.json, costEnabled auto-detect)
@@ -33,9 +34,10 @@ AWSops Dashboard is an AWS + Kubernetes operations dashboard providing real-time
   (Config-based settings from data/config.json — no hardcoded account ARNs)
 - **AI 라우팅 전략**: 목록/현황/구성 분석 → `aws-data` (Steampipe SQL), 트러블슈팅/진단 → 전문 Gateway
   (Routing strategy: listing/analysis → Steampipe SQL, troubleshooting → specialized Gateway)
+- **Memory Store**: 대화 이력 영구 저장 (사용자별, 365일 보관) / Conversation history persistence (per-user, 365-day retention)
 
 ### Auth & Delivery
-- **Auth**: Cognito User Pool + Lambda@Edge (Python 3.12, us-east-1)
+- **Auth**: Cognito User Pool + Lambda@Edge (Node.js 20, us-east-1)
 - **CDN**: CloudFront → ALB → EC2 (t4g.2xlarge), CachePolicy: CACHING_DISABLED
 - **IaC**: CDK (`infra-cdk/`) — AwsopsStack, CognitoStack, AgentCoreStack(placeholder)
 
@@ -65,6 +67,8 @@ AWSops Dashboard is an AWS + Kubernetes operations dashboard providing real-time
 | 6b | `06b-setup-agentcore-gateway.sh` | 8 AgentCore Gateways (role-based MCP routing) |
 | 6c | `06c-setup-agentcore-tools.sh` | 19 Lambda + create_targets.py → 125 MCP tools |
 | 6d | `06d-setup-agentcore-interpreter.sh` | Code Interpreter |
+| 6e | `06e-setup-agentcore-memory.sh` | Memory Store (대화 이력 365일 보관) |
+| 6f | `06f-setup-opencost.sh` | Prometheus + OpenCost (EKS 비용 분석) |
 | 7 | `07-setup-cloudfront-auth.sh` | Lambda@Edge → CloudFront 연동 |
 
 ## AgentCore Gateway Architecture
