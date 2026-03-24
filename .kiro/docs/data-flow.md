@@ -4,7 +4,7 @@
 ```
 Browser → Next.js page ('use client')
   → fetch('/awsops/api/steampipe', { queries })
-    → steampipe.ts: batchQuery() → pg Pool :9193
+    → steampipe.ts: batchQuery() → pg Pool :9193 (max 5, 120s timeout)
       → Steampipe → AWS API / K8s API / Trivy DB
     → node-cache (5min TTL)
   → JSON response → Recharts / DataTable / React Flow
@@ -37,6 +37,21 @@ Browser → POST /awsops/api/benchmark (version)
   → Powerpipe → Steampipe → AWS API
   → 431 controls 평가 (~3-5min)
   → JSON response
+```
+
+## CloudWatch Metrics (MSK, RDS, ElastiCache, OpenSearch)
+```
+Browser → GET /awsops/api/{msk,rds,elasticache,opensearch}
+  → boto3 CloudWatch get_metric_statistics()
+  → JSON response (CPU, Memory, Network, etc.)
+```
+
+## Container Cost
+```
+ECS: Browser → POST /awsops/api/container-cost
+  → Steampipe (ECS services) + Fargate pricing + Container Insights
+EKS: Browser → POST /awsops/api/eks-container-cost
+  → OpenCost API (CPU/Mem/Net/Storage/GPU) || request-based fallback
 ```
 
 ## AgentCore Gateway → Lambda

@@ -26,6 +26,22 @@
 | Gateway 연결 실패 | MCP 연결 에러 | Bedrock Direct로 자동 폴백 |
 | Code Interpreter 이름 에러 | 하이픈 사용 | 언더스코어만 사용 `[a-zA-Z][a-zA-Z0-9_]` |
 | arm64 빌드 실패 | 플랫폼 미지정 | `docker buildx --platform linux/arm64` |
+| Gateway Target inlinePayload 에러 | CLI 사용 | Python/boto3 사용 (`mcp.lambda` structure) |
+
+## CloudWatch Metrics API
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| MSK/RDS/ElastiCache 메트릭 없음 | CloudWatch 지연 | 5분 대기 후 재시도 |
+| OpenSearch 메트릭 에러 | 도메인명 불일치 | DomainName dimension 확인 |
+
+## Container Cost
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| EKS 비용 0 표시 | OpenCost 미설치 | `bash scripts/06f-setup-opencost.sh` 실행 |
+| EKS fallback 모드 | OpenCost API 접근 불가 | Prometheus + OpenCost pod 상태 확인 |
+| ECS 비용 부정확 | Container Insights 미활성 | ECS 클러스터에서 Container Insights 활성화 |
 
 ## Services
 

@@ -63,3 +63,17 @@ steampipe query "SELECT column_name FROM information_schema.columns WHERE table_
 - Python 3.11+ (agent), 3.12 (Lambda)
 - boto3 read-only 호출만 허용
 - arm64 Docker 빌드 필수
+
+## API Routes (12개)
+- `ai/route.ts` — 10-route classifier + SSE streaming
+- `steampipe/route.ts` — Steampipe query endpoint
+- `auth/route.ts` — Authentication
+- `agentcore/route.ts` — AgentCore status
+- `code/route.ts` — Code Interpreter
+- `benchmark/route.ts` — CIS benchmark
+- `msk/route.ts` — MSK CloudWatch metrics
+- `rds/route.ts` — RDS CloudWatch metrics
+- `elasticache/route.ts` — ElastiCache CloudWatch metrics
+- `opensearch/route.ts` — OpenSearch CloudWatch metrics
+- `container-cost/route.ts` — ECS container cost (Fargate pricing)
+- `eks-container-cost/route.ts` — EKS container cost (OpenCost + request-based)

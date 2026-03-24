@@ -1,13 +1,13 @@
-# AWSops Dashboard v1.3.0 — Kiro Rules
+# AWSops Dashboard v1.7.0 — Kiro Rules
 
 ## Project Overview
 AWS + Kubernetes 운영 대시보드 (Steampipe, Next.js 14, Amazon Bedrock AgentCore).
-27 pages, 5 API routes, 8 AgentCore Gateways (125 MCP tools), 19 Lambda functions.
+34 pages, 49 routes, 12 API routes, 24 query files, 8 AgentCore Gateways (125 MCP tools), 19 Lambda functions, 14 components.
 
 ## Tech Stack
 - **Frontend**: Next.js 14 (App Router), TypeScript, Tailwind CSS (dark navy), Recharts, React Flow
-- **Data**: Steampipe embedded PostgreSQL :9193 (380+ AWS, 60+ K8s, trivy), pg Pool, node-cache 5min
-- **AI**: Bedrock Claude Sonnet/Opus 4.6, AgentCore Runtime (Strands), 8 Gateways, Code Interpreter
+- **Data**: Steampipe embedded PostgreSQL :9193 (380+ AWS, 60+ K8s, trivy), pg Pool (max 5, 120s timeout), node-cache 5min
+- **AI**: Bedrock Claude Sonnet/Opus 4.6 (global.* cross-region), AgentCore Runtime (Strands), 8 Gateways, Code Interpreter
 - **Auth**: Cognito + Lambda@Edge (JWT cookie, Python 3.12, us-east-1)
 - **Infra**: CDK TypeScript → CloudFront → ALB → EC2 t4g.2xlarge (Private Subnet)
 
@@ -15,7 +15,7 @@ AWS + Kubernetes 운영 대시보드 (Steampipe, Next.js 14, Amazon Bedrock Agen
 
 ### Data Flow
 - 모든 AWS/K8s 데이터: Steampipe pg Pool 경유 — CLI 사용 금지
-- steampipe.ts: `Pool({ host: '127.0.0.1', port: 9193, max: 3, statement_timeout: 120000 })`
+- steampipe.ts: `Pool({ host: '127.0.0.1', port: 9193, max: 5, statement_timeout: 120000 })`
 - batchQuery: 3개 쿼리 동시 실행 (순차 배치)
 - node-cache 5분 TTL 캐싱
 
@@ -35,6 +35,7 @@ AWS + Kubernetes 운영 대시보드 (Steampipe, Next.js 14, Amazon Bedrock Agen
 - 분류기가 1~3개 route 반환 → 병렬 Gateway 호출 → Bedrock 응답 합성
 - code → Code Interpreter | network/container/iac/data/security/monitoring/cost → AgentCore Gateway
 - aws-data → Steampipe + Bedrock Direct | general → Ops Gateway + Bedrock fallback
+- Models: Sonnet 4.6 (`global.anthropic.claude-sonnet-4-6`), Opus 4.6 (`global.anthropic.claude-opus-4-6-v1`)
 
 ### Dark Theme Colors
 - BG: navy-900 `#0a0e1a`, navy-800 `#0f1629`, navy-700 `#151d30`
@@ -56,9 +57,9 @@ AWS + Kubernetes 운영 대시보드 (Steampipe, Next.js 14, Amazon Bedrock Agen
 
 ## File Structure
 ```
-src/app/           # 27 pages + 5 API routes
+src/app/           # 34 pages + 12 API routes (49 routes total)
 src/components/    # 14 shared components (layout, dashboard, charts, table, k8s)
-src/lib/           # steampipe.ts + queries/ (19 SQL files)
+src/lib/           # steampipe.ts, resource-inventory.ts, cost-snapshot.ts, app-config.ts + queries/ (24 SQL files)
 src/types/         # TypeScript types
 agent/             # Strands agent + 19 Lambda sources
 infra-cdk/         # CDK (AwsopsStack, CognitoStack)
@@ -72,4 +73,3 @@ docs/              # Guides, ADRs, Runbooks
 - `.kiro/docs/` — 데이터 흐름, 트러블슈팅
 - `docs/TROUBLESHOOTING.md` — 상세 문제 해결
 - `docs/decisions/` — ADR 전문
-- `docs/runbooks/` — 운영 절차
