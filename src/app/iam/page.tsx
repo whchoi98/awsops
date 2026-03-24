@@ -18,6 +18,15 @@ export default function IAMPage() {
   const [selected, setSelected] = useState<any>(null);
   const [detailType, setDetailType] = useState<'user' | 'role'>('user');
   const [detailLoading, setDetailLoading] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
+
+  // Admin access check / 관리자 접근 확인
+  useEffect(() => {
+    fetch('/awsops/api/steampipe?action=admin-check')
+      .then(r => r.json())
+      .then(d => { if (!d.isAdmin) setAccessDenied(true); })
+      .catch(() => setAccessDenied(true));
+  }, []);
 
   const fetchData = useCallback(async (bustCache = false) => {
     setLoading(true);
@@ -85,6 +94,22 @@ export default function IAMPage() {
     if (typeof val === 'string') try { return JSON.parse(val); } catch { return null; }
     return typeof val === 'object' ? val : null;
   };
+
+  if (accessDenied) {
+    return (
+      <div className="p-6 animate-fade-in">
+        <Header title={t('iam.title')} subtitle={t('iam.subtitle')} />
+        <div className="flex flex-col items-center justify-center mt-20">
+          <Shield size={48} className="text-accent-red mb-4" />
+          <h2 className="text-xl font-bold text-white mb-2">Access Denied</h2>
+          <p className="text-gray-400 text-sm text-center max-w-md">
+            You do not have permission to access this page.<br />
+            Contact your administrator to request access.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
