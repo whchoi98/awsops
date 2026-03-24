@@ -1,13 +1,13 @@
 # AWSops Dashboard — Agent Context
 
 ## Identity
-AWSops Dashboard v1.3.0 — AWS + Kubernetes 운영 대시보드.
+AWSops Dashboard v1.7.0 — AWS + Kubernetes 운영 대시보드.
 Steampipe, Next.js 14, Amazon Bedrock AgentCore 기반 실시간 모니터링 + AI 분석 플랫폼.
 
 ## Architecture (Single EC2)
 ```
 Browser → CloudFront (Lambda@Edge JWT) → ALB → EC2 t4g.2xlarge (Private Subnet)
-  ├─ Next.js :3000 (27 pages, 4 API routes)
+  ├─ Next.js :3000 (34 pages, 12 API routes, 49 routes)
   ├─ Steampipe :9193 (embedded PG, aws/k8s/trivy plugins)
   ├─ Powerpipe (CIS v1.5~v4.0, 431 controls)
   ├─ code-server :8888 (VSCode)
@@ -16,7 +16,7 @@ Browser → CloudFront (Lambda@Edge JWT) → ALB → EC2 t4g.2xlarge (Private Su
 
 ## Tech Stack
 - Frontend: Next.js 14 (App Router), TypeScript, Tailwind CSS (dark navy), Recharts, React Flow
-- Data: Steampipe embedded PostgreSQL (380+ AWS, 60+ K8s tables), pg Pool, node-cache 5min TTL
+- Data: Steampipe embedded PostgreSQL (380+ AWS, 60+ K8s tables), pg Pool (max 5, 120s timeout), node-cache 5min TTL
 - AI: Bedrock Claude Sonnet/Opus 4.6, AgentCore Runtime (Strands), 8 Gateways (125 MCP tools), Code Interpreter
 - Auth: Cognito + Lambda@Edge (JWT cookie)
 - IaC: CDK TypeScript (infra-cdk/)
@@ -47,10 +47,11 @@ Browser → CloudFront (Lambda@Edge JWT) → ALB → EC2 t4g.2xlarge (Private Su
 | general | Ops Gateway + Bedrock fallback | 9 |
 
 ## Key File Locations
-- Pages: `src/app/{service}/page.tsx` (27 pages)
-- API: `src/app/api/{ai,steampipe,code,benchmark,agentcore}/route.ts`
-- Queries: `src/lib/queries/*.ts` (19 files)
-- Components: `src/components/{layout,dashboard,charts,table,k8s}/`
+- Pages: `src/app/{service}/page.tsx` (34 pages)
+- API: `src/app/api/{ai,steampipe,auth,msk,rds,elasticache,opensearch,agentcore,code,benchmark,container-cost,eks-container-cost}/route.ts` (12 routes)
+- Queries: `src/lib/queries/*.ts` (24 files — ec2, ebs, msk, opensearch, vpc, s3, rds, k8s, container-cost, eks-container-cost...)
+- Lib: `src/lib/steampipe.ts`, `src/lib/resource-inventory.ts`, `src/lib/cost-snapshot.ts`, `src/lib/app-config.ts`
+- Components: `src/components/{layout,dashboard,charts,table,k8s}/` (14 components)
 - Agent: `agent/agent.py` (Strands), `agent/lambda/` (19 Lambdas)
-- Infra: `infra-cdk/lib/awsops-stack.ts`
-- Scripts: `scripts/0{0-9}*.sh`, `scripts/install-all.sh`
+- Infra: `infra-cdk/lib/awsops-stack.ts`, `infra-cdk/lib/cognito-stack.ts`
+- Scripts: `scripts/0{0-9}*.sh`, `scripts/install-all.sh` (17 scripts)
