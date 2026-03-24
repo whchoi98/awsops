@@ -10,8 +10,9 @@ AWSops Dashboard is an AWS + Kubernetes operations dashboard providing real-time
 - **Styling**: Tailwind CSS dark navy theme with custom accent colors
 - **Charts**: Recharts for metrics visualization
 - **Topology**: React Flow for network topology diagrams
-- **페이지**: 35개 리소스 페이지 (EC2, EBS, S3, VPC, IAM, Lambda, RDS, ECS, MSK, OpenSearch, Inventory 등)
-  (35 resource pages)
+- **페이지**: 36개 리소스 페이지 (EC2, EBS, S3, VPC, IAM, Lambda, RDS, ECS, MSK, OpenSearch, Inventory 등)
+  (36 resource pages)
+- 멀티 어카운트 지원 (AccountSelector, AccountContext)
 - Bedrock 모델 사용량 모니터링, i18n 다국어(ko/en) 지원
 
 ### Data Layer (`src/lib/`)
@@ -22,6 +23,7 @@ AWSops Dashboard is an AWS + Kubernetes operations dashboard providing real-time
 - **Inventory**: Resource count snapshots (data/inventory/, zero extra queries)
 - **Cost Snapshot**: Cost data fallback for MSP accounts (data/cost/)
 - **Config**: App config (data/config.json, costEnabled auto-detect)
+- **Multi-Account**: Steampipe Aggregator로 복수 계정 쿼리, 캐시키에 accountId 접두사 / Multi-account queries via Steampipe Aggregator, cache key prefixed with accountId
 
 ### AI Layer (`src/app/api/ai/`)
 - **Models**: Bedrock Sonnet/Opus 4.6
@@ -70,6 +72,7 @@ AWSops Dashboard is an AWS + Kubernetes operations dashboard providing real-time
 | 6e | `06e-setup-agentcore-memory.sh` | Memory Store (대화 이력 365일 보관) |
 | 6f | `06f-setup-opencost.sh` | Prometheus + OpenCost (EKS 비용 분석) |
 | 7 | `07-setup-cloudfront-auth.sh` | Lambda@Edge → CloudFront 연동 |
+| 11 | `11-setup-multi-account.sh` | Multi-Account (Target account IAM role + Steampipe connection) |
 
 ## AgentCore Gateway Architecture
 

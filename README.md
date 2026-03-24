@@ -4,7 +4,7 @@
 
 실시간 AWS/K8s 리소스 모니터링, 네트워크 트러블슈팅, CIS 컴플라이언스 스캔, AI 기반 분석을 단일 대시보드에서 제공합니다.
 
-**현황**: 35 페이지 · 50 라우트 · 25 쿼리 파일 · 13 API 라우트 · 125 MCP 도구 (8 Gateway) · 14 컴포넌트
+**현황**: 36 페이지 · 50 라우트 · 25 쿼리 파일 · 13 API 라우트 · 125 MCP 도구 (8 Gateway) · 17 컴포넌트
 
 ---
 
@@ -41,7 +41,7 @@
 │                                                                              │
 │  ┌─────────────────┐  ┌──────────────────┐  ┌────────────────────────────┐  │
 │  │  Next.js :3000  │  │  Steampipe :9193 │  │  VSCode :8888             │  │
-│  │  (35 Pages)     │──│  (Embedded PG)   │  │  (code-server)            │  │
+│  │  (36 Pages)     │──│  (Embedded PG)   │  │  (code-server)            │  │
 │  │  (13 APIs)      │  │  aws / k8s / trivy│  │                           │  │
 │  └─────────────────┘  └──────────────────┘  └────────────────────────────┘  │
 │  ┌─────────────────┐  ┌──────────────────────────────────────────────────┐  │
@@ -76,6 +76,7 @@
 | | AI Assistant | `/awsops/ai` | Claude Sonnet/Opus 4.6, SSE streaming, multi-route |
 | | AgentCore | `/awsops/agentcore` | Runtime status, 8 Gateways, 125 tools |
 | | Bedrock | `/awsops/bedrock` | Model usage, token costs, prompt caching, Account vs AWSops |
+| | Accounts | /awsops/accounts | Multi-account management, target account CRUD (admin only) |
 | **Compute** | EC2 | `/awsops/ec2` | Instances + detail panel |
 | | Lambda | `/awsops/lambda` | Functions, runtimes, memory/timeout |
 | | ECS | `/awsops/ecs` | Clusters, services, tasks |
@@ -305,7 +306,8 @@ awsops/
 │   │   ├── security/             # Security findings
 │   │   ├── compliance/           # CIS v1.5~v4.0 benchmarks
 │   │   └── api/                  # 13 API routes (ai, steampipe, auth, msk, rds, elasticache, opensearch, agentcore, code, benchmark, container-cost, eks-container-cost, bedrock-metrics)
-│   ├── components/               # 14 shared components (Sidebar, Charts, Table, K9s)
+│   ├── components/               # 17 shared components (Sidebar, Charts, Table, K8s, AccountSelector, AccountBadge)
+│   ├── contexts/                # AccountContext (multi-account state)
 │   ├── lib/steampipe.ts          # pg Pool (NOT CLI) — max 5, 120s timeout, 5min cache
 │   ├── lib/resource-inventory.ts  # 리소스 인벤토리 스냅샷 (resource snapshots)
 │   ├── lib/cost-snapshot.ts      # Cost 데이터 스냅샷 (cost data fallback)
@@ -334,6 +336,7 @@ awsops/
 │   ├── 06e-setup-agentcore-memory.sh  # Step 6e: Memory Store (365-day retention)
 │   ├── 06f-setup-opencost.sh           # Step 6f: Prometheus + OpenCost (EKS cost)
 │   ├── 07-setup-cloudfront-auth.sh # Step 7: Lambda@Edge
+│   ├── 11-setup-multi-account.sh  # Step 11: Multi-account setup
 │   ├── 08-start-all.sh           # Start all services
 │   ├── 09-stop-all.sh            # Stop all services
 │   ├── 10-verify.sh              # Health check
@@ -436,7 +439,7 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for details.
 
 Real-time AWS/K8s resource monitoring, network troubleshooting, CIS compliance scanning, and AI-powered analysis in a single dashboard.
 
-**Stats**: 35 pages · 50 routes · 25 query files · 13 API routes · 125 MCP tools (8 Gateways) · 14 components
+**Stats**: 36 pages · 50 routes · 25 query files · 13 API routes · 125 MCP tools (8 Gateways) · 17 components
 
 ## Documentation
 
