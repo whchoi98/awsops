@@ -4,6 +4,7 @@ export const queries = {
       ROUND(average::numeric, 2) AS avg_cpu,
       ROUND(maximum::numeric, 2) AS max_cpu
     FROM aws_ec2_instance_metric_cpu_utilization_hourly
+    WHERE timestamp >= NOW() - INTERVAL '24 hours'
     ORDER BY instance_id, timestamp DESC
   `,
 
@@ -32,7 +33,7 @@ export const queries = {
     FROM aws_ebs_volume v
     LEFT JOIN aws_ebs_volume_metric_read_ops_hourly r ON v.volume_id = r.volume_id
     LEFT JOIN aws_ebs_volume_metric_write_ops_hourly w ON v.volume_id = w.volume_id AND r.timestamp = w.timestamp
-    WHERE r.timestamp IS NOT NULL
+    WHERE r.timestamp IS NOT NULL AND r.timestamp >= NOW() - INTERVAL '24 hours'
     ORDER BY v.volume_id, r.timestamp DESC
   `,
 
@@ -68,6 +69,7 @@ export const queries = {
     SELECT db_instance_identifier, timestamp,
       ROUND(average::numeric, 2) AS avg_cpu, ROUND(maximum::numeric, 2) AS max_cpu
     FROM aws_rds_db_instance_metric_cpu_utilization_daily
+    WHERE timestamp >= NOW() - INTERVAL '30 days'
     ORDER BY db_instance_identifier, timestamp DESC
   `,
 
