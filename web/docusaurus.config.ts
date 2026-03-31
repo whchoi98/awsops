@@ -16,8 +16,8 @@ const config: Config = {
   },
   themes: ['@docusaurus/theme-mermaid'],
 
-  url: process.env.SITE_URL || 'https://www.atomai.click',
-  baseUrl: process.env.BASE_URL || '/awsops/',
+  url: process.env.SITE_URL || 'https://awsops.atomai.click',
+  baseUrl: process.env.BASE_URL || '/',
 
   organizationName: 'Atom-oh',
   projectName: 'awsops',

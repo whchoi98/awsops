@@ -35,8 +35,8 @@ jobs:
       - run: npm run build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
-          SITE_URL: ${{ vars.SITE_URL || 'https://www.atomai.click' }}
-          BASE_URL: ${{ vars.BASE_URL || '/awsops/' }}
+          SITE_URL: ${{ vars.SITE_URL || 'https://awsops.atomai.click' }}
+          BASE_URL: ${{ vars.BASE_URL || '/' }}
 
       - uses: actions/upload-pages-artifact@v3
         with:
