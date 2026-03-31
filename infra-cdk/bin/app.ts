@@ -18,12 +18,16 @@ const infra = new AwsopsStack(app, 'AwsopsStack', {
   description: 'AWSops Dashboard - VPC, ALB, EC2, CloudFront infrastructure',
 });
 
+// Custom domain (optional): cdk deploy -c customDomain=awsops.example.com
+const customDomain = app.node.tryGetContext('customDomain') as string | undefined;
+
 // Cognito authentication stack: User Pool, Lambda@Edge, CloudFront integration
 const cognito = new CognitoStack(app, 'AwsopsCognitoStack', {
   env: { account: env.account, region: 'us-east-1' }, // Lambda@Edge must be in us-east-1
   crossRegionReferences: true,
   description: 'AWSops Dashboard - Cognito authentication with Lambda@Edge',
   distribution: infra.distribution,
+  customDomain,
 });
 cognito.addDependency(infra);
 
