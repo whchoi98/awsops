@@ -33,11 +33,16 @@ let zombieCleanupStarted = false;
 
 async function cleanupZombieConnections(): Promise<number> {
   try {
+    // Only kill connections from the app (client_addr = 127.0.0.1 with SELECT queries).
+    // Exclude Steampipe internal FDW/plugin connections (client_addr IS NULL).
+    // 앱 커넥션만 정리 — Steampipe 내부 FDW/플러그인 커넥션(client_addr IS NULL) 제외
     const result = await pool.query(`
       SELECT pg_terminate_backend(pid)
       FROM pg_stat_activity
       WHERE state = 'active'
         AND pid != pg_backend_pid()
+        AND client_addr IS NOT NULL
+        AND query LIKE 'SELECT %'
         AND query NOT LIKE '%pg_terminate%'
         AND query NOT LIKE '%pg_stat_activity%'
         AND query_start < NOW() - INTERVAL '${ZOMBIE_MAX_MINUTES} minutes'
