@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Header from '@/components/layout/Header';
 import DataTable from '@/components/table/DataTable';
-import LineChartCard from '@/components/charts/LineChartCard';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
-import { Play, Clock, Database, Activity, FileText, Waypoints, ChevronDown, Radar, Gauge, Dog } from 'lucide-react';
+import { Play, Clock, Database, Activity, FileText, Waypoints, ChevronDown, Radar, Gauge, Dog, Sparkles, BarChart3, TrendingUp } from 'lucide-react';
+import {
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
+} from 'recharts';
 
 // --- Types / 타입 정의 ---
 
@@ -112,16 +114,80 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   datadog: <Dog size={14} className="text-accent-purple" />,
 };
 
-// Color map for datasource types / 데이터소스 타입별 색상 매핑
-const TYPE_COLORS: Record<string, string> = {
-  prometheus: '#f59e0b',
-  loki: '#00ff88',
-  tempo: '#00d4ff',
-  clickhouse: '#a855f7',
-  jaeger: '#00d4ff',
-  dynatrace: '#00ff88',
-  datadog: '#a855f7',
+// AI mode placeholders / AI 모드 플레이스홀더
+const AI_PLACEHOLDERS: Record<string, string> = {
+  prometheus: 'Describe metrics to query... e.g. "Show CPU usage across all nodes"',
+  loki: 'Describe logs to find... e.g. "Error logs from frontend app"',
+  tempo: 'Describe traces to search... e.g. "Slow requests over 1 second"',
+  clickhouse: 'Describe data to query... e.g. "Top queries by execution time"',
+  jaeger: 'Describe traces to find... e.g. "Error traces from payment service"',
+  dynatrace: 'Describe metrics to query... e.g. "Host CPU usage"',
+  datadog: 'Describe metrics or logs... e.g. "CPU usage by host"',
 };
+
+// AI mode natural language examples / AI 모드 자연어 예시
+const AI_EXAMPLES: Record<string, string[]> = {
+  prometheus: [
+    'Show CPU usage across all nodes',
+    'Memory utilization percentage',
+    'HTTP request rate by status code',
+    'Pod restart count in the last hour',
+  ],
+  loki: [
+    'Error logs from all services',
+    'Nginx access logs with 5xx status',
+    'Error rate over time',
+    'Logs containing "timeout" keyword',
+  ],
+  tempo: [
+    'Slow requests over 1 second',
+    'Error traces from frontend',
+    'Traces for the payment service',
+    'High latency API calls',
+  ],
+  clickhouse: [
+    'List all tables with row counts',
+    'Query statistics by hour today',
+    'Top 10 slowest queries',
+    'Database sizes',
+  ],
+  jaeger: [
+    'Error traces from frontend service',
+    'Slow API requests over 2 seconds',
+    'Recent traces from payment service',
+    'Traces with HTTP 500 errors',
+  ],
+  dynatrace: [
+    'Host CPU usage',
+    'Service response time average',
+    'Service error count',
+    'List all hosts',
+  ],
+  datadog: [
+    'CPU usage by host',
+    'Error logs from web service',
+    'HTTP request count by service',
+    'Memory usage trend',
+  ],
+};
+
+// Multi-series chart color palette / 멀티 시리즈 차트 색상 팔레트
+const CHART_COLORS = ['#00d4ff', '#00ff88', '#a855f7', '#f59e0b', '#ef4444', '#06b6d4', '#8b5cf6', '#f97316'];
+
+// Custom chart tooltip / 차트 커스텀 툴팁
+function ChartTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-navy-800 border border-navy-600 rounded-lg px-3 py-2 shadow-xl max-w-xs">
+      <p className="text-xs text-gray-400 mb-1">{label}</p>
+      {payload.map((entry: any, i: number) => (
+        <p key={i} className="text-xs font-mono" style={{ color: entry.color }}>
+          {entry.name}: <span className="font-semibold text-white">{typeof entry.value === 'number' ? entry.value.toFixed(4) : entry.value}</span>
+        </p>
+      ))}
+    </div>
+  );
+}
 
 // --- Component / 컴포넌트 ---
 
@@ -139,6 +205,11 @@ export default function DatasourceExplorePage() {
   const [dsDropdownOpen, setDsDropdownOpen] = useState(false);
   const [timeDropdownOpen, setTimeDropdownOpen] = useState(false);
   const [dsLoading, setDsLoading] = useState(true);
+  const [aiMode, setAiMode] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [generatedExplanation, setGeneratedExplanation] = useState<string | null>(null);
+  const [chartType, setChartType] = useState<'line' | 'bar'>('line');
 
   // Fetch datasource list / 데이터소스 목록 조회
   const fetchDatasources = useCallback(async () => {
@@ -202,13 +273,46 @@ export default function DatasourceExplorePage() {
     }
   }, [selectedDs, query, timeRange]);
 
-  // Keyboard shortcut: Ctrl/Cmd + Enter to run query / 단축키: Ctrl/Cmd + Enter로 쿼리 실행
+  // AI query generation / AI 쿼리 생성
+  const generateQuery = useCallback(async () => {
+    if (!selectedDs || !query.trim()) return;
+    setAiLoading(true);
+    setAiError(null);
+    setGeneratedExplanation(null);
+    try {
+      const res = await fetch('/awsops/api/datasources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'generate-query',
+          datasourceType: selectedDs.type,
+          naturalLanguage: query.trim(),
+          timeRange: timeRange.value,
+        }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(errData.error || `Generation failed with status ${res.status}`);
+      }
+      const data = await res.json();
+      setQuery(data.query);
+      setGeneratedExplanation(data.explanation);
+      setAiMode(false);
+    } catch (err: any) {
+      setAiError(err.message || 'AI query generation failed');
+    } finally {
+      setAiLoading(false);
+    }
+  }, [selectedDs, query, timeRange]);
+
+  // Keyboard shortcut: Ctrl/Cmd + Enter / 단축키: Ctrl/Cmd + Enter
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
-      runQuery();
+      if (aiMode) generateQuery();
+      else runQuery();
     }
-  }, [runQuery]);
+  }, [runQuery, generateQuery, aiMode]);
 
   // Close dropdowns on outside click / 외부 클릭 시 드롭다운 닫기
   useEffect(() => {
@@ -222,32 +326,34 @@ export default function DatasourceExplorePage() {
 
   // --- Render helpers / 렌더 헬퍼 ---
 
-  // Prometheus chart data transformation / Prometheus 차트 데이터 변환
-  const chartData = (() => {
-    if (!result || result.metadata.type !== 'prometheus') return null;
-    if (result.metadata.resultType !== 'matrix' || result.rows.length === 0) return null;
+  // Prometheus chart data transformation (supports multi-series)
+  // Prometheus 차트 데이터 변환 (멀티 시리즈 지원)
+  const { chartData, seriesKeys } = useMemo(() => {
+    if (!result || result.metadata.type !== 'prometheus') return { chartData: null, seriesKeys: [] };
+    if (result.metadata.resultType !== 'matrix' || result.rows.length === 0) return { chartData: null, seriesKeys: [] };
 
-    // Group by metric and build time series / 메트릭별 그룹화 및 시계열 생성
     const metricsMap = new Map<string, Map<string, number>>();
-    const allTimestamps = new Set<string>();
+    const timestampOrder: string[] = [];
+    const seenTs = new Set<string>();
 
     for (const row of result.rows) {
       const ts = new Date(row.timestamp).toLocaleTimeString();
-      allTimestamps.add(ts);
+      if (!seenTs.has(ts)) { seenTs.add(ts); timestampOrder.push(ts); }
       if (!metricsMap.has(row.metric)) metricsMap.set(row.metric, new Map());
       metricsMap.get(row.metric)!.set(ts, parseFloat(row.value));
     }
 
-    // If only one metric series, use simple LineChartCard format
-    if (metricsMap.size <= 1) {
-      return result.rows.map((r: any) => ({
-        name: new Date(r.timestamp).toLocaleTimeString(),
-        value: parseFloat(r.value),
-      }));
-    }
+    const keys = Array.from(metricsMap.keys()).slice(0, 8); // max 8 series
+    const data = timestampOrder.map(ts => {
+      const point: Record<string, any> = { name: ts };
+      for (const key of keys) {
+        point[key] = metricsMap.get(key)?.get(ts) ?? null;
+      }
+      return point;
+    });
 
-    return null; // Multi-series not supported by simple LineChartCard
-  })();
+    return { chartData: data, seriesKeys: keys };
+  }, [result]);
 
   // Max duration for Tempo bar rendering / Tempo 막대 렌더링용 최대 duration
   const maxDuration = (() => {
@@ -410,19 +516,47 @@ export default function DatasourceExplorePage() {
             )}
           </div>
 
-          {/* Run Query button / 쿼리 실행 버튼 */}
+          {/* AI Assist toggle / AI 지원 토글 */}
           <button
-            onClick={runQuery}
-            disabled={loading || !selectedDs || !query.trim()}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-cyan text-navy-900 font-semibold text-sm hover:bg-accent-cyan/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            onClick={() => { setAiMode(!aiMode); setAiError(null); setGeneratedExplanation(null); }}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+              aiMode
+                ? 'bg-accent-purple/20 border-accent-purple/50 text-accent-purple'
+                : 'bg-navy-900 border-navy-600 text-gray-400 hover:text-accent-purple hover:border-accent-purple/30'
+            }`}
           >
-            {loading ? (
-              <div className="w-4 h-4 border-2 border-navy-900/30 border-t-navy-900 rounded-full animate-spin" />
-            ) : (
-              <Play size={14} />
-            )}
-            Run Query
+            <Sparkles size={14} />
+            AI
           </button>
+
+          {/* Run Query / Generate button / 쿼리 실행 / 생성 버튼 */}
+          {aiMode ? (
+            <button
+              onClick={generateQuery}
+              disabled={aiLoading || !selectedDs || !query.trim()}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-purple text-white font-semibold text-sm hover:bg-accent-purple/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {aiLoading ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <Sparkles size={14} />
+              )}
+              {t('datasources.generateQuery')}
+            </button>
+          ) : (
+            <button
+              onClick={runQuery}
+              disabled={loading || !selectedDs || !query.trim()}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-cyan text-navy-900 font-semibold text-sm hover:bg-accent-cyan/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {loading ? (
+                <div className="w-4 h-4 border-2 border-navy-900/30 border-t-navy-900 rounded-full animate-spin" />
+              ) : (
+                <Play size={14} />
+              )}
+              {t('datasources.runQuery')}
+            </button>
+          )}
 
           {/* Keyboard shortcut hint / 단축키 힌트 */}
           <span className="text-xs text-gray-600 hidden sm:inline">
@@ -435,12 +569,14 @@ export default function DatasourceExplorePage() {
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
 
         {/* Query Editor / 쿼리 에디터 */}
-        <div className="bg-navy-800 rounded-lg border border-navy-600 p-4">
+        <div className={`bg-navy-800 rounded-lg border p-4 ${aiMode ? 'border-accent-purple/30' : 'border-navy-600'}`}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-              {selectedDs ? `${selectedDs.type.toUpperCase()} Query` : 'Query'}
+            <span className={`text-xs font-semibold uppercase tracking-wider ${aiMode ? 'text-accent-purple' : 'text-gray-400'}`}>
+              {aiMode
+                ? `${t('datasources.naturalLanguage')} → ${selectedDs?.type.toUpperCase() || 'Query'}`
+                : selectedDs ? `${selectedDs.type.toUpperCase()} Query` : 'Query'}
             </span>
-            {selectedDs && (
+            {selectedDs && !aiMode && (
               <span className="text-xs text-gray-500">
                 {PLACEHOLDERS[selectedDs.type]?.split('...')[0]}
               </span>
@@ -449,23 +585,52 @@ export default function DatasourceExplorePage() {
 
           <textarea
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => { setQuery(e.target.value); setGeneratedExplanation(null); }}
             onKeyDown={handleKeyDown}
-            placeholder={selectedDs ? PLACEHOLDERS[selectedDs.type] : 'Select a datasource to start querying...'}
-            className="w-full bg-navy-900 border border-navy-600 rounded-lg p-3 text-sm font-mono text-gray-200 placeholder-gray-600 resize-y focus:outline-none focus:border-accent-cyan/50 focus:ring-1 focus:ring-accent-cyan/20 transition-colors"
+            placeholder={
+              aiMode
+                ? (selectedDs ? AI_PLACEHOLDERS[selectedDs.type] : 'Select a datasource first...')
+                : (selectedDs ? PLACEHOLDERS[selectedDs.type] : 'Select a datasource to start querying...')
+            }
+            className={`w-full bg-navy-900 border rounded-lg p-3 text-sm text-gray-200 placeholder-gray-600 resize-y focus:outline-none transition-colors ${
+              aiMode
+                ? 'border-accent-purple/30 focus:border-accent-purple/50 focus:ring-1 focus:ring-accent-purple/20'
+                : 'border-navy-600 focus:border-accent-cyan/50 focus:ring-1 focus:ring-accent-cyan/20 font-mono'
+            }`}
             rows={3}
           />
 
-          {/* Example queries / 예제 쿼리 */}
+          {/* AI generated explanation banner / AI 생성 설명 배너 */}
+          {generatedExplanation && (
+            <div className="mt-2 px-3 py-2 rounded-lg bg-accent-purple/10 border border-accent-purple/20 text-xs text-accent-purple flex items-center gap-2">
+              <Sparkles size={12} />
+              {t('datasources.aiGenerated')} — {generatedExplanation}
+            </div>
+          )}
+
+          {/* AI error banner / AI 에러 배너 */}
+          {aiError && (
+            <div className="mt-2 px-3 py-2 rounded-lg bg-accent-red/10 border border-accent-red/20 text-xs text-accent-red">
+              {aiError}
+            </div>
+          )}
+
+          {/* Example queries/prompts / 예제 쿼리/프롬프트 */}
           {selectedDs && (
             <div className="mt-3">
-              <span className="text-xs text-gray-500 mr-2">Examples:</span>
+              <span className="text-xs text-gray-500 mr-2">
+                {aiMode ? t('datasources.examples') + ':' : 'Examples:'}
+              </span>
               <div className="flex flex-wrap gap-1.5 mt-1">
-                {(EXAMPLE_QUERIES[selectedDs.type] || []).map((ex, i) => (
+                {(aiMode ? AI_EXAMPLES[selectedDs.type] || [] : EXAMPLE_QUERIES[selectedDs.type] || []).map((ex, i) => (
                   <button
                     key={i}
-                    onClick={() => setQuery(ex)}
-                    className="px-2.5 py-1 rounded-md text-xs font-mono bg-navy-700 border border-navy-600 text-gray-400 hover:text-accent-cyan hover:border-accent-cyan/30 transition-colors truncate max-w-[300px]"
+                    onClick={() => { setQuery(ex); setGeneratedExplanation(null); }}
+                    className={`px-2.5 py-1 rounded-md text-xs border transition-colors truncate max-w-[300px] ${
+                      aiMode
+                        ? 'bg-accent-purple/5 border-accent-purple/20 text-gray-400 hover:text-accent-purple hover:border-accent-purple/40'
+                        : 'font-mono bg-navy-700 border-navy-600 text-gray-400 hover:text-accent-cyan hover:border-accent-cyan/30'
+                    }`}
                     title={ex}
                   >
                     {ex}
@@ -513,13 +678,79 @@ export default function DatasourceExplorePage() {
           </div>
         )}
 
-        {/* Results: Prometheus chart / 결과: Prometheus 차트 */}
-        {result && result.metadata.type === 'prometheus' && chartData && (
-          <LineChartCard
-            title={`${result.metadata.datasource} - ${result.metadata.resultType}`}
-            data={chartData}
-            color={TYPE_COLORS.prometheus}
-          />
+        {/* Results: Prometheus chart (single + multi-series) / 결과: Prometheus 차트 */}
+        {result && result.metadata.type === 'prometheus' && chartData && chartData.length > 0 && (
+          <div className="bg-navy-800 rounded-lg border border-navy-600 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-white">
+                {result.metadata.datasource} - {result.metadata.resultType}
+                {seriesKeys.length > 1 && (
+                  <span className="ml-2 text-xs font-normal text-gray-400">({seriesKeys.length} series)</span>
+                )}
+              </h3>
+              <div className="flex gap-1 bg-navy-900 rounded-lg p-0.5">
+                <button
+                  onClick={() => setChartType('line')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                    chartType === 'line' ? 'bg-accent-cyan/20 text-accent-cyan' : 'text-gray-500 hover:text-gray-300'
+                  }`}
+                >
+                  <TrendingUp size={12} />
+                  Line
+                </button>
+                <button
+                  onClick={() => setChartType('bar')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                    chartType === 'bar' ? 'bg-accent-orange/20 text-accent-orange' : 'text-gray-500 hover:text-gray-300'
+                  }`}
+                >
+                  <BarChart3 size={12} />
+                  Bar
+                </button>
+              </div>
+            </div>
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                {chartType === 'line' ? (
+                  <LineChart data={chartData}>
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 10 }} interval="preserveStartEnd" />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 10 }} width={50} />
+                    <Tooltip content={<ChartTooltip />} />
+                    {seriesKeys.length > 1 && <Legend wrapperStyle={{ fontSize: '11px' }} />}
+                    {seriesKeys.map((key, i) => (
+                      <Line
+                        key={key}
+                        type="monotone"
+                        dataKey={key}
+                        name={key}
+                        stroke={CHART_COLORS[i % CHART_COLORS.length]}
+                        strokeWidth={1.5}
+                        dot={false}
+                        connectNulls
+                      />
+                    ))}
+                  </LineChart>
+                ) : (
+                  <BarChart data={chartData}>
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 10 }} interval="preserveStartEnd" />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 10 }} width={50} />
+                    <Tooltip content={<ChartTooltip />} />
+                    {seriesKeys.length > 1 && <Legend wrapperStyle={{ fontSize: '11px' }} />}
+                    {seriesKeys.map((key, i) => (
+                      <Bar
+                        key={key}
+                        dataKey={key}
+                        name={key}
+                        fill={CHART_COLORS[i % CHART_COLORS.length]}
+                        radius={[2, 2, 0, 0]}
+                        maxBarSize={30}
+                      />
+                    ))}
+                  </BarChart>
+                )}
+              </ResponsiveContainer>
+            </div>
+          </div>
         )}
 
         {/* Results: Loki log viewer / 결과: Loki 로그 뷰어 */}

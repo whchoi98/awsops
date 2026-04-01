@@ -158,6 +158,10 @@
   "datasources.allowedNetworksHint": "CIDR, IP 주소, 호스트명 패턴 (*.example.com) 지원",
   "datasources.diagnose": "연결 진단",
   "datasources.diagnoseTooltip": "AI가 네트워크 경로, SG, NLB 타겟 등을 자동 진단합니다",
+  "datasources.aiAssist": "AI 지원",
+  "datasources.generateQuery": "생성",
+  "datasources.aiGenerated": "AI가 생성한 쿼리 — 확인 후 실행하세요",
+  "datasources.naturalLanguage": "자연어",
 
   "dashboard.title": "AWSops 대시보드",
   "dashboard.computeContainers": "컴퓨팅 & 컨테이너",

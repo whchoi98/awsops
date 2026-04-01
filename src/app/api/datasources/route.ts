@@ -6,8 +6,13 @@ import { getConfig, saveConfig, getDatasources, getDatasourceById, getDatasource
 import type { DatasourceConfig, DatasourceType } from '@/lib/app-config';
 import { queryDatasource, testConnection } from '@/lib/datasource-client';
 import { getUserFromRequest } from '@/lib/auth-utils';
+import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
+import { DATASOURCE_QUERY_PROMPTS } from '@/lib/datasource-prompts';
 
 const VALID_TYPES: DatasourceType[] = ['prometheus', 'loki', 'tempo', 'clickhouse', 'jaeger', 'dynatrace', 'datadog'];
+
+// Bedrock client for AI query generation / AI 쿼리 생성용 Bedrock 클라이언트
+const bedrockClient = new BedrockRuntimeClient({ region: 'ap-northeast-2' });
 
 // --- SSRF prevention helpers / SSRF 방지 헬퍼 ---
 
@@ -233,6 +238,53 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(result);
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Query execution failed';
+        return NextResponse.json({ error: message }, { status: 500 });
+      }
+    }
+
+    // --- AI query generation / AI 쿼리 생성 ---
+    if (action === 'generate-query') {
+      const { datasourceType, naturalLanguage, timeRange: tr } = body as {
+        datasourceType?: string;
+        naturalLanguage?: string;
+        timeRange?: string;
+      };
+      if (!datasourceType || !naturalLanguage) {
+        return NextResponse.json({ error: 'Missing datasourceType or naturalLanguage' }, { status: 400 });
+      }
+      if (!VALID_TYPES.includes(datasourceType as DatasourceType)) {
+        return NextResponse.json({ error: `Invalid datasourceType: ${datasourceType}` }, { status: 400 });
+      }
+      const dsType = datasourceType as DatasourceType;
+      const systemPrompt = DATASOURCE_QUERY_PROMPTS[dsType]
+        + (tr ? `\n\nTime context: the user is looking at data from the last ${tr}.` : '');
+      try {
+        const bedrockBody = JSON.stringify({
+          anthropic_version: 'bedrock-2023-05-31',
+          max_tokens: 300,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: naturalLanguage }],
+        });
+        const response = await bedrockClient.send(new InvokeModelCommand({
+          modelId: 'global.anthropic.claude-sonnet-4-6',
+          contentType: 'application/json',
+          accept: 'application/json',
+          body: new TextEncoder().encode(bedrockBody),
+        }));
+        const result = JSON.parse(new TextDecoder().decode(response.body));
+        let query = (result.content?.[0]?.text || '').trim();
+        query = query.replace(/^```(?:\w+)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+        const QUERY_LANGUAGES: Record<string, string> = {
+          prometheus: 'PromQL', loki: 'LogQL', tempo: 'TraceQL',
+          clickhouse: 'SQL', jaeger: 'Jaeger', dynatrace: 'DQL', datadog: 'Datadog',
+        };
+        return NextResponse.json({
+          query,
+          explanation: `Generated ${QUERY_LANGUAGES[dsType] || dsType} query from: "${naturalLanguage}"`,
+          queryLanguage: QUERY_LANGUAGES[dsType] || dsType,
+        });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'AI query generation failed';
         return NextResponse.json({ error: message }, { status: 500 });
       }
     }

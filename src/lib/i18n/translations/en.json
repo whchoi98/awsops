@@ -158,6 +158,10 @@
   "datasources.allowedNetworksHint": "Supports CIDR, IP address, hostname pattern (*.example.com)",
   "datasources.diagnose": "Diagnose",
   "datasources.diagnoseTooltip": "AI diagnoses network path, SGs, NLB targets automatically",
+  "datasources.aiAssist": "AI Assist",
+  "datasources.generateQuery": "Generate",
+  "datasources.aiGenerated": "AI generated — review and run",
+  "datasources.naturalLanguage": "Natural Language",
 
   "dashboard.title": "AWSops Dashboard",
   "dashboard.computeContainers": "Compute & Containers",
