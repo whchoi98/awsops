@@ -15,7 +15,7 @@ export const queries = {
       m.timestamp
     FROM aws_ec2_instance_metric_cpu_utilization_hourly m
     JOIN aws_ec2_instance i ON m.instance_id = i.instance_id
-    WHERE i.instance_state = 'running'
+    WHERE i.instance_state = 'running' AND m.timestamp >= NOW() - INTERVAL '6 hours'
     ORDER BY m.instance_id, m.timestamp DESC
   `,
 
@@ -43,6 +43,7 @@ export const queries = {
       ROUND(r.average::numeric, 0) AS read_iops, r.timestamp
     FROM aws_ebs_volume_metric_read_ops_hourly r
     JOIN aws_ebs_volume v ON r.volume_id = v.volume_id
+    WHERE r.timestamp >= NOW() - INTERVAL '6 hours'
     ORDER BY r.volume_id, r.timestamp DESC
   `,
 
@@ -53,6 +54,7 @@ export const queries = {
       c.timestamp
     FROM aws_rds_db_instance_metric_cpu_utilization_hourly c
     JOIN aws_rds_db_instance r ON c.db_instance_identifier = r.db_instance_identifier
+    WHERE c.timestamp >= NOW() - INTERVAL '6 hours'
     ORDER BY c.db_instance_identifier, c.timestamp DESC
   `,
 
@@ -62,6 +64,7 @@ export const queries = {
       ROUND(average::numeric, 0) AS avg_connections,
       ROUND(maximum::numeric, 0) AS max_connections, timestamp
     FROM aws_rds_db_instance_metric_connections_hourly
+    WHERE timestamp >= NOW() - INTERVAL '6 hours'
     ORDER BY db_instance_identifier, timestamp DESC
   `,
 

@@ -3,7 +3,7 @@
 // Runs on server start + every 4 minutes (before 5-min cache TTL expires)
 // 서버 시작 시 + 4분마다 실행 (5분 캐시 TTL 만료 전)
 
-import { batchQuery, checkCostAvailability } from '@/lib/steampipe';
+import { batchQuery, checkCostAvailability, startZombieCleanup } from '@/lib/steampipe';
 import { getAccounts, isMultiAccount } from '@/lib/app-config';
 import { queries as ec2Q } from '@/lib/queries/ec2';
 import { queries as s3Q } from '@/lib/queries/s3';
@@ -25,10 +25,10 @@ import { queries as ecrQ } from '@/lib/queries/ecr';
 import { queries as ebsQ } from '@/lib/queries/ebs';
 import { queries as mskQ } from '@/lib/queries/msk';
 import { queries as osQ } from '@/lib/queries/opensearch';
-import { queries as metQ } from '@/lib/queries/metrics';
+// Monitoring queries removed from cache warmer — CloudWatch FDW causes pool exhaustion
 
 const WARM_INTERVAL_MS = 4 * 60 * 1000; // 4 minutes / 4분
-const METRIC_CACHE_TTL = 600; // 10 minutes for CloudWatch metric queries / CloudWatch 메트릭 쿼리는 10분
+// METRIC_CACHE_TTL removed — monitoring queries no longer run in cache warmer
 let warmingTimer: ReturnType<typeof setInterval> | null = null;
 let isWarming = false;
 let initialized = false; // Lazy-init flag / 지연 초기화 플래그
@@ -58,8 +58,8 @@ const status: CacheWarmerStatus = {
   startedAt: null,
   intervalMin: WARM_INTERVAL_MS / 60000,
   dashboardQueries: 0,
-  monitoringQueries: 10,
-  metricCacheTtlMin: METRIC_CACHE_TTL / 60,
+  monitoringQueries: 0,
+  metricCacheTtlMin: 0,
 };
 
 // Export status getter / 상태 조회 함수
@@ -97,21 +97,9 @@ function getDashboardQueries(includeCost: boolean): Record<string, string> {
   };
 }
 
-// Monitoring queries (same as monitoring/page.tsx) / 모니터링 쿼리
-function getMonitoringQueries(): Record<string, string> {
-  return {
-    ec2CpuLatest: metQ.ec2CpuLatest,
-    ec2CpuHourly: metQ.ec2CpuHourly,
-    ec2NetworkLatest: metQ.ec2NetworkLatest,
-    ebsIopsLatest: metQ.ebsIopsLatest,
-    ebsIopsHourly: metQ.ebsIopsHourly,
-    rdsMetrics: metQ.rdsMetrics,
-    rdsConnections: metQ.rdsConnections,
-    rdsCpuDaily: metQ.rdsCpuDaily,
-    k8sNodes: metQ.k8sNodeResources,
-    k8sPodRes: metQ.k8sNodePodResources,
-  };
-}
+// Monitoring queries DISABLED — CloudWatch metric tables cause pg pool exhaustion
+// via slow Steampipe FDW API calls that accumulate as zombie connections.
+// 모니터링 쿼리 비활성화 — CloudWatch 메트릭 테이블의 느린 API 호출이 좀비 연결로 누적
 
 async function warmCache(): Promise<void> {
   if (isWarming) return; // Skip if already running / 이미 실행 중이면 스킵
@@ -128,9 +116,12 @@ async function warmCache(): Promise<void> {
     status.dashboardQueries = Object.keys(dashQueries).length;
     await batchQuery(dashQueries);
 
-    // 3. Run monitoring queries with longer TTL (CloudWatch metrics are slow)
-    // 모니터링 쿼리는 CloudWatch API 호출이 느리므로 TTL을 10분으로 설정
-    await batchQuery(getMonitoringQueries(), { ttl: METRIC_CACHE_TTL });
+    // 3. Monitoring queries DISABLED — CloudWatch metric tables make slow AWS API
+    // calls via Steampipe FDW, causing zombie connections that exhaust the pg pool.
+    // Monitoring page fetches its own data on demand.
+    // 모니터링 쿼리 비활성화 — CloudWatch 메트릭 테이블은 Steampipe FDW를 통해
+    // 느린 AWS API 호출을 하여 좀비 연결로 pg 풀을 고갈시킴.
+    // 모니터링 페이지는 필요 시 직접 데이터를 가져옴.
 
     // 4. Multi-account: warm each account's dashboard cache (max 3 accounts)
     // 멀티 어카운트: 각 계정별 대시보드 캐시 워밍 (최대 3개)
@@ -154,7 +145,7 @@ async function warmCache(): Promise<void> {
     status.warmCount++;
     status.lastError = null;
     const acctInfo = isMultiAccount() ? ` + ${Math.min(getAccounts().length, 3)} accounts` : '';
-    console.log(`[CacheWarmer] Warmed dashboard (${status.dashboardQueries}) + monitoring (${status.monitoringQueries})${acctInfo} cache in ${elapsed.toFixed(1)}s`);
+    console.log(`[CacheWarmer] Warmed dashboard (${status.dashboardQueries})${acctInfo} cache in ${elapsed.toFixed(1)}s`);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     status.lastError = message;
@@ -170,6 +161,10 @@ export function startCacheWarmer(): void {
 
   status.startedAt = new Date().toISOString();
   console.log('[CacheWarmer] Starting background cache warming (interval: 4min)');
+
+  // Start zombie connection cleanup alongside cache warmer
+  // 캐시 워머와 함께 좀비 연결 정리 시작
+  startZombieCleanup();
 
   // Initial warm after 5s delay (let server fully start) / 서버 시작 5초 후 초기 워밍
   setTimeout(() => {
