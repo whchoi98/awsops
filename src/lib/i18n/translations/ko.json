@@ -1481,6 +1481,12 @@
   "ai.followup.code1": "AWS 비용 데이터를 차트로 시각화해줘",
   "ai.followup.code2": "랜덤 숫자 통계를 계산해줘",
   "ai.followup.code3": "JSON 데이터를 파싱하는 코드를 만들어줘",
+  "ai.followup.datasource1": "다른 시간 범위로 같은 메트릭 조회해줘",
+  "ai.followup.datasource2": "관련 로그도 함께 확인해줘",
+  "ai.followup.datasource3": "CloudWatch 알람과 비교 분석해줘",
+  "ai.followup.dsdiag1": "연결 문제 원인을 더 분석해줘",
+  "ai.followup.dsdiag2": "보안 그룹 규칙 확인해줘",
+  "ai.followup.dsdiag3": "NLB 타겟 헬스 상태 확인해줘",
   "ai.followup.general1": "서울 리전에서 사용 가능한 서비스를 확인해줘",
   "ai.followup.general2": "ECS와 EKS 차이점을 알려줘",
   "ai.followup.general3": "서버리스 아키텍처를 추천해줘"

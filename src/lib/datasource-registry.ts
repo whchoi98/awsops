@@ -132,22 +132,29 @@ export const DATASOURCE_TYPES: Record<DatasourceType, DatasourceTypeMeta> = {
 // Get all supported datasource types / 지원되는 모든 데이터소스 타입
 export const DATASOURCE_TYPE_LIST: DatasourceType[] = Object.keys(DATASOURCE_TYPES) as DatasourceType[];
 
-// Detect datasource type from AI question keywords / AI 질문 키워드에서 데이터소스 타입 감지
+// Detect single datasource type (first match) / AI 질문 키워드에서 데이터소스 타입 감지 (첫 매치)
 export function detectDatasourceType(question: string): DatasourceType | null {
   const q = question.toLowerCase();
-  // Prometheus keywords
   if (/프로메테우스|prometheus|promql|메트릭|metric|cpu 사용|memory 사용|node_/.test(q)) return 'prometheus';
-  // Loki keywords
   if (/로키|loki|logql|로그 검색|로그 조회|에러 로그|error log|log search/.test(q)) return 'loki';
-  // Tempo keywords
   if (/템포|tempo|traceql|트레이스|trace|스팬|span|지연시간|latency|분산 추적/.test(q)) return 'tempo';
-  // ClickHouse keywords
   if (/클릭하우스|clickhouse|클릭 하우스/.test(q)) return 'clickhouse';
-  // Jaeger keywords
   if (/예거|jaeger|예이거/.test(q)) return 'jaeger';
-  // Dynatrace keywords
   if (/다이나트레이스|dynatrace|다이나 트레이스/.test(q)) return 'dynatrace';
-  // Datadog keywords
   if (/데이터독|datadog|데이터 독/.test(q)) return 'datadog';
   return null;
+}
+
+// Detect ALL datasource types mentioned in question / 질문에 언급된 모든 데이터소스 타입 감지 (복수 반환)
+export function detectDatasourceTypes(question: string): DatasourceType[] {
+  const q = question.toLowerCase();
+  const types: DatasourceType[] = [];
+  if (/프로메테우스|prometheus|promql|메트릭|metric|cpu 사용|memory 사용|node_/.test(q)) types.push('prometheus');
+  if (/로키|loki|logql|로그 검색|로그 조회|에러 로그|error log|log search/.test(q)) types.push('loki');
+  if (/템포|tempo|traceql|트레이스|trace|스팬|span|지연시간|latency|분산 추적/.test(q)) types.push('tempo');
+  if (/클릭하우스|clickhouse|클릭 하우스/.test(q)) types.push('clickhouse');
+  if (/예거|jaeger|예이거/.test(q)) types.push('jaeger');
+  if (/다이나트레이스|dynatrace|다이나 트레이스/.test(q)) types.push('dynatrace');
+  if (/데이터독|datadog|데이터 독/.test(q)) types.push('datadog');
+  return types;
 }

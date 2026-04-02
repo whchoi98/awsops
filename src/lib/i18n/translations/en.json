@@ -1481,6 +1481,12 @@
   "ai.followup.code1": "Visualize AWS cost data in a chart",
   "ai.followup.code2": "Calculate random number statistics",
   "ai.followup.code3": "Create code to parse JSON data",
+  "ai.followup.datasource1": "Query the same metrics with a different time range",
+  "ai.followup.datasource2": "Also check related logs",
+  "ai.followup.datasource3": "Compare with CloudWatch alarms",
+  "ai.followup.dsdiag1": "Analyze the connection issue further",
+  "ai.followup.dsdiag2": "Check the security group rules",
+  "ai.followup.dsdiag3": "Check the NLB target health",
   "ai.followup.general1": "Check available services in Seoul region",
   "ai.followup.general2": "Explain the difference between ECS and EKS",
   "ai.followup.general3": "Recommend a serverless architecture"
