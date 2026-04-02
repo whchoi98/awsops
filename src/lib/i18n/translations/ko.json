@@ -317,6 +317,9 @@
 
   "k8s.title": "EKS 개요",
   "k8s.subtitle": "쿠버네티스 클러스터, 노드, 워크로드",
+  "k8s.noAccess.title": "EKS 클러스터 접근 권한이 필요합니다",
+  "k8s.noAccess.description": "Kubernetes 데이터를 표시하려면 EC2 인스턴스 역할이 EKS 클러스터에 인증되어야 합니다. 클러스터 관리자에게 Access Entry 또는 aws-auth ConfigMap 등록을 요청하세요.",
+  "k8s.noAccess.guide": "인증 가이드 바로가기",
   "k8s.clusters": "클러스터",
   "k8s.nodes": "노드",
   "k8s.pods": "파드",

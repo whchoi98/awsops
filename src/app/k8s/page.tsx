@@ -8,7 +8,7 @@ import StatusBadge from '@/components/dashboard/StatusBadge';
 import PieChartCard from '@/components/charts/PieChartCard';
 import BarChartCard from '@/components/charts/BarChartCard';
 import DataTable from '@/components/table/DataTable';
-import { Box, Rocket, Network, Server, AlertTriangle } from 'lucide-react';
+import { Box, Rocket, Network, Server, AlertTriangle, BookOpen } from 'lucide-react';
 import { queries as k8sQ } from '@/lib/queries/k8s';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { useAccountContext } from '@/contexts/AccountContext';
@@ -94,7 +94,7 @@ function parseMiB(mem: any): number {
 }
 
 export default function K8sOverviewPage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { currentAccountId } = useAccountContext();
 
   const [data, setData] = useState<DashboardData>({});
@@ -217,6 +217,10 @@ export default function K8sOverviewPage() {
   const nodes = get('nodeList');
   const podReqRows = get('podRequests');
   const eksClusters = get('eksClusters');
+
+  // Detect missing K8s access / K8s 접근 권한 미설정 감지
+  const hasK8sData = nodes.length > 0 || get('podSummary').length > 0;
+  const k8sError = Object.values(data).find(v => v?.error)?.error || null;
 
   // Aggregate pod requests per node / 노드별 Pod 리소스 요청 집계
   const reqMap: Record<string, { cpuReq: number; memReqMiB: number; podCount: number }> = {};
@@ -492,6 +496,47 @@ export default function K8sOverviewPage() {
       />
 
       <main className="p-6 space-y-6">
+        {/* EKS Access Required Banner / EKS 접근 권한 안내 배너 */}
+        {!loading && !hasK8sData && (
+          <div className="p-4 rounded-lg bg-accent-orange/10 border border-accent-orange/30">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="text-accent-orange shrink-0 mt-0.5" size={20} />
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-semibold text-accent-orange mb-1">
+                  {t('k8s.noAccess.title')}
+                </h3>
+                <p className="text-xs text-gray-400 mb-3">
+                  {t('k8s.noAccess.description')}
+                </p>
+                {k8sError && (
+                  <p className="text-xs text-gray-500 mb-3 font-mono bg-navy-900 p-2 rounded truncate">
+                    {k8sError}
+                  </p>
+                )}
+                <div className="flex gap-2 mb-3">
+                  <a
+                    href="/awsops-docs/docs/compute/eks-auth"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/30 hover:bg-accent-cyan/20 transition-colors"
+                  >
+                    <BookOpen size={14} />
+                    {t('k8s.noAccess.guide')}
+                  </a>
+                </div>
+                <div className="p-2.5 rounded bg-navy-900 text-xs font-mono text-gray-400 space-y-1 overflow-x-auto">
+                  <div className="text-gray-500"># 1. {lang === 'ko' ? '클러스터 인증 모드 확인' : 'Check cluster auth mode'}</div>
+                  <div>aws eks describe-cluster --name <span className="text-accent-cyan">CLUSTER_NAME</span> \</div>
+                  <div className="ml-4">--query &apos;cluster.accessConfig.authenticationMode&apos;</div>
+                  <div className="text-gray-500 mt-2"># 2. Access Entry {lang === 'ko' ? '등록 (클러스터 소유자 실행)' : 'registration (run as cluster owner)'}</div>
+                  <div>aws eks create-access-entry --cluster-name <span className="text-accent-cyan">CLUSTER_NAME</span> \</div>
+                  <div className="ml-4">--principal-arn <span className="text-accent-cyan">ROLE_ARN</span> --type STANDARD</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* EKS Cluster / VPC Filter / EKS 클러스터 및 VPC 필터 */}
         {eksClusters.length > 0 && (
           <div className="space-y-2">
