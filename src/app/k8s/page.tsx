@@ -206,7 +206,7 @@ export default function K8sOverviewPage() {
           const roleRes = await fetch('/awsops/api/steampipe', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ queries: { callerArn: `SELECT arn FROM aws_iam_role WHERE arn = (SELECT replace(replace(replace(arn, ':sts:', ':iam:'), ':assumed-role/', ':role/'), '/' || split_part(arn, '/', 3), '') FROM aws_sts_caller_identity) LIMIT 1` } }),
+            body: JSON.stringify({ queries: { callerArn: `SELECT replace(replace(replace(arn, ':sts:', ':iam:'), ':assumed-role/', ':role/'), '/' || split_part(arn, '/', 3), '') as arn FROM aws_sts_caller_identity` } }),
           });
           const roleData = await roleRes.json();
           const arn = roleData.callerArn?.rows?.[0]?.arn;
