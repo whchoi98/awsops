@@ -15,7 +15,7 @@ AWSops is an integrated operations dashboard for real-time monitoring and manage
 ## Key Features
 
 ### Real-time Resource Monitoring
-- View AWS and Kubernetes resource status at a glance across **34 pages**
+- View AWS and Kubernetes resource status at a glance across **37 pages**
 - Dashboards for major services including EC2, Lambda, ECS, EKS, S3, RDS, and VPC
 - Real-time CloudWatch metrics integration
 
@@ -58,14 +58,14 @@ AWSops is an integrated operations dashboard for real-time monitoring and manage
 | **Cognito** | User Pool + Hosted UI | Email/username login, HttpOnly cookie auth |
 | **ALB** | Internet-facing | Port 80 (VSCode) / 3000 (Dashboard) |
 | **EC2** | t4g.2xlarge (ARM64 Graviton) | 100GB GP3 EBS, Private Subnet |
-| **VPC** | 10.254.0.0/16, 2 AZs | NAT Gateway, Public + Private Subnets |
+| **VPC** | 10.10.0.0/16, 2 AZs | NAT Gateway, Public + Private Subnets |
 
 ### Next.js 14 Application
 
 | Item | Count |
 |------|-------|
 | **App Router** | 8 |
-| **Pages** | 35 |
+| **Pages** | 37 |
 | **API Routes** | 13 |
 | **SSE Streaming** | Real-time AI response streaming |
 
@@ -151,6 +151,15 @@ Real-time data from the following services via the Steampipe AWS plugin:
 | Security | IAM, KMS, Secrets Manager |
 | Monitoring | CloudWatch, CloudTrail |
 | Cost | Cost Explorer, Budgets |
+
+### External Datasources (7 Types)
+Integrate external observability platforms as datasources for unified analysis:
+
+| Category | Datasources |
+|----------|-------------|
+| Metrics | Prometheus, Dynatrace, Datadog |
+| Logs | Loki, ClickHouse |
+| Traces | Tempo, Jaeger |
 
 ### Kubernetes (60+ Tables)
 Monitor the following resources by connecting to EKS clusters:

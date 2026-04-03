@@ -22,6 +22,7 @@ const sidebars: SidebarsConfig = {
         'overview/dashboard',
         'overview/ai-assistant',
         'overview/agentcore',
+        'overview/accounts',
       ],
     },
     {
@@ -32,6 +33,7 @@ const sidebars: SidebarsConfig = {
         'compute/lambda',
         'compute/ecs',
         'compute/ecr',
+        'compute/eks-auth',
         'compute/eks',
         'compute/eks-explorer',
         'compute/eks-pods',
@@ -75,6 +77,7 @@ const sidebars: SidebarsConfig = {
         'monitoring/cloudtrail',
         'monitoring/cost',
         'monitoring/inventory',
+        'monitoring/datasources',
       ],
     },
     {

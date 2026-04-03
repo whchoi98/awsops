@@ -8,7 +8,7 @@ import Screenshot from '@site/src/components/Screenshot';
 
 # 네비게이션 가이드
 
-AWSops 대시보드는 사이드바 기반 네비게이션을 제공합니다. 35개의 페이지가 6개 그룹으로 구성되어 있어 원하는 정보를 빠르게 찾을 수 있습니다.
+AWSops 대시보드는 사이드바 기반 네비게이션을 제공합니다. 37개의 페이지가 6개 그룹으로 구성되어 있어 원하는 정보를 빠르게 찾을 수 있습니다.
 
 <Screenshot src="/screenshots/overview/dashboard.png" alt="AWSops 대시보드 전체 화면 — 사이드바, 헤더, 메인 콘텐츠 영역" />
 
@@ -20,9 +20,10 @@ AWSops 대시보드는 사이드바 기반 네비게이션을 제공합니다. 3
 
 화면 왼쪽에 고정된 네비게이션 영역입니다.
 
-- **상단**: AWSops 로고 + Sign Out 버튼
+- **상단**: AWSops 로고 + EN/한 언어 전환 + Sign Out 버튼
+- **Account Selector**: 멀티 어카운트 모드에서 계정 선택
 - **중앙**: 6개 메뉴 그룹 (Overview, Compute, Network & CDN, Storage & DB, Monitoring, Security)
-- **하단**: Cost ON/OFF 토글 + 버전 정보 (v1.6.0)
+- **하단**: Cost ON/OFF 토글 + 버전 정보
 - 현재 페이지는 왼쪽에 **청록색(cyan) 하이라이트**로 표시됩니다
 
 ### ② 헤더 (상단)
@@ -42,13 +43,14 @@ AWSops 대시보드는 사이드바 기반 네비게이션을 제공합니다. 3
 
 ## 메뉴 그룹
 
-### Overview (3개 페이지)
+### Overview (4개 페이지)
 
 | 메뉴 | 설명 |
 |------|------|
 | **Dashboard** | 전체 리소스 요약, 20개 StatsCard, 경고 현황 |
-| **AI Assistant** | AI 기반 질의응답, 자연어로 인프라 분석 |
+| **AI Assistant** | AI 기반 질의응답, 자연어로 인프라 분석 (멀티 데이터소스 상관 분석 지원) |
 | **AgentCore** | AgentCore Runtime/Gateway 상태, 호출 통계 |
+| **Accounts** | 멀티 어카운트 관리 (추가/삭제/테스트, 관리자 전용) |
 
 ### Compute (8개 페이지)
 
@@ -58,10 +60,14 @@ AWSops 대시보드는 사이드바 기반 네비게이션을 제공합니다. 3
 | **Lambda** | Lambda 함수, 런타임 분포 |
 | **ECS** | ECS 클러스터, 서비스, 태스크 |
 | **ECR** | ECR 리포지토리, 이미지 |
-| **EKS** | EKS 클러스터 개요, 노드, Pod 요약 |
-| **EKS Explorer** | K9s 스타일 터미널 UI |
-| **ECS Container Cost** | ECS 워크로드별 비용 분석 |
-| **EKS Container Cost** | EKS 워크로드별 비용 분석 |
+| **EKS** | EKS 클러스터 개요, 노드, Pod 요약 (Access Entry 상태, 클릭 필터링, Service Resources 탭) |
+| **EKS Explorer** | K9s 스타일 터미널 UI (Steampipe 기반 읽기 전용) |
+| **ECS Container Cost** | ECS Fargate 워크로드별 비용 분석 (Container Insights + Fargate 가격) |
+| **EKS Container Cost** | EKS Pod별 비용 분석 (OpenCost 또는 Request 기반 폴백) |
+
+:::tip EKS 서브페이지
+EKS Overview에서 통계 카드(Nodes, Pods, Deployments, Services)를 클릭하면 각 상세 페이지로 이동합니다. 클러스터 카드를 클릭하면 해당 클러스터만 필터링됩니다.
+:::
 
 ### Network & CDN (4개 페이지)
 
@@ -84,16 +90,18 @@ AWSops 대시보드는 사이드바 기반 네비게이션을 제공합니다. 3
 | **OpenSearch** | OpenSearch 도메인 |
 | **MSK** | MSK Kafka 클러스터 |
 
-### Monitoring (6개 페이지)
+### Monitoring (8개 페이지)
 
 | 메뉴 | 설명 |
 |------|------|
 | **Monitoring** | CPU, Memory, Network, Disk I/O 통합 |
+| **Bedrock** | Bedrock 모델 사용량, 비용, 토큰 모니터링 |
 | **CloudWatch** | CloudWatch 알람 현황 |
 | **CloudTrail** | CloudTrail 트레일 및 이벤트 |
-| **Bedrock** | Bedrock 모델 사용량, 비용, 토큰 모니터링 |
 | **Cost** | Cost Explorer, 비용 분석 |
 | **Resource Inventory** | 리소스 인벤토리 추이 |
+| **Datasources** | 외부 데이터소스 관리 (Prometheus, Loki, Tempo, ClickHouse, Jaeger, Dynatrace, Datadog) |
+| **┗ Explore** | 데이터소스 쿼리 실행 + AI 쿼리 생성 (PromQL, LogQL, TraceQL, SQL) |
 
 ### Security (3개 페이지)
 

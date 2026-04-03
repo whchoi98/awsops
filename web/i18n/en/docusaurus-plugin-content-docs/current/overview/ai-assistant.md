@@ -5,6 +5,7 @@ description: AWSops AI Assistant detailed guide - 10-route classification and ad
 ---
 
 import Screenshot from '@site/src/components/Screenshot';
+import AIStreamingFlow from '@site/src/components/diagrams/AIStreamingFlow';
 
 # AI Assistant
 
@@ -206,11 +207,28 @@ Analyzing question...
 
 ### Streaming Events
 
-| Event | Description |
-|-------|-------------|
-| `status` | Progress status message |
-| `done` | Completed response data |
-| `error` | Error message |
+| Event | Description | Data |
+|-------|------------|------|
+| `status` | Progress status messages | `{ step, message }` |
+| `chunk` | Real-time text streaming | `{ delta: string }` |
+| `done` | Complete response data | `{ content, route, usedTools, ... }` |
+| `error` | Error messages | `{ message }` |
+
+### Streaming Modes
+
+Three streaming modes are automatically selected based on the response path:
+
+<AIStreamingFlow />
+
+| Mode | Applied Path | Method |
+|------|-------------|--------|
+| **Real Streaming** | Multi-route synthesis | Bedrock Converse API — token-level immediate delivery |
+| **Simulated Streaming** | Single Gateway response | 50-char chunks + 15ms delay — typing effect |
+| **Direct Streaming** | aws-data (Steampipe+Bedrock) | Bedrock native streaming |
+
+:::info Multi-Route Synthesis Streaming
+When synthesizing results from 2-3 parallel routes, the Bedrock Converse Stream API (`ConverseStreamCommand`) streams the synthesis process in real-time. Users can see the synthesized results as they are generated.
+:::
 
 ## Tool Usage Display
 

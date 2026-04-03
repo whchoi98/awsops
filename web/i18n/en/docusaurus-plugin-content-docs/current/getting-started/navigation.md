@@ -8,7 +8,7 @@ import Screenshot from '@site/src/components/Screenshot';
 
 # Navigation Guide
 
-The AWSops dashboard provides sidebar-based navigation. With 35 pages organized into 6 groups, you can quickly find the information you need.
+The AWSops dashboard provides sidebar-based navigation. With 37 pages organized into 6 groups, you can quickly find the information you need.
 
 <Screenshot src="/screenshots/overview/dashboard.png" alt="AWSops dashboard full screen — sidebar, header, and main content area" />
 
@@ -20,9 +20,10 @@ The screen is divided into 3 main areas.
 
 A fixed navigation area on the left side of the screen.
 
-- **Top**: AWSops logo + Sign Out button
+- **Top**: AWSops logo + EN/한 language toggle + Sign Out button
+- **Account Selector**: Select account in multi-account mode
 - **Center**: 6 menu groups (Overview, Compute, Network & CDN, Storage & DB, Monitoring, Security)
-- **Bottom**: Cost ON/OFF toggle + version info (v1.6.0)
+- **Bottom**: Cost ON/OFF toggle + version info
 - The current page is indicated with a **cyan highlight** on the left
 
 ### ② Header (Top)
@@ -42,13 +43,14 @@ The area where data for the selected page is displayed.
 
 ## Menu Groups
 
-### Overview (3 pages)
+### Overview (4 pages)
 
 | Menu | Description |
 |------|-------------|
 | **Dashboard** | Overall resource summary, 20 StatsCards, warning status |
-| **AI Assistant** | AI-based Q&A, analyze infrastructure with natural language |
+| **AI Assistant** | AI-based Q&A, infrastructure analysis (multi-datasource correlation supported) |
 | **AgentCore** | AgentCore Runtime/Gateway status, call statistics |
+| **Accounts** | Multi-account management (add/remove/test, admin only) |
 
 ### Compute (8 pages)
 
@@ -58,10 +60,14 @@ The area where data for the selected page is displayed.
 | **Lambda** | Lambda functions, runtime distribution |
 | **ECS** | ECS clusters, services, tasks |
 | **ECR** | ECR repositories, images |
-| **EKS** | EKS cluster overview, nodes, pod summary |
-| **EKS Explorer** | K9s-style terminal UI |
-| **ECS Container Cost** | Cost analysis by ECS workload |
-| **EKS Container Cost** | Cost analysis by EKS workload |
+| **EKS** | EKS cluster overview, nodes, pods (Access Entry status, click filtering, Service Resources tab) |
+| **EKS Explorer** | K9s-style terminal UI (Steampipe-based, read-only) |
+| **ECS Container Cost** | ECS Fargate workload cost analysis (Container Insights + Fargate pricing) |
+| **EKS Container Cost** | EKS Pod cost analysis (OpenCost or request-based fallback) |
+
+:::tip EKS Sub-pages
+Click stats cards (Nodes, Pods, Deployments, Services) on the EKS Overview to navigate to detail pages. Click a cluster card to filter to that cluster.
+:::
 
 ### Network & CDN (4 pages)
 
@@ -84,16 +90,18 @@ The area where data for the selected page is displayed.
 | **OpenSearch** | OpenSearch domains |
 | **MSK** | MSK Kafka clusters |
 
-### Monitoring (6 pages)
+### Monitoring (8 pages)
 
 | Menu | Description |
 |------|-------------|
 | **Monitoring** | Integrated CPU, Memory, Network, Disk I/O |
+| **Bedrock** | Bedrock model usage, cost, and token monitoring |
 | **CloudWatch** | CloudWatch alarm status |
 | **CloudTrail** | CloudTrail trails and events |
-| **Bedrock** | Bedrock model usage, cost, and token monitoring |
 | **Cost** | Cost Explorer, cost analysis |
 | **Resource Inventory** | Resource inventory trends |
+| **Datasources** | External datasource management (Prometheus, Loki, Tempo, ClickHouse, Jaeger, Dynatrace, Datadog) |
+| **┗ Explore** | Datasource query execution + AI query generation (PromQL, LogQL, TraceQL, SQL) |
 
 ### Security (3 pages)
 
