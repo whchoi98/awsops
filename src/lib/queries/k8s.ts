@@ -101,6 +101,19 @@ export const queries = {
       name
   `,
 
+  podsPerNamespace: `
+    SELECT
+      namespace,
+      context_name,
+      COUNT(*) AS pod_count
+    FROM
+      kubernetes_pod
+    GROUP BY
+      namespace, context_name
+    ORDER BY
+      pod_count DESC
+  `,
+
   pvcList: `
     SELECT
       name,
@@ -125,7 +138,8 @@ export const queries = {
       type,
       reason,
       message,
-      last_timestamp
+      last_timestamp,
+      context_name
     FROM
       kubernetes_event
     WHERE
@@ -235,5 +249,80 @@ export const queries = {
       COUNT(*) FILTER (WHERE available_replicas < replicas OR available_replicas IS NULL) AS partially_available
     FROM
       kubernetes_deployment
+  `,
+
+  // ── Describe-level queries (on-demand, single resource) ──
+
+  podDescribe: `
+    SELECT name, namespace, phase, node_name, pod_ip, host_ip,
+      creation_timestamp, restart_policy, service_account_name,
+      qos_class, priority, dns_policy, context_name,
+      labels, annotations, containers, init_containers,
+      volumes, conditions, tolerations, node_selector, owner_references
+    FROM kubernetes_pod
+  `,
+
+  deploymentDescribe: `
+    SELECT name, namespace, replicas, ready_replicas, available_replicas,
+      unavailable_replicas, creation_timestamp, strategy, context_name,
+      labels, annotations, conditions, selector
+    FROM kubernetes_deployment
+  `,
+
+  serviceDescribe: `
+    SELECT name, namespace, type, cluster_ip, external_ip,
+      creation_timestamp, context_name,
+      labels, annotations, ports, selector
+    FROM kubernetes_service
+  `,
+
+  replicasetDescribe: `
+    SELECT name, namespace, replicas, ready_replicas, available_replicas,
+      creation_timestamp, context_name,
+      labels, annotations, conditions, selector
+    FROM kubernetes_replicaset
+  `,
+
+  daemonsetDescribe: `
+    SELECT name, namespace, desired_number_scheduled, current_number_scheduled,
+      number_ready, number_available, number_misscheduled,
+      creation_timestamp, context_name,
+      labels, annotations, conditions, selector
+    FROM kubernetes_daemonset
+  `,
+
+  statefulsetDescribe: `
+    SELECT name, namespace, replicas, ready_replicas, current_replicas,
+      creation_timestamp, service_name, context_name,
+      labels, annotations, conditions, selector
+    FROM kubernetes_stateful_set
+  `,
+
+  jobDescribe: `
+    SELECT name, namespace, active, succeeded, failed,
+      completions, parallelism, start_time, completion_time,
+      creation_timestamp, context_name,
+      labels, annotations, conditions
+    FROM kubernetes_job
+  `,
+
+  configmapDescribe: `
+    SELECT name, namespace, creation_timestamp, data, context_name,
+      labels, annotations
+    FROM kubernetes_config_map
+  `,
+
+  secretDescribe: `
+    SELECT name, namespace, type, creation_timestamp, context_name,
+      labels, annotations
+    FROM kubernetes_secret
+  `,
+
+  pvcDescribe: `
+    SELECT name, namespace, phase, storage_class, volume_name,
+      capacity::text as capacity, access_modes::text as access_modes,
+      creation_timestamp, context_name,
+      labels, annotations
+    FROM kubernetes_persistent_volume_claim
   `
 };

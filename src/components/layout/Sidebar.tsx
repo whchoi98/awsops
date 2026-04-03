@@ -61,10 +61,6 @@ const navGroups: NavGroup[] = [
       { labelKey: 'sidebar.aiAssistant', href: '/ai', icon: BrainCircuit },
       { labelKey: 'sidebar.agentcore', href: '/agentcore', icon: Activity },
       { labelKey: 'sidebar.accounts', href: '/accounts', icon: Layers },
-      { labelKey: 'sidebar.datasources', href: '/datasources', icon: DatabaseZap, subItems: [
-        { labelKey: 'sidebar.datasources', href: '/datasources', icon: DatabaseZap },
-        { labelKey: 'sidebar.datasourceExplore', href: '/datasources/explore', icon: SearchCode },
-      ]},
     ],
   },
   {
@@ -110,6 +106,10 @@ const navGroups: NavGroup[] = [
       { labelKey: 'sidebar.cloudtrail', href: '/cloudtrail', icon: FileSearch },
       { labelKey: 'sidebar.cost', href: '/cost', icon: DollarSign },
       { labelKey: 'sidebar.resourceInventory', href: '/inventory', icon: BarChart3 },
+      { labelKey: 'sidebar.datasources', href: '/datasources', icon: DatabaseZap, subItems: [
+        { labelKey: 'sidebar.datasources', href: '/datasources', icon: DatabaseZap },
+        { labelKey: 'sidebar.datasourceExplore', href: '/datasources/explore', icon: SearchCode },
+      ]},
     ],
   },
   {

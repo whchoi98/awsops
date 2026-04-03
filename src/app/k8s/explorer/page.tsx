@@ -178,6 +178,23 @@ const tabConfig: Record<string, { query: string; label: string; columns: { key: 
 
 const TAB_KEYS = Object.keys(tabConfig);
 
+// Map each tab to its describe-level query for on-demand detail fetch
+const describeQueryMap: Record<string, string> = {
+  pods: k8sQ.podDescribe,
+  deployments: k8sQ.deploymentDescribe,
+  services: k8sQ.serviceDescribe,
+  replicasets: k8sQ.replicasetDescribe,
+  daemonsets: k8sQ.daemonsetDescribe,
+  statefulsets: k8sQ.statefulsetDescribe,
+  jobs: k8sQ.jobDescribe,
+  configmaps: k8sQ.configmapDescribe,
+  secrets: k8sQ.secretDescribe,
+  pvcs: k8sQ.pvcDescribe,
+};
+
+// Validate K8s resource name (RFC 1123: lowercase alphanumeric + hyphen/dot)
+const K8S_NAME_RE = /^[a-z0-9][a-z0-9._-]*$/;
+
 export default function K8sExplorerPage() {
   const { t } = useLanguage();
   const { currentAccountId } = useAccountContext();
@@ -339,14 +356,41 @@ export default function K8sExplorerPage() {
   // Reset page when filters change / 필터 변경 시 페이지 리셋
   useMemo(() => { setCurrentPage(1); }, [clusterFilter, selectedNamespace, statusFilter, nodeFilter, searchText]);
 
-  const handleRowSelect = (row: any, index: number) => {
+  const handleRowSelect = async (row: any, index: number) => {
     if (selectedRow === index) {
       setSelectedRow(undefined);
       setSelectedResource(null);
-    } else {
-      setSelectedRow(index);
-      setSelectedResource(row);
+      return;
     }
+    setSelectedRow(index);
+    setSelectedResource({ ...row, _loading: true });
+
+    // On-demand describe query
+    const baseQuery = describeQueryMap[activeTab];
+    const name = String(row.name || '');
+    const ns = String(row.namespace || '');
+    if (baseQuery && name && K8S_NAME_RE.test(name) && (!ns || K8S_NAME_RE.test(ns))) {
+      const where = ns
+        ? ` WHERE name = '${name}' AND namespace = '${ns}'`
+        : ` WHERE name = '${name}'`;
+      try {
+        const res = await fetch('/awsops/api/steampipe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            accountId: currentAccountId,
+            queries: { detail: baseQuery + where },
+          }),
+        });
+        const result = await res.json();
+        const detailRow = result.detail?.rows?.[0];
+        if (detailRow) {
+          setSelectedResource({ ...detailRow, _loading: false });
+          return;
+        }
+      } catch { /* fall through to basic data */ }
+    }
+    setSelectedResource({ ...row, _loading: false });
   };
 
   const currentConfig = tabConfig[activeTab];

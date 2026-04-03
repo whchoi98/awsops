@@ -8,7 +8,7 @@ import StatusBadge from '@/components/dashboard/StatusBadge';
 import PieChartCard from '@/components/charts/PieChartCard';
 import BarChartCard from '@/components/charts/BarChartCard';
 import DataTable from '@/components/table/DataTable';
-import { Box, Rocket, Network, Server, AlertTriangle, BookOpen, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Box, Rocket, Network, Server, AlertTriangle, BookOpen, ShieldCheck, ShieldAlert, Plus, Loader2 } from 'lucide-react';
 import { queries as k8sQ } from '@/lib/queries/k8s';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { useAccountContext } from '@/contexts/AccountContext';
@@ -107,6 +107,32 @@ export default function K8sOverviewPage() {
   const [nodeTraffic, setNodeTraffic] = useState<any>(null);
   const [eniLoading, setEniLoading] = useState(false);
   const [ec2RoleArn, setEc2RoleArn] = useState<string | null>(null);
+  const [registeringCluster, setRegisteringCluster] = useState<string | null>(null);
+  const [registerResult, setRegisterResult] = useState<{ cluster: string; ok: boolean; msg: string } | null>(null);
+
+  // Register kubeconfig for an EKS cluster / EKS 클러스터 kubeconfig 등록
+  const registerKubeconfig = useCallback(async (clusterName: string, region: string) => {
+    setRegisteringCluster(clusterName);
+    setRegisterResult(null);
+    try {
+      const res = await fetch('/awsops/api/k8s', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clusterName, region }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        setRegisterResult({ cluster: clusterName, ok: true, msg: result.message });
+        setTimeout(() => fetchData(true), 3000);
+      } else {
+        setRegisterResult({ cluster: clusterName, ok: false, msg: result.error });
+      }
+    } catch (e: any) {
+      setRegisterResult({ cluster: clusterName, ok: false, msg: e.message });
+    } finally {
+      setRegisteringCluster(null);
+    }
+  }, []);
 
   // Fetch ENI data + traffic for selected node / 선택된 노드의 ENI + 트래픽 조회
   const fetchNodeEnis = useCallback(async (nodeName: string) => {
@@ -189,6 +215,7 @@ export default function K8sOverviewPage() {
             serviceList: k8sQ.serviceList,
             warningEvents: k8sQ.warningEvents,
             namespaceSummary: k8sQ.namespaceSummary,
+            podsPerNamespace: k8sQ.podsPerNamespace,
             nodeList: NODE_LIST_QUERY,
             podRequests: POD_REQUESTS_QUERY,
             podList: k8sQ.podList,
@@ -225,7 +252,7 @@ export default function K8sOverviewPage() {
   const deploySummary = getFirst('deploymentSummary') as any;
   const services = get('serviceList');
   const events = get('warningEvents');
-  const namespaces = get('namespaceSummary');
+  const _namespaces = get('namespaceSummary');
   const nodes = get('nodeList');
   const podReqRows = get('podRequests');
   const eksClusters = get('eksClusters');
@@ -280,6 +307,30 @@ export default function K8sOverviewPage() {
 
   const hasFilters = selectedClusters.size > 0 || selectedVpcs.size > 0;
 
+  // Extract cluster name from context_name ARN / context_name ARN에서 클러스터명 추출
+  const getClusterFromContext = (contextName: string) => {
+    const m = contextName?.match(/\/([^/]+)$/);
+    return m ? m[1] : '';
+  };
+
+  // Filter K8s resources by selected clusters / 선택된 클러스터로 K8s 리소스 필터링
+  const filteredClusterNames = useMemo(() => {
+    if (selectedClusters.size === 0) return null; // no filter
+    return selectedClusters;
+  }, [selectedClusters]);
+
+  const filterByCluster = useCallback((items: any[]) => {
+    if (!filteredClusterNames) return items;
+    return items.filter((item: any) => {
+      const cluster = getClusterFromContext(item.context_name);
+      return cluster && filteredClusterNames.has(cluster);
+    });
+  }, [filteredClusterNames]);
+
+  const filteredNodes = useMemo(() => filterByCluster(nodes), [nodes, filterByCluster]);
+  const filteredEvents = useMemo(() => filterByCluster(events), [events, filterByCluster]);
+  const filteredServices = useMemo(() => filterByCluster(services), [services, filterByCluster]);
+
   // Toggle helpers / 토글 헬퍼
   const toggleCluster = (name: string) => {
     setSelectedClusters(prev => {
@@ -320,10 +371,11 @@ export default function K8sOverviewPage() {
     { name: 'Succeeded', value: Number(podSummary.succeeded_pods) || 0 },
   ].filter((d) => d.value > 0);
 
-  // Namespace bar data
-  const namespaceData = namespaces.map((ns: any) => ({
-    name: ns.name,
-    value: 1,
+  // Pods per namespace bar data
+  const podsPerNs = get('podsPerNamespace');
+  const podsPerNsData = podsPerNs.map((r: any) => ({
+    name: r.namespace,
+    value: Number(r.pod_count) || 0,
   }));
 
   // Node Detail View / 노드 상세 뷰
@@ -542,7 +594,7 @@ export default function K8sOverviewPage() {
                 )}
                 <div className="flex gap-2 mb-3">
                   <a
-                    href="/awsops-docs/docs/compute/eks-auth"
+                    href={`${process.env.NEXT_PUBLIC_DOCS_URL}/compute/eks-auth`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/30 hover:bg-accent-cyan/20 transition-colors"
@@ -669,26 +721,46 @@ export default function K8sOverviewPage() {
                     <div><span className="text-gray-500">Platform: </span><span className="text-gray-300 font-mono">{c.platform_version || '--'}</span></div>
                     <div><span className="text-gray-500">Region: </span><span className="text-gray-300 font-mono">{c.region}</span></div>
                   </div>
-                  {/* CLI guide for unconnected clusters (cluster owner must run) / 미연결 클러스터 등록 가이드 */}
+                  {/* kubeconfig register button + CLI guide / kubeconfig 등록 버튼 + CLI 가이드 */}
                   {access === 'no-access' && (
                     <div className="mt-2 pt-2 border-t border-navy-700 space-y-1.5">
-                      <p className="text-[10px] text-gray-500">
-                        {lang === 'ko' ? '클러스터 소유자가 실행:' : 'Run as cluster owner:'}
-                      </p>
-                      <div className="p-1.5 rounded bg-navy-900 text-[10px] font-mono text-gray-400 overflow-x-auto">
-                        <div>aws eks create-access-entry \</div>
-                        <div className="ml-2">--cluster-name <span className="text-accent-cyan">{c.cluster_name}</span> \</div>
-                        <div className="ml-2">--principal-arn <span className="text-accent-orange">{ec2RoleArn || 'EC2_ROLE_ARN'}</span> --type STANDARD</div>
-                        <div className="mt-1">aws eks associate-access-policy \</div>
-                        <div className="ml-2">--cluster-name <span className="text-accent-cyan">{c.cluster_name}</span> \</div>
-                        <div className="ml-2">--principal-arn <span className="text-accent-orange">{ec2RoleArn || 'EC2_ROLE_ARN'}</span> \</div>
-                        <div className="ml-2">--policy-arn arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy \</div>
-                        <div className="ml-2">--access-scope type=cluster</div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => registerKubeconfig(c.cluster_name, c.region || 'ap-northeast-2')}
+                          disabled={registeringCluster === c.cluster_name}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/30 hover:bg-accent-cyan/20 transition-colors disabled:opacity-50"
+                        >
+                          {registeringCluster === c.cluster_name ? (
+                            <><Loader2 size={12} className="animate-spin" /> {lang === 'ko' ? '등록 중...' : 'Registering...'}</>
+                          ) : (
+                            <><Plus size={12} /> {lang === 'ko' ? 'kubeconfig 등록' : 'Register kubeconfig'}</>
+                          )}
+                        </button>
+                        <a href={`${process.env.NEXT_PUBLIC_DOCS_URL}/compute/eks-auth`} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[10px] text-gray-500 hover:text-accent-cyan transition-colors">
+                          <BookOpen size={10} /> {t('k8s.noAccess.guide')}
+                        </a>
                       </div>
-                      <a href="/awsops-docs/docs/compute/eks-auth" target="_blank" rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[10px] text-gray-500 hover:text-accent-cyan transition-colors">
-                        <BookOpen size={10} /> {t('k8s.noAccess.guide')}
-                      </a>
+                      {registerResult && registerResult.cluster === c.cluster_name && (
+                        <div className={`p-1.5 rounded text-[10px] ${registerResult.ok ? 'bg-accent-green/10 text-accent-green' : 'bg-accent-red/10 text-accent-red'}`}>
+                          {registerResult.msg}
+                        </div>
+                      )}
+                      <details className="group">
+                        <summary className="text-[10px] text-gray-500 cursor-pointer hover:text-gray-400">
+                          {lang === 'ko' ? '권한 없으면 클러스터 소유자가 실행:' : 'If no access, run as cluster owner:'}
+                        </summary>
+                        <div className="mt-1 p-1.5 rounded bg-navy-900 text-[10px] font-mono text-gray-400 overflow-x-auto">
+                          <div>aws eks create-access-entry \</div>
+                          <div className="ml-2">--cluster-name <span className="text-accent-cyan">{c.cluster_name}</span> \</div>
+                          <div className="ml-2">--principal-arn <span className="text-accent-orange">{ec2RoleArn || 'EC2_ROLE_ARN'}</span> --type STANDARD</div>
+                          <div className="mt-1">aws eks associate-access-policy \</div>
+                          <div className="ml-2">--cluster-name <span className="text-accent-cyan">{c.cluster_name}</span> \</div>
+                          <div className="ml-2">--principal-arn <span className="text-accent-orange">{ec2RoleArn || 'EC2_ROLE_ARN'}</span> \</div>
+                          <div className="ml-2">--policy-arn arn:aws:eks::aws:cluster-access-policy/AmazonEKSAdminViewPolicy \</div>
+                          <div className="ml-2">--access-scope type=cluster</div>
+                        </div>
+                      </details>
                     </div>
                   )}
                 </div>
@@ -723,7 +795,7 @@ export default function K8sOverviewPage() {
           />
           <StatsCard
             label={t('k8s.services')}
-            value={services.length}
+            value={filteredServices.length}
             icon={Network}
             color="orange"
           />
@@ -733,7 +805,7 @@ export default function K8sOverviewPage() {
         <div>
           <h2 className="text-lg font-semibold text-white mb-3">{t('k8s.nodes')}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {nodes.map((node: any) => {
+            {filteredNodes.map((node: any) => {
               const capCpu = parseCpu(node.capacity_cpu) || 1;
               const capMiB = parseMiB(node.capacity_memory) || 1;
               const req = reqMap[node.name] || { cpuReq: 0, memReqMiB: 0, podCount: 0 };
@@ -778,7 +850,7 @@ export default function K8sOverviewPage() {
                 </div>
               );
             })}
-            {nodes.length === 0 && !loading && (
+            {filteredNodes.length === 0 && !loading && (
               <div className="col-span-full text-center text-gray-500 py-8">No nodes found</div>
             )}
           </div>
@@ -787,7 +859,7 @@ export default function K8sOverviewPage() {
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <PieChartCard title="Pod Status Distribution" data={podStatusData} />
-          <BarChartCard title="Namespaces" data={namespaceData} color="#00d4ff" />
+          <BarChartCard title="Pods per Namespace" data={podsPerNsData} color="#00d4ff" />
         </div>
 
         {/* Warning Events Table */}
@@ -805,7 +877,7 @@ export default function K8sOverviewPage() {
               { key: 'count', label: 'Count' },
               { key: 'last_timestamp', label: 'Last Seen' },
             ]}
-            data={events}
+            data={filteredEvents}
           />
         </div>
       </main>
