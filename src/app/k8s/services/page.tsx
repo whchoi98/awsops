@@ -89,7 +89,7 @@ export default function K8sServicesPage() {
             { key: 'namespace', label: t('k8s.namespace') },
             { key: 'type', label: t('k8s.serviceType') },
             { key: 'cluster_ip', label: t('k8s.clusterIp') },
-            { key: 'external_ip', label: t('k8s.externalIp') },
+            { key: 'external_ips', label: t('k8s.externalIp') },
             { key: 'creation_timestamp', label: t('common.created') },
           ]}
           data={services}
