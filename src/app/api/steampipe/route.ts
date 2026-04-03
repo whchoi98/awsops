@@ -448,6 +448,53 @@ export async function POST(request: NextRequest) {
     const bustCache = searchParams.get('bustCache') === 'true';
 
     const body = await request.json();
+
+    // EKS Access Entry registration / EKS Access Entry 등록
+    if (body.action === 'eks-register-access') {
+      const { clusterName, region, principalArn } = body as { clusterName: string; region: string; principalArn: string };
+      if (!clusterName || !principalArn) {
+        return NextResponse.json({ error: 'clusterName and principalArn required' }, { status: 400 });
+      }
+      try {
+        // Step 1: Create access entry / Access Entry 생성
+        try {
+          execFileSync('aws', ['eks', 'create-access-entry',
+            '--cluster-name', clusterName, '--region', region || 'ap-northeast-2',
+            '--principal-arn', principalArn, '--type', 'STANDARD',
+          ], { timeout: 15000 });
+        } catch (e: any) {
+          const stderr = e.stderr?.toString() || '';
+          if (!stderr.includes('ResourceInUseException') && !stderr.includes('already exists')) {
+            return NextResponse.json({ error: `Access Entry 생성 실패: ${stderr.slice(0, 200)}` });
+          }
+          // Already exists — continue to policy association
+        }
+        // Step 2: Associate AdminView policy / AdminView 정책 연결
+        try {
+          execFileSync('aws', ['eks', 'associate-access-policy',
+            '--cluster-name', clusterName, '--region', region || 'ap-northeast-2',
+            '--principal-arn', principalArn,
+            '--policy-arn', 'arn:aws:eks::aws:cluster-access-policy/AmazonEKSAdminViewPolicy',
+            '--access-scope', 'type=cluster',
+          ], { timeout: 15000 });
+        } catch (e: any) {
+          const stderr = e.stderr?.toString() || '';
+          if (!stderr.includes('ResourceInUseException') && !stderr.includes('already exists')) {
+            return NextResponse.json({ error: `Policy 연결 실패: ${stderr.slice(0, 200)}` });
+          }
+        }
+        // Step 3: Generate kubeconfig / kubeconfig 생성
+        try {
+          execFileSync('aws', ['eks', 'update-kubeconfig',
+            '--name', clusterName, '--region', region || 'ap-northeast-2',
+          ], { timeout: 15000 });
+        } catch {}
+        return NextResponse.json({ message: `${clusterName}: Access Entry + AdminViewPolicy 등록 완료` });
+      } catch (err: any) {
+        return NextResponse.json({ error: err.message || 'Unknown error' });
+      }
+    }
+
     const { queries, saveInventory, accountId } = body as {
       queries: Record<string, string>;
       saveInventory?: boolean;

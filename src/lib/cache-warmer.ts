@@ -68,7 +68,7 @@ export function getCacheWarmerStatus(): CacheWarmerStatus {
 }
 
 // Dashboard queries (same as page.tsx) / 대시보드 쿼리 (page.tsx와 동일)
-function getDashboardQueries(includeCost: boolean): Record<string, string> {
+function getDashboardQueries(includeCost: boolean, includeK8s: boolean = true): Record<string, string> {
   return {
     ec2Status: ec2Q.statusCount,
     ec2Types: ec2Q.typeDistribution,
@@ -81,9 +81,24 @@ function getDashboardQueries(includeCost: boolean): Record<string, string> {
     ecsSummary: ecsQ.summary,
     dynamoSummary: dynamoQ.summary,
     ...(includeCost ? { costSummary: costQ.summary, costDetail: costQ.dashboardDetail } : {}),
-    k8sNodes: k8sQ.nodeSummary,
-    k8sPods: k8sQ.podSummary,
-    k8sDeploy: k8sQ.deploymentSummary,
+    ...(includeK8s ? {
+      k8sNodes: k8sQ.nodeSummary,
+      k8sPods: k8sQ.podSummary,
+      k8sDeploy: k8sQ.deploymentSummary,
+      k8sWarnings: k8sQ.warningEvents,
+      // K8s page queries / K8s 페이지 쿼리 (overview + explorer)
+      k8sServiceList: k8sQ.serviceList,
+      k8sNamespace: k8sQ.namespaceSummary,
+      k8sPodsPerNs: k8sQ.podsPerNamespace,
+      k8sNodeList: k8sQ.nodeList,
+      k8sPodReqs: k8sQ.podRequests,
+      k8sPodList: k8sQ.podList,
+      k8sEksClusters: k8sQ.eksClusterList,
+      k8sSvcResources: k8sQ.serviceResources,
+      k8sCallerRole: k8sQ.callerRole,
+      k8sNodeCap: k8sQ.nodeCapacity,
+      k8sPodReqsCtx: k8sQ.podRequestsWithContext,
+    } : {}),
     secSummary: secQ.summary,
     ecacheSummary: ecacheQ.summary,
     ctSummary: ctQ.summary,
@@ -93,7 +108,9 @@ function getDashboardQueries(includeCost: boolean): Record<string, string> {
     ebsSummary: ebsQ.summary,
     mskSummary: mskQ.summary,
     osSummary: osQ.summary,
-    k8sWarnings: k8sQ.warningEvents,
+    // ECS page queries / ECS 페이지 쿼리
+    ecsClusterList: ecsQ.clusterList,
+    ecsServiceList: ecsQ.serviceList,
   };
 }
 
@@ -130,7 +147,8 @@ async function warmCache(): Promise<void> {
       const accounts = getAccounts().slice(0, MAX_WARM_ACCOUNTS);
       for (const acc of accounts) {
         try {
-          const accDash = getDashboardQueries(acc.features?.costEnabled ?? false);
+          const accK8s = acc.features?.k8sEnabled ?? false;
+          const accDash = getDashboardQueries(acc.features?.costEnabled ?? false, accK8s);
           await batchQuery(accDash, { accountId: acc.accountId });
         } catch (err: unknown) {
           console.warn(`[CacheWarmer] Account ${acc.alias} warm failed: ${err instanceof Error ? err.message : 'Unknown'}`);

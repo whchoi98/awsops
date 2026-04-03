@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
     if (action === 'tasks') {
       // ECS running tasks / ECS 실행 중 Task 목록
       const result = await runQuery(queries.ecsRunningTasks, queryOpts);
-      if (result.error) return NextResponse.json({ error: result.error }, { status: 500 });
+      if (result.error) return NextResponse.json({ tasks: [] });
 
       // Calculate cost per task / Task별 비용 계산
       const tasks = result.rows.map((t: any) => {

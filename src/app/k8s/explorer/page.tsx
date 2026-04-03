@@ -15,31 +15,20 @@ interface DashboardData {
   [key: string]: { rows: Record<string, unknown>[]; error?: string };
 }
 
-const NODE_QUERY = `
-  SELECT
-    name, capacity_cpu as cpu_capacity, capacity_memory as memory_capacity,
-    allocatable_cpu, allocatable_memory
-  FROM kubernetes_node
-`;
-
-const POD_REQUESTS_QUERY = `
-  SELECT
-    p.node_name,
-    c->'resources'->'requests'->>'cpu' AS cpu_req,
-    c->'resources'->'requests'->>'memory' AS mem_req
-  FROM
-    kubernetes_pod p,
-    jsonb_array_elements(p.containers) AS c
-  WHERE
-    p.phase = 'Running' AND p.node_name IS NOT NULL
-`;
-
 // Parse K8s CPU (e.g. "8" → 8, "7910m" → 7.91)
 function parseCpu(cpu: any): number {
   if (!cpu) return 0;
   const s = String(cpu).trim();
   if (s.endsWith('m')) return parseFloat(s) / 1000;
   return parseFloat(s) || 0;
+}
+
+// Extract cluster name from kubeconfig context_name
+// e.g. "arn:aws:eks:ap-northeast-2:123456789012:cluster/my-cluster" → "my-cluster"
+function extractClusterName(ctx: string): string {
+  if (!ctx) return '';
+  const m = ctx.match(/\/([^/]+)$/);
+  return m ? m[1] : ctx;
 }
 
 // Parse K8s memory to MiB
@@ -169,6 +158,23 @@ const tabConfig: Record<string, { query: string; label: string; columns: { key: 
 
 const TAB_KEYS = Object.keys(tabConfig);
 
+// Map each tab to its describe-level query for on-demand detail fetch
+const describeQueryMap: Record<string, string> = {
+  pods: k8sQ.podDescribe,
+  deployments: k8sQ.deploymentDescribe,
+  services: k8sQ.serviceDescribe,
+  replicasets: k8sQ.replicasetDescribe,
+  daemonsets: k8sQ.daemonsetDescribe,
+  statefulsets: k8sQ.statefulsetDescribe,
+  jobs: k8sQ.jobDescribe,
+  configmaps: k8sQ.configmapDescribe,
+  secrets: k8sQ.secretDescribe,
+  pvcs: k8sQ.pvcDescribe,
+};
+
+// Validate K8s resource name (RFC 1123: lowercase alphanumeric + hyphen/dot)
+const K8S_NAME_RE = /^[a-z0-9][a-z0-9._-]*$/;
+
 export default function K8sExplorerPage() {
   const { t } = useLanguage();
   const { currentAccountId } = useAccountContext();
@@ -200,8 +206,8 @@ export default function K8sExplorerPage() {
           accountId: currentAccountId,
           queries: {
             resources: currentConfig?.query ?? '',
-            nodes: NODE_QUERY,
-            podRequests: POD_REQUESTS_QUERY,
+            nodes: k8sQ.nodeCapacity,
+            podRequests: k8sQ.podRequestsWithContext,
             eksClusters: k8sQ.eksClusterList,
           },
         }),
@@ -246,6 +252,7 @@ export default function K8sExplorerPage() {
   const podReqRows = data.podRequests?.rows || [];
   const reqMap: Record<string, { cpuReq: number; memReqMiB: number }> = {};
   podReqRows.forEach((r: any) => {
+    if (clusterFilter && extractClusterName(r.context_name || '') !== clusterFilter) return;
     const node = String(r.node_name || '');
     if (!node) return;
     if (!reqMap[node]) reqMap[node] = { cpuReq: 0, memReqMiB: 0 };
@@ -253,18 +260,22 @@ export default function K8sExplorerPage() {
     if (r.mem_req) reqMap[node].memReqMiB += parseMiB(r.mem_req);
   });
 
-  const nodes = (data.nodes?.rows || []).map((n: any) => {
+  const allNodes = (data.nodes?.rows || []).map((n: any) => {
     const capCpu = parseCpu(n.cpu_capacity);
     const capMiB = parseMiB(n.memory_capacity);
     const req = reqMap[n.name] || { cpuReq: 0, memReqMiB: 0 };
     return {
       name: n.name,
+      context_name: n.context_name || '',
       cpu_capacity: capCpu,
       memory_capacity: capMiB,
       cpu_percent: capCpu > 0 ? (req.cpuReq / capCpu) * 100 : 0,
       memory_percent: capMiB > 0 ? (req.memReqMiB / capMiB) * 100 : 0,
     };
   });
+  const nodes = clusterFilter
+    ? allNodes.filter(n => extractClusterName(n.context_name) === clusterFilter)
+    : allNodes;
 
   // Extract unique namespaces
   const namespaces = useMemo(() => {
@@ -293,6 +304,9 @@ export default function K8sExplorerPage() {
   // Client-side filtering / 클라이언트 필터링
   const filteredResources = useMemo(() => {
     let filtered = resources;
+    if (clusterFilter) {
+      filtered = filtered.filter((r: any) => extractClusterName(r.context_name || '') === clusterFilter);
+    }
     if (selectedNamespace) {
       filtered = filtered.filter((r: any) => r.namespace === selectedNamespace);
     }
@@ -311,25 +325,52 @@ export default function K8sExplorerPage() {
       );
     }
     return filtered;
-  }, [resources, selectedNamespace, statusFilter, nodeFilter, searchText]);
+  }, [resources, clusterFilter, selectedNamespace, statusFilter, nodeFilter, searchText]);
 
-  const hasFilters = selectedNamespace || statusFilter || nodeFilter || searchText;
-  const clearAllFilters = () => { setSelectedNamespace(''); setStatusFilter(''); setNodeFilter(''); setSearchText(''); setCurrentPage(1); };
+  const hasFilters = clusterFilter || selectedNamespace || statusFilter || nodeFilter || searchText;
+  const clearAllFilters = () => { setClusterFilter(''); setSelectedNamespace(''); setStatusFilter(''); setNodeFilter(''); setSearchText(''); setCurrentPage(1); };
 
   // Pagination / 페이지네이션
   const totalPages = Math.max(1, Math.ceil(filteredResources.length / pageSize));
   const paginatedResources = filteredResources.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   // Reset page when filters change / 필터 변경 시 페이지 리셋
-  useMemo(() => { setCurrentPage(1); }, [selectedNamespace, statusFilter, nodeFilter, searchText]);
+  useMemo(() => { setCurrentPage(1); }, [clusterFilter, selectedNamespace, statusFilter, nodeFilter, searchText]);
 
-  const handleRowSelect = (row: any, index: number) => {
+  const handleRowSelect = async (row: any, index: number) => {
     if (selectedRow === index) {
       setSelectedRow(undefined);
       setSelectedResource(null);
-    } else {
-      setSelectedRow(index);
-      setSelectedResource(row);
+      return;
     }
+    setSelectedRow(index);
+    setSelectedResource({ ...row, _loading: true });
+
+    // On-demand describe query
+    const baseQuery = describeQueryMap[activeTab];
+    const name = String(row.name || '');
+    const ns = String(row.namespace || '');
+    if (baseQuery && name && K8S_NAME_RE.test(name) && (!ns || K8S_NAME_RE.test(ns))) {
+      const where = ns
+        ? ` WHERE name = '${name}' AND namespace = '${ns}'`
+        : ` WHERE name = '${name}'`;
+      try {
+        const res = await fetch('/awsops/api/steampipe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            accountId: currentAccountId,
+            queries: { detail: baseQuery + where },
+          }),
+        });
+        const result = await res.json();
+        const detailRow = result.detail?.rows?.[0];
+        if (detailRow) {
+          setSelectedResource({ ...detailRow, _loading: false });
+          return;
+        }
+      } catch { /* fall through to basic data */ }
+    }
+    setSelectedResource({ ...row, _loading: false });
   };
 
   const currentConfig = tabConfig[activeTab];
