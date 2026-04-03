@@ -313,6 +313,39 @@ By default, private IP ranges (`10.x.x.x`, `172.16-31.x.x`, `192.168.x.x`) are b
 Adding overly broad CIDR ranges to Allowed Networks may weaken SSRF protection. Only register the minimum required ranges.
 :::
 
+## AI Agent Integration
+
+Registered datasources are automatically available to the AI assistant (`/ai`). When your question contains datasource keywords, the AI generates and executes queries automatically.
+
+### Single Datasource Query
+
+```
+"Show CPU usage from Prometheus"
+→ datasource route → auto-generate PromQL → analyze results
+```
+
+### Multi-Datasource Correlation
+
+Query multiple datasources simultaneously for correlation analysis:
+
+```
+"Correlate Prometheus metrics with Loki error logs"
+→ Prometheus PromQL + Loki LogQL parallel execution → combined analysis
+```
+
+### Cross-Source Analysis with AWS
+
+Combine datasource queries with AWS resources for root cause analysis:
+
+```
+"Compare Prometheus CPU spike with CloudWatch alarms"
+→ datasource + monitoring multi-route → cross-source correlation
+```
+
+:::tip AI Keywords
+Keywords recognized by the AI assistant: **prometheus**, **loki**, **tempo**, **clickhouse**, **jaeger**, **dynatrace**, **datadog** (Korean keywords also supported)
+:::
+
 ## Related Pages
 
 - [Monitoring Dashboard](./monitoring.md) - System monitoring overview
