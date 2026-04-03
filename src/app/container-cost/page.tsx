@@ -190,7 +190,7 @@ export default function ContainerCostPage() {
         <div className="bg-navy-800 rounded-lg p-4 border border-navy-600">
           <h3 className="text-white font-medium mb-4">Service Cost Distribution (Daily)</h3>
           {filteredServiceCosts.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={300} minWidth={0}>
               <PieChart>
                 <Pie
                   data={filteredServiceCosts.map(s => ({
@@ -219,7 +219,7 @@ export default function ContainerCostPage() {
         <div className="bg-navy-800 rounded-lg p-4 border border-navy-600">
           <h3 className="text-white font-medium mb-4">Cost by Service (CPU vs Memory)</h3>
           {filteredServiceCosts.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={300} minWidth={0}>
               <BarChart data={filteredServiceCosts.map(s => {
                 const svcTasks = filteredTasks.filter(t => t.service_name === s.name);
                 const cpuCost = svcTasks.reduce((sum, t) => sum + t.dailyCost.cpuCost, 0);

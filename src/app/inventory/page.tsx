@@ -324,7 +324,7 @@ export default function InventoryPage() {
 
           {/* Chart */}
           <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <LineChart data={chartData}>
                 <XAxis
                   dataKey="name"

@@ -225,7 +225,7 @@ export default function EksContainerCostPage() {
         <div className="bg-navy-800 rounded-lg p-4 border border-navy-600">
           <h3 className="text-white font-medium mb-4">Namespace Cost Distribution (Daily)</h3>
           {filteredNsCosts.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={300} minWidth={0}>
               <PieChart>
                 <Pie
                   data={filteredNsCosts.map(s => ({ name: s.name, value: s.cost }))}
@@ -249,7 +249,7 @@ export default function EksContainerCostPage() {
         <div className="bg-navy-800 rounded-lg p-4 border border-navy-600">
           <h3 className="text-white font-medium mb-4">Node Daily Cost + Pod Count</h3>
           {filteredNodes.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={300} minWidth={0}>
               <BarChart data={filteredNodes.map(n => ({
                 name: n.node_name.split('.')[0],
                 'Daily Cost': n.dailyCost,

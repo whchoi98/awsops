@@ -31,7 +31,7 @@ export default function BarChartCard({ title, data, color = '#00d4ff' }: BarChar
       <h3 className="text-sm font-semibold text-white mb-4">{title}</h3>
 
       <div className="h-52">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <BarChart data={data}>
             <XAxis
               dataKey="name"

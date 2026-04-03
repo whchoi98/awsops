@@ -443,7 +443,7 @@ export default function RDSPage() {
                             </div>
                             {chartData.length > 2 ? (
                               <div className="h-20">
-                                <ResponsiveContainer width="100%" height="100%">
+                                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                                   <LineChart data={chartData}>
                                     <XAxis dataKey="name" hide />
                                     <Tooltip contentStyle={{ background: '#0f1629', border: '1px solid #1a2540', borderRadius: 8, fontSize: 11 }} labelStyle={{ color: '#6b7280' }} />

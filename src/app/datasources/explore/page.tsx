@@ -716,7 +716,7 @@ export default function DatasourceExplorePage() {
               </div>
             </div>
             <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 {chartType === 'line' ? (
                   <LineChart data={chartData}>
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 10 }} interval="preserveStartEnd" />
