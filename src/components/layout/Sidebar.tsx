@@ -33,6 +33,10 @@ import {
   Sparkles,
   LogOut,
   Layers,
+  DatabaseZap,
+  SearchCode,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
@@ -41,6 +45,7 @@ interface NavItem {
   labelKey: string;
   href: string;
   icon: LucideIcon;
+  subItems?: NavItem[];
 }
 
 interface NavGroup {
@@ -101,6 +106,10 @@ const navGroups: NavGroup[] = [
       { labelKey: 'sidebar.cloudtrail', href: '/cloudtrail', icon: FileSearch },
       { labelKey: 'sidebar.cost', href: '/cost', icon: DollarSign },
       { labelKey: 'sidebar.resourceInventory', href: '/inventory', icon: BarChart3 },
+      { labelKey: 'sidebar.datasources', href: '/datasources', icon: DatabaseZap, subItems: [
+        { labelKey: 'sidebar.datasources', href: '/datasources', icon: DatabaseZap },
+        { labelKey: 'sidebar.datasourceExplore', href: '/datasources/explore', icon: SearchCode },
+      ]},
     ],
   },
   {
@@ -120,6 +129,7 @@ export default function Sidebar() {
   const [customerLogo, setCustomerLogo] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState<string | null>(null);
   const [customerLogoBg, setCustomerLogoBg] = useState<string>('dark'); // 'light' for white bg, 'dark' for transparent / 밝은 로고는 light, 어두운 로고는 dark
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
   const { getFeatures, isMultiAccount } = useAccountContext();
   const features = getFeatures();
 
@@ -141,11 +151,75 @@ export default function Sidebar() {
     return path.startsWith(href);
   };
 
+  const toggleMenu = (href: string) => {
+    setExpandedMenus(prev => ({ ...prev, [href]: !prev[href] }));
+  };
+
+  const isMenuExpanded = (item: NavItem) => {
+    if (expandedMenus[item.href] !== undefined) return expandedMenus[item.href];
+    // Auto-expand if any sub-item is active
+    return item.subItems?.some(sub => isActive(sub.href)) ?? false;
+  };
+
   const toggleLang = () => {
     setLang(lang === 'ko' ? 'en' : 'ko');
   };
 
   const renderNavItem = (item: NavItem) => {
+    if (item.subItems) {
+      const expanded = isMenuExpanded(item);
+      const anySubActive = item.subItems.some(sub => isActive(sub.href));
+      const Icon = item.icon;
+
+      return (
+        <div key={item.href + '-group'}>
+          <button
+            onClick={() => toggleMenu(item.href)}
+            className={`
+              w-full flex items-center gap-3 px-4 py-2.5 text-[15px] transition-colors relative
+              ${
+                anySubActive
+                  ? 'text-accent-cyan border-l-2 border-accent-cyan bg-navy-700/30'
+                  : 'text-gray-400 hover:text-gray-200 hover:bg-navy-700/50 border-l-2 border-transparent'
+              }
+            `}
+          >
+            <Icon size={18} />
+            <span className="flex-1 text-left">{t(item.labelKey)}</span>
+            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </button>
+          {expanded && (
+            <div className="space-y-0.5">
+              {item.subItems.map(sub => {
+                const path = pathname.replace('/awsops', '') || '/';
+                const subActive = sub.href === item.href
+                  ? path === sub.href   // exact match for parent-path sub-item
+                  : isActive(sub.href);
+                const SubIcon = sub.icon;
+                return (
+                  <Link
+                    key={sub.href}
+                    href={sub.href}
+                    className={`
+                      flex items-center gap-3 pl-8 pr-4 py-2 text-[13px] transition-colors relative
+                      ${
+                        subActive
+                          ? 'bg-navy-700 text-accent-cyan border-l-2 border-accent-cyan'
+                          : 'text-gray-400 hover:text-gray-200 hover:bg-navy-700/50 border-l-2 border-transparent'
+                      }
+                    `}
+                  >
+                    <SubIcon size={16} />
+                    <span>{t(sub.labelKey)}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      );
+    }
+
     const active = isActive(item.href);
     const Icon = item.icon;
 

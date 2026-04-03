@@ -1,7 +1,7 @@
 'use client';
 
 import { RefreshCw } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 
 interface HeaderProps {
@@ -13,7 +13,11 @@ interface HeaderProps {
 export default function Header({ title, subtitle, onRefresh }: HeaderProps) {
   const { t } = useLanguage();
   const [spinning, setSpinning] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState(() => new Date().toLocaleTimeString());
+  const [lastUpdated, setLastUpdated] = useState('');
+
+  useEffect(() => {
+    setLastUpdated(new Date().toLocaleTimeString());
+  }, []);
 
   const handleRefresh = () => {
     if (!onRefresh) return;
@@ -33,7 +37,7 @@ export default function Header({ title, subtitle, onRefresh }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-4">
-        <span className="text-xs text-gray-500 font-mono">
+        <span className="text-xs text-gray-500 font-mono" suppressHydrationWarning>
           {t('common.lastUpdated')} {lastUpdated}
         </span>
 

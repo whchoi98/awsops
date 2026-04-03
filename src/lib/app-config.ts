@@ -29,6 +29,37 @@ export interface AccountConfig {
   profile?: string;        // AWS CLI profile for cross-account access
 }
 
+// External datasource types (Grafana-style) / 외부 데이터소스 타입 (Grafana 스타일)
+export type DatasourceType = 'prometheus' | 'loki' | 'tempo' | 'clickhouse' | 'jaeger' | 'dynatrace' | 'datadog';
+
+export interface DatasourceAuth {
+  type: 'none' | 'basic' | 'bearer' | 'custom-header';
+  username?: string;
+  password?: string;
+  token?: string;
+  headerName?: string;
+  headerValue?: string;
+}
+
+export interface DatasourceSettings {
+  timeout?: number;        // ms, default 30000
+  cacheTTL?: number;       // seconds, default 60
+  database?: string;       // ClickHouse database name
+  customHeaders?: Record<string, string>;
+}
+
+export interface DatasourceConfig {
+  id: string;              // UUID
+  name: string;            // "Production Prometheus"
+  type: DatasourceType;
+  url: string;             // "http://prometheus:9090"
+  isDefault?: boolean;     // Default datasource per type / 타입별 기본 데이터소스
+  auth?: DatasourceAuth;
+  settings?: DatasourceSettings;
+  createdAt: string;       // ISO timestamp
+  updatedAt: string;
+}
+
 export interface AppConfig {
   costEnabled: boolean;
   agentRuntimeArn?: string;
@@ -43,6 +74,8 @@ export interface AppConfig {
   customerLogoBg?: string;     // Logo background: "light" (white bg) or "dark" (transparent) / 로고 배경: light=흰색, dark=투명
   adminEmails?: string[];      // Admin user emails allowed to access /accounts / 계정 관리 접근 허용 이메일
   accounts?: AccountConfig[];
+  datasources?: DatasourceConfig[];  // External datasources / 외부 데이터소스
+  datasourceAllowedNetworks?: string[];  // Allowed private CIDRs/hostnames for datasource SSRF allowlist
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -104,4 +137,27 @@ export function isMultiAccount(): boolean {
 
 export function getHostAccount(): AccountConfig | undefined {
   return getAccounts().find(a => a.isHost);
+}
+
+// --- Datasource utilities / 데이터소스 유틸리티 ---
+
+export function getDatasources(): DatasourceConfig[] {
+  return getConfig().datasources || [];
+}
+
+export function getDatasourceById(id: string): DatasourceConfig | undefined {
+  return getDatasources().find(d => d.id === id);
+}
+
+export function getDefaultDatasource(type: DatasourceType): DatasourceConfig | undefined {
+  const byType = getDatasources().filter(d => d.type === type);
+  return byType.find(d => d.isDefault) || byType[0];
+}
+
+export function getDatasourcesByType(type: DatasourceType): DatasourceConfig[] {
+  return getDatasources().filter(d => d.type === type);
+}
+
+export function getDatasourceAllowedNetworks(): string[] {
+  return getConfig().datasourceAllowedNetworks || [];
 }

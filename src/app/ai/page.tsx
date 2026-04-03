@@ -218,6 +218,8 @@ export default function AIPage() {
     'aws-data': [t('ai.followup.awsdata1'), t('ai.followup.awsdata2'), t('ai.followup.awsdata3')],
     iac: [t('ai.followup.iac1'), t('ai.followup.iac2'), t('ai.followup.iac3')],
     code: [t('ai.followup.code1'), t('ai.followup.code2'), t('ai.followup.code3')],
+    datasource: [t('ai.followup.datasource1'), t('ai.followup.datasource2'), t('ai.followup.datasource3')],
+    'datasource-diag': [t('ai.followup.dsdiag1'), t('ai.followup.dsdiag2'), t('ai.followup.dsdiag3')],
     general: [t('ai.followup.general1'), t('ai.followup.general2'), t('ai.followup.general3')],
   };
 
