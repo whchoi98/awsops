@@ -18,7 +18,7 @@ interface DashboardData {
 const NODE_QUERY = `
   SELECT
     name, capacity_cpu as cpu_capacity, capacity_memory as memory_capacity,
-    allocatable_cpu, allocatable_memory
+    allocatable_cpu, allocatable_memory, context_name
   FROM kubernetes_node
 `;
 
@@ -26,7 +26,8 @@ const POD_REQUESTS_QUERY = `
   SELECT
     p.node_name,
     c->'resources'->'requests'->>'cpu' AS cpu_req,
-    c->'resources'->'requests'->>'memory' AS mem_req
+    c->'resources'->'requests'->>'memory' AS mem_req,
+    p.context_name
   FROM
     kubernetes_pod p,
     jsonb_array_elements(p.containers) AS c
@@ -40,6 +41,14 @@ function parseCpu(cpu: any): number {
   const s = String(cpu).trim();
   if (s.endsWith('m')) return parseFloat(s) / 1000;
   return parseFloat(s) || 0;
+}
+
+// Extract cluster name from kubeconfig context_name
+// e.g. "arn:aws:eks:ap-northeast-2:123456789012:cluster/my-cluster" → "my-cluster"
+function extractClusterName(ctx: string): string {
+  if (!ctx) return '';
+  const m = ctx.match(/\/([^/]+)$/);
+  return m ? m[1] : ctx;
 }
 
 // Parse K8s memory to MiB
@@ -246,6 +255,7 @@ export default function K8sExplorerPage() {
   const podReqRows = data.podRequests?.rows || [];
   const reqMap: Record<string, { cpuReq: number; memReqMiB: number }> = {};
   podReqRows.forEach((r: any) => {
+    if (clusterFilter && extractClusterName(r.context_name || '') !== clusterFilter) return;
     const node = String(r.node_name || '');
     if (!node) return;
     if (!reqMap[node]) reqMap[node] = { cpuReq: 0, memReqMiB: 0 };
@@ -253,18 +263,22 @@ export default function K8sExplorerPage() {
     if (r.mem_req) reqMap[node].memReqMiB += parseMiB(r.mem_req);
   });
 
-  const nodes = (data.nodes?.rows || []).map((n: any) => {
+  const allNodes = (data.nodes?.rows || []).map((n: any) => {
     const capCpu = parseCpu(n.cpu_capacity);
     const capMiB = parseMiB(n.memory_capacity);
     const req = reqMap[n.name] || { cpuReq: 0, memReqMiB: 0 };
     return {
       name: n.name,
+      context_name: n.context_name || '',
       cpu_capacity: capCpu,
       memory_capacity: capMiB,
       cpu_percent: capCpu > 0 ? (req.cpuReq / capCpu) * 100 : 0,
       memory_percent: capMiB > 0 ? (req.memReqMiB / capMiB) * 100 : 0,
     };
   });
+  const nodes = clusterFilter
+    ? allNodes.filter(n => extractClusterName(n.context_name) === clusterFilter)
+    : allNodes;
 
   // Extract unique namespaces
   const namespaces = useMemo(() => {
@@ -293,6 +307,9 @@ export default function K8sExplorerPage() {
   // Client-side filtering / 클라이언트 필터링
   const filteredResources = useMemo(() => {
     let filtered = resources;
+    if (clusterFilter) {
+      filtered = filtered.filter((r: any) => extractClusterName(r.context_name || '') === clusterFilter);
+    }
     if (selectedNamespace) {
       filtered = filtered.filter((r: any) => r.namespace === selectedNamespace);
     }
@@ -311,16 +328,16 @@ export default function K8sExplorerPage() {
       );
     }
     return filtered;
-  }, [resources, selectedNamespace, statusFilter, nodeFilter, searchText]);
+  }, [resources, clusterFilter, selectedNamespace, statusFilter, nodeFilter, searchText]);
 
-  const hasFilters = selectedNamespace || statusFilter || nodeFilter || searchText;
-  const clearAllFilters = () => { setSelectedNamespace(''); setStatusFilter(''); setNodeFilter(''); setSearchText(''); setCurrentPage(1); };
+  const hasFilters = clusterFilter || selectedNamespace || statusFilter || nodeFilter || searchText;
+  const clearAllFilters = () => { setClusterFilter(''); setSelectedNamespace(''); setStatusFilter(''); setNodeFilter(''); setSearchText(''); setCurrentPage(1); };
 
   // Pagination / 페이지네이션
   const totalPages = Math.max(1, Math.ceil(filteredResources.length / pageSize));
   const paginatedResources = filteredResources.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   // Reset page when filters change / 필터 변경 시 페이지 리셋
-  useMemo(() => { setCurrentPage(1); }, [selectedNamespace, statusFilter, nodeFilter, searchText]);
+  useMemo(() => { setCurrentPage(1); }, [clusterFilter, selectedNamespace, statusFilter, nodeFilter, searchText]);
 
   const handleRowSelect = (row: any, index: number) => {
     if (selectedRow === index) {

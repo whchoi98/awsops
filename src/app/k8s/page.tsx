@@ -8,7 +8,7 @@ import StatusBadge from '@/components/dashboard/StatusBadge';
 import PieChartCard from '@/components/charts/PieChartCard';
 import BarChartCard from '@/components/charts/BarChartCard';
 import DataTable from '@/components/table/DataTable';
-import { Box, Rocket, Network, Server, AlertTriangle, BookOpen, ShieldCheck, ShieldAlert, Plus, Loader2 } from 'lucide-react';
+import { Box, Rocket, Network, Server, AlertTriangle, BookOpen, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { queries as k8sQ } from '@/lib/queries/k8s';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { useAccountContext } from '@/contexts/AccountContext';
@@ -38,7 +38,7 @@ interface DashboardData {
 const NODE_LIST_QUERY = `
   SELECT
     name, uid, pod_cidr, capacity_cpu, capacity_memory,
-    allocatable_cpu, allocatable_memory,
+    allocatable_cpu, allocatable_memory, context_name,
     CASE WHEN jsonb_array_length(conditions) > 0 THEN 'Ready' ELSE 'NotReady' END as status
   FROM kubernetes_node
 `;
@@ -107,8 +107,6 @@ export default function K8sOverviewPage() {
   const [nodeTraffic, setNodeTraffic] = useState<any>(null);
   const [eniLoading, setEniLoading] = useState(false);
   const [ec2RoleArn, setEc2RoleArn] = useState<string | null>(null);
-  const [registeringCluster, setRegisteringCluster] = useState<string | null>(null);
-  const [registerResult, setRegisterResult] = useState<{ cluster: string; ok: boolean; msg: string } | null>(null);
 
   // Fetch ENI data + traffic for selected node / 선택된 노드의 ENI + 트래픽 조회
   const fetchNodeEnis = useCallback(async (nodeName: string) => {
@@ -195,15 +193,18 @@ export default function K8sOverviewPage() {
             podRequests: POD_REQUESTS_QUERY,
             podList: k8sQ.podList,
             eksClusters: k8sQ.eksClusterList,
-            accessEntries: `SELECT cluster_name, principal_arn, type FROM aws_eks_access_entry`,
-            callerRole: `SELECT replace(replace(replace(arn, ':sts:', ':iam:'), ':assumed-role/', ':role/'), '/' || split_part(arn, '/', 3), '') as arn FROM aws_sts_caller_identity`,
+            callerRole: `SELECT arn FROM aws_sts_caller_identity`,
           },
         }),
       });
       const result = await res.json();
       setData(result);
-      // Extract EC2 role ARN from batch result / 배치 결과에서 EC2 역할 ARN 추출
-      const detectedArn = result.callerRole?.rows?.[0]?.arn;
+      // STS ARN → IAM Role ARN (arn:aws:sts::ACCT:assumed-role/ROLE/SESSION → arn:aws:iam::ACCT:role/ROLE)
+      const rawArn = result.callerRole?.rows?.[0]?.arn || '';
+      const detectedArn = rawArn
+        .replace(':sts:', ':iam:')
+        .replace(':assumed-role/', ':role/')
+        .replace(/\/[^/]*$/, '');
       if (detectedArn && !ec2RoleArn) setEc2RoleArn(detectedArn);
     } catch {
       // keep existing data
@@ -213,37 +214,8 @@ export default function K8sOverviewPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentAccountId]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
-
   // Register EKS Access Entry + ViewPolicy / Access Entry + ViewPolicy 등록
-  const registerAccessEntry = useCallback(async (clusterName: string, region: string) => {
-    if (!ec2RoleArn) return;
-    setRegisteringCluster(clusterName);
-    setRegisterResult(null);
-    try {
-      const res = await fetch('/awsops/api/steampipe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'eks-register-access',
-          clusterName,
-          region,
-          principalArn: ec2RoleArn,
-        }),
-      });
-      const result = await res.json();
-      if (result.error) {
-        setRegisterResult({ cluster: clusterName, ok: false, msg: result.error });
-      } else {
-        setRegisterResult({ cluster: clusterName, ok: true, msg: result.message || 'Access Entry registered' });
-        setTimeout(() => fetchData(true), 2000);
-      }
-    } catch (err: any) {
-      setRegisterResult({ cluster: clusterName, ok: false, msg: err.message || 'Failed' });
-    } finally {
-      setRegisteringCluster(null);
-    }
-  }, [ec2RoleArn, fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const get = (key: string) => data[key]?.rows || [];
   const getFirst = (key: string) => get(key)[0] || {};
@@ -258,12 +230,19 @@ export default function K8sOverviewPage() {
   const podReqRows = get('podRequests');
   const eksClusters = get('eksClusters');
 
-  // Access entry data per cluster / 클러스터별 Access Entry 데이터
-  const accessEntries = get('accessEntries');
+  // K8s connectivity check: clusters with node data are connected / 노드 데이터가 있으면 K8s 연결됨
+  const connectedClusters = useMemo(() => {
+    const set = new Set<string>();
+    nodes.forEach((n: any) => {
+      if (n.context_name) {
+        const m = n.context_name.match(/\/([^/]+)$/);
+        if (m) set.add(m[1]);
+      }
+    });
+    return set;
+  }, [nodes]);
   const getClusterAccess = (clusterName: string) => {
-    if (!ec2RoleArn) return 'unknown';
-    const hasEntry = accessEntries.some((e: any) => e.cluster_name === clusterName && e.principal_arn === ec2RoleArn);
-    return hasEntry ? 'registered' : 'none';
+    return connectedClusters.has(clusterName) ? 'connected' : 'no-access';
   };
 
   // Detect missing K8s access / K8s 접근 권한 미설정 감지
@@ -665,24 +644,22 @@ export default function K8sOverviewPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {filteredClusters.map((c: any) => {
                 const access = getClusterAccess(c.cluster_name);
-                const isRegistering = registeringCluster === c.cluster_name;
-                const result = registerResult?.cluster === c.cluster_name ? registerResult : null;
                 return (
                 <div key={c.cluster_name} className="bg-navy-800 border border-navy-600 rounded-lg p-3">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-white font-mono text-sm font-semibold">{c.cluster_name}</span>
                     <div className="flex items-center gap-2">
-                      {access === 'registered' ? (
+                      {access === 'connected' ? (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent-green/10 text-accent-green border border-accent-green/20">
                           <ShieldCheck size={10} />
-                          Access Entry
+                          K8s Connected
                         </span>
-                      ) : access === 'none' ? (
+                      ) : (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent-red/10 text-accent-red border border-accent-red/20">
                           <ShieldAlert size={10} />
                           {t('k8s.noAccess.noEntry')}
                         </span>
-                      ) : null}
+                      )}
                       <StatusBadge status={c.status || 'UNKNOWN'} />
                     </div>
                   </div>
@@ -692,31 +669,26 @@ export default function K8sOverviewPage() {
                     <div><span className="text-gray-500">Platform: </span><span className="text-gray-300 font-mono">{c.platform_version || '--'}</span></div>
                     <div><span className="text-gray-500">Region: </span><span className="text-gray-300 font-mono">{c.region}</span></div>
                   </div>
-                  {/* Register Access Entry button / Access Entry 등록 버튼 */}
-                  {access === 'none' && ec2RoleArn && (
-                    <div className="mt-2 pt-2 border-t border-navy-700">
-                      <button
-                        onClick={() => registerAccessEntry(c.cluster_name, c.region)}
-                        disabled={isRegistering}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/30 hover:bg-accent-cyan/20 disabled:opacity-50 transition-colors"
-                      >
-                        {isRegistering ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-                        {t('k8s.noAccess.register')}
-                      </button>
-                      <a
-                        href="/awsops-docs/docs/compute/eks-auth"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 ml-2 text-[10px] text-gray-500 hover:text-accent-cyan transition-colors"
-                      >
-                        <BookOpen size={10} />
-                        {t('k8s.noAccess.guide')}
+                  {/* CLI guide for unconnected clusters (cluster owner must run) / 미연결 클러스터 등록 가이드 */}
+                  {access === 'no-access' && (
+                    <div className="mt-2 pt-2 border-t border-navy-700 space-y-1.5">
+                      <p className="text-[10px] text-gray-500">
+                        {lang === 'ko' ? '클러스터 소유자가 실행:' : 'Run as cluster owner:'}
+                      </p>
+                      <div className="p-1.5 rounded bg-navy-900 text-[10px] font-mono text-gray-400 overflow-x-auto">
+                        <div>aws eks create-access-entry \</div>
+                        <div className="ml-2">--cluster-name <span className="text-accent-cyan">{c.cluster_name}</span> \</div>
+                        <div className="ml-2">--principal-arn <span className="text-accent-orange">{ec2RoleArn || 'EC2_ROLE_ARN'}</span> --type STANDARD</div>
+                        <div className="mt-1">aws eks associate-access-policy \</div>
+                        <div className="ml-2">--cluster-name <span className="text-accent-cyan">{c.cluster_name}</span> \</div>
+                        <div className="ml-2">--principal-arn <span className="text-accent-orange">{ec2RoleArn || 'EC2_ROLE_ARN'}</span> \</div>
+                        <div className="ml-2">--policy-arn arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy \</div>
+                        <div className="ml-2">--access-scope type=cluster</div>
+                      </div>
+                      <a href="/awsops-docs/docs/compute/eks-auth" target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[10px] text-gray-500 hover:text-accent-cyan transition-colors">
+                        <BookOpen size={10} /> {t('k8s.noAccess.guide')}
                       </a>
-                    </div>
-                  )}
-                  {result && (
-                    <div className={`mt-2 px-2 py-1.5 rounded text-xs ${result.ok ? 'bg-accent-green/10 text-accent-green' : 'bg-accent-red/10 text-accent-red'}`}>
-                      {result.msg}
                     </div>
                   )}
                 </div>

@@ -48,7 +48,8 @@ export const queries = {
       pod_ip,
       creation_timestamp,
       restart_policy,
-      service_account_name
+      service_account_name,
+      context_name
     FROM
       kubernetes_pod
     ORDER BY
@@ -64,7 +65,8 @@ export const queries = {
       available_replicas,
       unavailable_replicas,
       creation_timestamp,
-      strategy
+      strategy,
+      context_name
     FROM
       kubernetes_deployment
     ORDER BY
@@ -79,7 +81,8 @@ export const queries = {
       cluster_ip,
       external_ip,
       creation_timestamp,
-      selector
+      selector,
+      context_name
     FROM
       kubernetes_service
     ORDER BY
@@ -107,7 +110,8 @@ export const queries = {
       volume_name,
       capacity::text as capacity,
       access_modes::text as access_modes,
-      creation_timestamp
+      creation_timestamp,
+      context_name
     FROM
       kubernetes_persistent_volume_claim
     ORDER BY
@@ -138,7 +142,8 @@ export const queries = {
       replicas,
       ready_replicas,
       available_replicas,
-      creation_timestamp
+      creation_timestamp,
+      context_name
     FROM
       kubernetes_replicaset
     ORDER BY
@@ -154,7 +159,8 @@ export const queries = {
       number_ready,
       number_available,
       number_misscheduled,
-      creation_timestamp
+      creation_timestamp,
+      context_name
     FROM
       kubernetes_daemonset
     ORDER BY
@@ -169,7 +175,8 @@ export const queries = {
       ready_replicas,
       current_replicas,
       creation_timestamp,
-      service_name
+      service_name,
+      context_name
     FROM
       kubernetes_stateful_set
     ORDER BY
@@ -187,7 +194,8 @@ export const queries = {
       parallelism,
       start_time,
       completion_time,
-      creation_timestamp
+      creation_timestamp,
+      context_name
     FROM
       kubernetes_job
     ORDER BY
@@ -199,7 +207,8 @@ export const queries = {
       name,
       namespace,
       creation_timestamp,
-      data
+      data,
+      context_name
     FROM
       kubernetes_config_map
     ORDER BY
@@ -211,7 +220,8 @@ export const queries = {
       name,
       namespace,
       type,
-      creation_timestamp
+      creation_timestamp,
+      context_name
     FROM
       kubernetes_secret
     ORDER BY

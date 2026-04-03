@@ -228,6 +228,13 @@ export class AwsopsStack extends cdk.Stack {
       ],
     }));
 
+    // EKS Access Entry management (register Steampipe read-only access to EKS clusters)
+    // AssociateAccessPolicy requires access-entry resource, so use wildcard
+    ec2Role.addToPolicy(new iam.PolicyStatement({
+      actions: ['eks:CreateAccessEntry', 'eks:AssociateAccessPolicy'],
+      resources: ['*'],
+    }));
+
     // -------------------------------------------------------
     // EC2 Instance (Private Subnet, ARM64 Graviton by default)
     // -------------------------------------------------------
