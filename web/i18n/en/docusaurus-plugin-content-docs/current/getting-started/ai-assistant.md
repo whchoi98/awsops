@@ -127,6 +127,14 @@ Example: `Network Gateway (17 tools)`, `Bedrock + Steampipe SQL`
 - **Tools Used**: List of MCP tools called
 - **Queried Resources**: Tables queried from Steampipe
 
+### Real-time Streaming
+
+Responses are streamed in real-time and displayed progressively on screen. The optimal streaming mode is automatically selected based on the response path:
+
+- **Single Gateway response**: Displayed naturally with a typing effect
+- **Multi-route synthesis**: Real-time streaming of synthesis results via Bedrock Converse API
+- **Data queries (aws-data)**: Bedrock native token streaming
+
 ## Model Selection
 
 Select a model from the dropdown in the upper right corner:
