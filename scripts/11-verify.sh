@@ -2,7 +2,7 @@
 set -e
 ################################################################################
 #                                                                              #
-#   Step 9: Verification & Health Check                                        #
+#   Step 11: Verification & Health Check                                       #
 #                                                                              #
 #   Checks:                                                                    #
 #     [1/5] Services   - Steampipe, Next.js                                    #
@@ -23,7 +23,7 @@ ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/nu
 
 echo ""
 echo -e "${CYAN}=================================================================${NC}"
-echo -e "${CYAN}   Step 9: Verification & Health Check${NC}"
+echo -e "${CYAN}   Step 11: Verification & Health Check${NC}"
 echo -e "${CYAN}=================================================================${NC}"
 echo ""
 

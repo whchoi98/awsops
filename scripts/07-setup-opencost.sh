@@ -14,7 +14,7 @@
 
 set -e
 
-REGION="ap-northeast-2"
+REGION="${AWS_DEFAULT_REGION:-$(aws configure get region 2>/dev/null || echo 'ap-northeast-2')}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 CONFIG_FILE="$PROJECT_DIR/data/config.json"
@@ -172,5 +172,5 @@ echo "  2. Restart server: pkill -f 'next-server' && nohup sh -c 'PORT=3000 npm 
 echo "  3. Check EKS Container Cost page for OpenCost data"
 echo ""
 echo "  Note: port-forward stops on EC2 reboot."
-echo "  Use 'bash scripts/08-start-all.sh' to restart all services including port-forward."
+echo "  Use 'bash scripts/09-start-all.sh' to restart all services including port-forward."
 echo ""

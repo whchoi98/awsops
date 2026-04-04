@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================================================
-# AWSops - Step 6e: AgentCore Memory 설정
-# AWSops - Step 6e: AgentCore Memory Setup
+# AWSops - Step 6f: AgentCore Memory 설정
+# AWSops - Step 6f: AgentCore Memory Setup
 #
 #   AgentCore Memory Store를 생성하여 AI 대화 이력을 영구 저장합니다.
 #   Creates AgentCore Memory Store for persistent AI conversation history.
@@ -26,7 +26,7 @@ WORK_DIR="${HOME}/awsops"
 CONFIG_FILE="${WORK_DIR}/data/config.json"
 
 echo -e "${CYAN}=================================================================${NC}"
-echo -e "${CYAN}  AWSops - Step 6e: AgentCore Memory 설정${NC}"
+echo -e "${CYAN}  AWSops - Step 6f: AgentCore Memory 설정${NC}"
 echo -e "${CYAN}=================================================================${NC}"
 echo ""
 echo -e "  계정 / Account:  ${GREEN}${ACCOUNT_ID}${NC}"

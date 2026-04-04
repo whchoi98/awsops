@@ -1,7 +1,7 @@
 #!/bin/bash
 ###############################################################################
-# Step 6f (Interactive): OpenCost Setup with Auto-Detection                   #
-# 단계 6f (대화형): 자동 감지 기반 OpenCost 설치                               #
+# Step 7 (Interactive): OpenCost Setup with Auto-Detection                    #
+# 단계 7 (대화형): 자동 감지 기반 OpenCost 설치                                #
 #                                                                             #
 # Features / 기능:                                                             #
 #   - Auto-detect existing Prometheus installations                           #

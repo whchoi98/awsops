@@ -9,7 +9,7 @@ set -e
 #     bash scripts/install-all.sh                                              #
 #                                                                              #
 #   Runs: Step 1 -> Step 2 -> Step 3 -> Step 11 (verify)                       #
-#   Optional: Steps 5 (Cognito), 6 (AgentCore), 8 (CloudFront Auth)           #
+#   Optional: Steps 4 (EKS), 5 (Cognito), 6 (AgentCore), 7 (OpenCost), 8 (CF)#
 #                                                                              #
 ################################################################################
 
@@ -51,6 +51,7 @@ echo "      Step 6f: Memory Store            (06f-setup-agentcore-memory.sh)"
 echo "      Docker: 재빌드 + Runtime 업데이트  (6e 후 수동 실행)"
 echo "    Step 7:  OpenCost (EKS 비용)       (07-setup-opencost.sh)"
 echo "    Step 8:  CloudFront Lambda@Edge    (08-setup-cloudfront-auth.sh)"
+echo "    Step 12: Multi-Account 설정        (12-setup-multi-account.sh)"
 echo ""
 echo "  운영 스크립트 / Operations:"
 echo "    bash scripts/09-start-all.sh       # 서비스 시작 / Start services"
@@ -147,5 +148,7 @@ echo "  다음 단계 / Next steps:"
 echo "    bash scripts/04-setup-eks-access.sh              # EKS 접근 설정"
 echo "    bash scripts/05-setup-cognito.sh                 # Cognito 인증"
 echo "    bash scripts/06-setup-agentcore.sh               # AgentCore AI (6a→6b→6c→6d→6e→6f)"
+echo "    bash scripts/07-setup-opencost.sh                # Prometheus + OpenCost (EKS 비용)"
 echo "    bash scripts/08-setup-cloudfront-auth.sh         # Lambda@Edge → CloudFront"
+echo "    bash scripts/12-setup-multi-account.sh           # 멀티 어카운트 설정"
 echo ""
