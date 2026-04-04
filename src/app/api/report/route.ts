@@ -508,9 +508,7 @@ export async function GET(request: NextRequest) {
       status: meta.status,
       progress: meta.progress,
       downloadUrl: meta.status === 'completed' ? downloadUrl : undefined,
-      sections: meta.status === 'completed'
-        ? meta.sections.map(s => ({ section: s.section, title: s.title }))
-        : undefined,
+      sections: meta.status === 'completed' ? meta.sections : undefined,
       error: meta.error,
       createdAt: meta.createdAt,
       completedAt: meta.completedAt,

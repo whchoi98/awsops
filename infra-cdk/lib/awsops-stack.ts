@@ -241,6 +241,16 @@ export class AwsopsStack extends cdk.Stack {
       resources: ['*'],
     }));
 
+    // CloudFront + Lambda@Edge management (08-setup-cloudfront-auth.sh)
+    ec2Role.addToPolicy(new iam.PolicyStatement({
+      actions: [
+        'cloudfront:GetDistribution',
+        'cloudfront:GetDistributionConfig',
+        'cloudfront:UpdateDistribution',
+      ],
+      resources: [`arn:aws:cloudfront::${this.account}:distribution/*`],
+    }));
+
     // -------------------------------------------------------
     // EC2 Instance (Private Subnet, ARM64 Graviton by default)
     // -------------------------------------------------------

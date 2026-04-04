@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Filter, ArrowLeft, Cpu, HardDrive, Wifi } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import StatsCard from '@/components/dashboard/StatsCard';
@@ -78,6 +78,8 @@ export default function K8sOverviewPage() {
   const { t, lang } = useLanguage();
   const { currentAccountId } = useAccountContext();
 
+  const fetchDataRef = useRef<((bustCache?: boolean) => Promise<void>) | null>(null);
+
   const [data, setData] = useState<DashboardData>({});
   const [loading, setLoading] = useState(true);
   const [selectedClusters, setSelectedClusters] = useState<Set<string>>(new Set());
@@ -104,8 +106,30 @@ export default function K8sOverviewPage() {
       });
       const result = await res.json();
       if (result.success) {
+        setRegisterResult({ cluster: clusterName, ok: true, msg: lang === 'ko' ? '등록 완료, 연결 확인 중...' : 'Registered, verifying connection...' });
+        // Poll up to 5 times (3s interval) waiting for Steampipe to load the new connection
+        // Steampipe auto-detects .spc file changes but needs a few seconds
+        for (let i = 0; i < 5; i++) {
+          await new Promise(r => setTimeout(r, 3000));
+          try {
+            const probe = await fetch('/awsops/api/steampipe?bustCache=true', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ accountId: currentAccountId, queries: { probe: k8sQ.nodeList } }),
+            });
+            const probeResult = await probe.json();
+            const nodeRows = probeResult.probe?.rows || [];
+            const found = nodeRows.some((n: any) => n.context_name && String(n.context_name).includes(clusterName));
+            if (found) {
+              setRegisterResult({ cluster: clusterName, ok: true, msg: lang === 'ko' ? 'K8s 연결 완료!' : 'K8s Connected!' });
+              fetchDataRef.current?.(true);
+              return;
+            }
+          } catch { /* continue polling */ }
+        }
+        // Polling exhausted — refresh data and show final status
+        fetchDataRef.current?.(true);
         setRegisterResult({ cluster: clusterName, ok: true, msg: result.message });
-        setTimeout(() => fetchData(true), 3000);
       } else {
         setRegisterResult({ cluster: clusterName, ok: false, msg: result.error });
       }
@@ -114,7 +138,7 @@ export default function K8sOverviewPage() {
     } finally {
       setRegisteringCluster(null);
     }
-  }, []);
+  }, [lang, currentAccountId]);
 
   // Fetch ENI data + traffic for selected node / 선택된 노드의 ENI + 트래픽 조회
   const fetchNodeEnis = useCallback(async (nodeName: string) => {
@@ -228,6 +252,8 @@ export default function K8sOverviewPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentAccountId]);
+
+  fetchDataRef.current = fetchData;
 
   // Register EKS Access Entry + ViewPolicy / Access Entry + ViewPolicy 등록
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -734,10 +760,10 @@ export default function K8sOverviewPage() {
                   </div>
                   {/* kubeconfig register button + CLI guide / kubeconfig 등록 버튼 + CLI 가이드 */}
                   {access === 'no-access' && (
-                    <div className="mt-2 pt-2 border-t border-navy-700 space-y-1.5">
+                    <div className="mt-2 pt-2 border-t border-navy-700 space-y-1.5" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => registerKubeconfig(c.cluster_name, c.region || 'ap-northeast-2')}
+                          onClick={(e) => { e.stopPropagation(); registerKubeconfig(c.cluster_name, c.region || 'ap-northeast-2'); }}
                           disabled={registeringCluster === c.cluster_name}
                           className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/30 hover:bg-accent-cyan/20 transition-colors disabled:opacity-50"
                         >

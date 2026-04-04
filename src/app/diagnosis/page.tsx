@@ -73,6 +73,45 @@ const SECTION_ICONS: Record<string, string> = {
   'appendix': '\u{1F4CB}',
 };
 
+// Section sub-topic descriptions for live progress display
+// 섹션별 세부 분석 항목 (실시간 진행 표시용)
+const SECTION_SUBTOPICS: Record<string, { ko: string[]; en: string[] }> = {
+  'cost-overview':          { ko: ['서비스별 비용 집계', '월별 추이 분석', '비용 이상 감지'], en: ['Per-service cost aggregation', 'Monthly trend analysis', 'Cost anomaly detection'] },
+  'cost-compute':           { ko: ['EC2 인스턴스 비용', 'Lambda 실행 비용', 'ECS/Fargate 비용', 'Savings Plans 커버리지'], en: ['EC2 instance costs', 'Lambda execution costs', 'ECS/Fargate costs', 'Savings Plans coverage'] },
+  'cost-network':           { ko: ['Inter-AZ 데이터 전송', 'NAT Gateway 비용', 'Data Transfer Out', 'VPN/TGW 비용'], en: ['Inter-AZ data transfer', 'NAT Gateway costs', 'Data Transfer Out', 'VPN/TGW costs'] },
+  'cost-storage':           { ko: ['S3 스토리지 클래스', 'EBS 볼륨 비용', 'Snapshot 비용', 'Lifecycle 정책'], en: ['S3 storage classes', 'EBS volume costs', 'Snapshot costs', 'Lifecycle policies'] },
+  'idle-resources':         { ko: ['미연결 EBS 스캔', '미사용 EIP 스캔', '중지된 EC2 스캔', '오래된 스냅샷', '미사용 보안그룹'], en: ['Unattached EBS scan', 'Unused EIP scan', 'Stopped EC2 scan', 'Old snapshots', 'Unused security groups'] },
+  'security-posture':       { ko: ['Security Group 분석', 'S3 퍼블릭 접근', 'EBS 암호화', 'IAM 사용자 점검', 'CIS 컴플라이언스'], en: ['Security Group analysis', 'S3 public access', 'EBS encryption', 'IAM user audit', 'CIS compliance'] },
+  'network-architecture':   { ko: ['VPC 구성 분석', '서브넷 설계', 'NAT Gateway 이중화', 'Route Table', 'TGW/Peering'], en: ['VPC architecture', 'Subnet design', 'NAT Gateway redundancy', 'Route tables', 'TGW/Peering'] },
+  'compute-analysis':       { ko: ['EC2 활용률 분석', 'Instance Type 적정성', 'Lambda 메모리 최적화', 'Auto Scaling 설정'], en: ['EC2 utilization', 'Instance type fitness', 'Lambda memory optimization', 'Auto Scaling config'] },
+  'eks-analysis':           { ko: ['EKS 클러스터 구성', '노드풀 분석', 'Pod 리소스 효율', 'Namespace 비용'], en: ['EKS cluster config', 'Node pool analysis', 'Pod resource efficiency', 'Namespace costs'] },
+  'database-analysis':      { ko: ['RDS 인스턴스 분석', 'ElastiCache 노드', 'OpenSearch 도메인', 'Multi-AZ 설정', '스토리지 효율'], en: ['RDS instance analysis', 'ElastiCache nodes', 'OpenSearch domains', 'Multi-AZ setup', 'Storage efficiency'] },
+  'msk-analysis':           { ko: ['MSK 브로커 구성', '처리량 분석', 'EBS 사용량', 'Consumer Lag'], en: ['MSK broker config', 'Throughput analysis', 'EBS usage', 'Consumer lag'] },
+  'storage-analysis':       { ko: ['S3 버킷 구조', 'EBS 타입 분포', '암호화 현황', 'Lifecycle 적용률'], en: ['S3 bucket structure', 'EBS type distribution', 'Encryption status', 'Lifecycle adoption'] },
+  'executive-summary':      { ko: ['전체 섹션 종합', '6 Pillar 점수 산출', '핵심 발견사항 도출'], en: ['Cross-section synthesis', '6 Pillar scoring', 'Key findings extraction'] },
+  'recommendations':        { ko: ['Quick Wins 도출', '단기 로드맵', '중기 로드맵', 'ROI 산출'], en: ['Quick Wins extraction', 'Short-term roadmap', 'Mid-term roadmap', 'ROI calculation'] },
+  'appendix':               { ko: ['리소스 인벤토리 집계'], en: ['Resource inventory aggregation'] },
+};
+
+// Full section names for detailed display
+const SECTION_FULL_NAMES: Record<string, { ko: string; en: string }> = {
+  'cost-overview':        { ko: '비용 개요', en: 'Cost Overview' },
+  'cost-compute':         { ko: '컴퓨팅 비용 분석', en: 'Compute Cost Analysis' },
+  'cost-network':         { ko: '네트워크 비용 분석', en: 'Network Cost Analysis' },
+  'cost-storage':         { ko: '스토리지 비용 분석', en: 'Storage Cost Analysis' },
+  'idle-resources':       { ko: '유휴 리소스 스캔', en: 'Idle Resource Scan' },
+  'security-posture':     { ko: '보안 진단', en: 'Security Posture' },
+  'network-architecture': { ko: '네트워크 아키텍처 분석', en: 'Network Architecture' },
+  'compute-analysis':     { ko: '컴퓨팅 최적화 분석', en: 'Compute Optimization' },
+  'eks-analysis':         { ko: 'EKS 클러스터 분석', en: 'EKS Cluster Analysis' },
+  'database-analysis':    { ko: '데이터베이스 분석', en: 'Database Analysis' },
+  'msk-analysis':         { ko: 'MSK 스트리밍 분석', en: 'MSK Streaming Analysis' },
+  'storage-analysis':     { ko: '스토리지 분석', en: 'Storage Analysis' },
+  'executive-summary':    { ko: '종합 요약 (AI 종합)', en: 'Executive Summary (AI Synthesis)' },
+  'recommendations':      { ko: '개선 로드맵 (AI 종합)', en: 'Improvement Roadmap (AI Synthesis)' },
+  'appendix':             { ko: '부록: 인벤토리', en: 'Appendix: Inventory' },
+};
+
 const POLL_INTERVAL = 5000;
 
 // --- Helpers ---
@@ -330,7 +369,8 @@ export default function DiagnosisPage() {
 
   // --- Severity icon for section content ---
 
-  const getSeverityIcon = (content: string) => {
+  const getSeverityIcon = (content: string | undefined) => {
+    if (!content) return <CheckCircle size={16} className="text-gray-600" />;
     const critCount = (content.match(/critical|심각|긴급/gi) || []).length;
     const warnCount = (content.match(/warning|주의|경고/gi) || []).length;
     if (critCount > 2) return <XCircle size={16} className="text-red-400" />;
@@ -377,8 +417,14 @@ export default function DiagnosisPage() {
           <div className="flex items-center gap-3 text-sm">
             <span className="text-gray-400">
               {progress.current}/{progress.total}
-              {progress.currentSection && (
-                <> — {progress.currentSection} {isEn ? 'analyzing...' : '분석 중...'}</>
+              {progress.currentSection && progress.currentSection !== 'data-collection' && progress.currentSection !== 'generating-pptx' && (
+                <> — {SECTION_ICONS[progress.currentSection] || ''} {(isEn ? SECTION_FULL_NAMES[progress.currentSection]?.en : SECTION_FULL_NAMES[progress.currentSection]?.ko) || progress.currentSection} {isEn ? 'analyzing...' : '분석 중...'}</>
+              )}
+              {progress.currentSection === 'data-collection' && (
+                <> — {isEn ? 'Collecting data...' : '데이터 수집 중...'}</>
+              )}
+              {progress.currentSection === 'generating-pptx' && (
+                <> — {isEn ? 'Creating PPTX...' : 'PPTX 생성 중...'}</>
               )}
             </span>
             <span className="text-accent-cyan font-mono">{formatElapsed(elapsedTime)}</span>
@@ -421,7 +467,49 @@ export default function DiagnosisPage() {
             />
           </div>
 
-          {/* Section checklist */}
+          {/* Active section detail panel */}
+          {progress.currentSection && progress.currentSection !== 'data-collection' && progress.currentSection !== 'generating-pptx' && (
+            <div className="bg-navy-900/50 border border-accent-cyan/20 rounded-lg p-3 mb-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Loader2 size={14} className="animate-spin text-accent-cyan" />
+                <span className="text-accent-cyan font-medium text-sm">
+                  {SECTION_ICONS[progress.currentSection] || ''} {(isEn ? SECTION_FULL_NAMES[progress.currentSection]?.en : SECTION_FULL_NAMES[progress.currentSection]?.ko) || progress.currentSection}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 ml-6">
+                {(isEn ? SECTION_SUBTOPICS[progress.currentSection]?.en : SECTION_SUBTOPICS[progress.currentSection]?.ko)?.map((topic, i) => (
+                  <span key={i} className="text-[11px] text-gray-400 flex items-center gap-1">
+                    <span className="text-accent-cyan/60">&#x2022;</span> {topic}
+                  </span>
+                )) || null}
+              </div>
+            </div>
+          )}
+          {progress.currentSection === 'data-collection' && (
+            <div className="bg-navy-900/50 border border-accent-cyan/20 rounded-lg p-3 mb-3">
+              <div className="flex items-center gap-2">
+                <Loader2 size={14} className="animate-spin text-accent-cyan" />
+                <span className="text-accent-cyan font-medium text-sm">
+                  {isEn ? 'Collecting infrastructure data from Steampipe...' : 'Steampipe에서 인프라 데이터 수집 중...'}
+                </span>
+              </div>
+              {progress.statusMessage && (
+                <div className="ml-6 mt-1 text-[11px] text-gray-400">{progress.statusMessage}</div>
+              )}
+            </div>
+          )}
+          {progress.currentSection === 'generating-pptx' && (
+            <div className="bg-navy-900/50 border border-accent-purple/20 rounded-lg p-3 mb-3">
+              <div className="flex items-center gap-2">
+                <Loader2 size={14} className="animate-spin text-accent-purple" />
+                <span className="text-accent-purple font-medium text-sm">
+                  {isEn ? 'Generating PPTX report file...' : 'PPTX 리포트 파일 생성 중...'}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Section checklist — compact grid */}
           <div className="grid grid-cols-3 md:grid-cols-5 gap-1.5 text-xs">
             {Object.entries(SECTION_ICONS).map(([key, icon]) => {
               const done = progress.completedSections?.includes(key);
@@ -429,9 +517,10 @@ export default function DiagnosisPage() {
               return (
                 <div
                   key={key}
-                  className={`flex items-center gap-1.5 px-2 py-1.5 rounded ${
+                  title={(isEn ? SECTION_FULL_NAMES[key]?.en : SECTION_FULL_NAMES[key]?.ko) || key}
+                  className={`flex items-center gap-1.5 px-2 py-1.5 rounded transition-colors ${
                     done ? 'bg-accent-green/10 text-accent-green' :
-                    active ? 'bg-accent-cyan/10 text-accent-cyan' :
+                    active ? 'bg-accent-cyan/15 text-accent-cyan ring-1 ring-accent-cyan/30' :
                     'bg-navy-700/50 text-gray-600'
                   }`}
                 >
@@ -441,14 +530,6 @@ export default function DiagnosisPage() {
               );
             })}
           </div>
-
-          {/* Current activity detail */}
-          {progress.statusMessage && (
-            <div className="mt-3 text-xs text-gray-400 flex items-center gap-2">
-              <span className="text-accent-cyan">{'>'}</span>
-              {progress.statusMessage}
-            </div>
-          )}
         </div>
       )}
 

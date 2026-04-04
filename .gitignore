@@ -84,3 +84,6 @@ powerpipe/.mod.cache.json
 data/config.json
 data/agentcore-stats.json
 data/memory/
+
+# reports (auto-generated)
+reports/
