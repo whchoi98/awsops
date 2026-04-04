@@ -181,8 +181,8 @@ const DEFAULT_HOURLY_RATE = 0.236; // 매칭 실패 시 m5.xlarge 기준
 ### OpenCost 설치
 
 ```bash
-# scripts/06f-setup-opencost.sh 실행
-bash scripts/06f-setup-opencost.sh
+# scripts/07-setup-opencost.sh 실행
+bash scripts/07-setup-opencost.sh
 
 # 설치 내용: Metrics Server → Prometheus → OpenCost
 # 설치 후 data/config.json에 엔드포인트 추가:
@@ -367,7 +367,7 @@ async function simulateStreaming(content, send) {
 현재 AWSops에서 AlertManager는 **비활성화** 상태입니다:
 
 ```bash
-# scripts/06f-setup-opencost.sh
+# scripts/07-setup-opencost.sh
 helm install prometheus prometheus-community/prometheus \
   --set alertmanager.enabled=false   # ← 명시적 비활성화
 ```
@@ -383,7 +383,7 @@ Prometheus는 OpenCost의 메트릭 수집용으로만 설치되어 있습니다
 
 **Step 1. AlertManager 활성화**
 
-`scripts/06f-setup-opencost.sh` 수정:
+`scripts/07-setup-opencost.sh` 수정:
 ```bash
 helm upgrade prometheus prometheus-community/prometheus \
   --set alertmanager.enabled=true
@@ -739,7 +739,7 @@ export function getUserFromRequest(request: NextRequest): UserInfo {
 
 ### 현재 설치 상태
 
-`scripts/06f-setup-opencost.sh`로 설치된 Prometheus 구성:
+`scripts/07-setup-opencost.sh`로 설치된 Prometheus 구성:
 
 ```bash
 helm install prometheus prometheus-community/prometheus \

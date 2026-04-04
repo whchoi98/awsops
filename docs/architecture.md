@@ -69,10 +69,10 @@ AWSops Dashboard is an AWS + Kubernetes operations dashboard providing real-time
 | 6b | `06b-setup-agentcore-gateway.sh` | 8 AgentCore Gateways (role-based MCP routing) |
 | 6c | `06c-setup-agentcore-tools.sh` | 19 Lambda + create_targets.py → 125 MCP tools |
 | 6d | `06d-setup-agentcore-interpreter.sh` | Code Interpreter |
-| 6e | `06e-setup-agentcore-memory.sh` | Memory Store (대화 이력 365일 보관) |
-| 6f | `06f-setup-opencost.sh` | Prometheus + OpenCost (EKS 비용 분석) |
-| 7 | `07-setup-cloudfront-auth.sh` | Lambda@Edge → CloudFront 연동 |
-| 11 | `11-setup-multi-account.sh` | Multi-Account (Target account IAM role + Steampipe connection) |
+| 6f | `06f-setup-agentcore-memory.sh` | Memory Store (대화 이력 365일 보관) |
+| 7 | `07-setup-opencost.sh` | Prometheus + OpenCost (EKS 비용 분석) |
+| 8 | `08-setup-cloudfront-auth.sh` | Lambda@Edge → CloudFront 연동 |
+| 12 | `12-setup-multi-account.sh` | Multi-Account (Target account IAM role + Steampipe connection) |
 
 ## AgentCore Gateway Architecture
 

@@ -68,7 +68,7 @@ connection "aws_222222222222" {
 
 - Target accounts: CloudFormation template (`infra-cdk/cfn-target-account-role.yaml`) deploys `AWSopsReadOnlyRole` with `ReadOnlyAccess`
 - Trust policy: host account ID + optional external ID (prevents confused deputy when configured)
-- Setup script: `scripts/11-setup-multi-account.sh` manages account lifecycle (init/add/remove/apply/verify)
+- Setup script: `scripts/12-setup-multi-account.sh` manages account lifecycle (init/add/remove/apply/verify)
 
 ### AI Integration
 
@@ -111,7 +111,7 @@ The IAM role name was previously hardcoded as `AWSopsReadOnlyRole` across all 15
 
 ### Negative / Trade-offs
 - Aggregator queries are slower (~N accounts x single-account time)
-- Steampipe restart required when adding/removing accounts (`11-setup-multi-account.sh apply`)
+- Steampipe restart required when adding/removing accounts (`12-setup-multi-account.sh apply`)
 - Kubernetes/Trivy tables don't support multi-account (EKS cluster is per-host-account)
 - Cache memory increases linearly with account count (mitigated by 5min TTL)
 - Cost queries in "All Accounts" mode execute sequentially per account (mitigated by async parallel execution)

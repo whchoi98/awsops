@@ -283,6 +283,35 @@ if gw:
             ('list_budgets', 'List budgets', {'type': 'object', 'properties': {}}),
         ]])
 
+    create_target(gw, 'finops-mcp-target', 'awsops-finops-mcp',
+        'FinOps Optimization - Compute Optimizer, RI/SP Recommendations, Cost Optimization Hub, Trusted Advisor (5 tools)',
+        [{'name': n, 'description': d, 'inputSchema': s} for n, d, s in [
+            ('get_rightsizing_recommendations', 'EC2/RDS/ECS/Lambda rightsizing recommendations from Compute Optimizer',
+                {'type': 'object', 'properties': {'resource_type': prop('string', 'all, ec2, rds, ecs, or lambda')}}),
+            ('get_savings_plans_recommendations', 'Savings Plans purchase recommendations from Cost Explorer',
+                {'type': 'object', 'properties': {
+                    'savings_plan_type': prop('string', 'COMPUTE_SP or EC2_INSTANCE_SP'),
+                    'term': prop('string', 'ONE_YEAR or THREE_YEARS'),
+                    'payment_option': prop('string', 'NO_UPFRONT, PARTIAL_UPFRONT, or ALL_UPFRONT'),
+                }}),
+            ('get_reserved_instance_recommendations', 'Reserved Instance purchase recommendations from Cost Explorer',
+                {'type': 'object', 'properties': {
+                    'service': prop('string', 'e.g. Amazon Elastic Compute Cloud - Compute, Amazon RDS, Amazon ElastiCache'),
+                    'term': prop('string', 'ONE_YEAR or THREE_YEARS'),
+                    'payment_option': prop('string', 'NO_UPFRONT, PARTIAL_UPFRONT, or ALL_UPFRONT'),
+                }}),
+            ('get_cost_optimization_hub_recommendations', 'Unified optimization recommendations across all AWS services from Cost Optimization Hub',
+                {'type': 'object', 'properties': {
+                    'action_type': prop('string', 'Rightsize, Stop, Upgrade, PurchaseSavingsPlans, PurchaseReservedInstances, MigrateToGraviton'),
+                    'resource_type': prop('string', 'Ec2Instance, RdsDbInstance, LambdaFunction, EcsService, ElastiCacheReservedInstances'),
+                    'max_results': prop('string', 'Max results (default 50, max 100)'),
+                }}),
+            ('get_trusted_advisor_cost_checks', 'Cost optimization checks from AWS Trusted Advisor',
+                {'type': 'object', 'properties': {
+                    'category': prop('string', 'cost_optimizing (default), security, fault_tolerance, performance'),
+                }}),
+        ]])
+
 # ========== OPS GATEWAY ==========
 print('\n=== Ops Gateway ===')
 gw = find_gateway('ops-gateway')

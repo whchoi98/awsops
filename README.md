@@ -256,17 +256,17 @@ bash scripts/06-setup-agentcore.sh           # 6a->6b->6c->6d->6e batch
   # bash scripts/06d-setup-agentcore-interpreter.sh  # Code Interpreter
   # bash scripts/06e-setup-agentcore-config.sh       # Runtime config
 
-# Step 7: Lambda@Edge -> CloudFront integration
+# Step 8: Lambda@Edge -> CloudFront integration
 # Lambda@Edge -> CloudFront 연동
-bash scripts/07-setup-cloudfront-auth.sh
+bash scripts/08-setup-cloudfront-auth.sh
 ```
 
 ### 운영
 
 ```bash
-bash scripts/08-start-all.sh    # Start + status + URLs
-bash scripts/09-stop-all.sh     # Stop all services
-bash scripts/10-verify.sh       # Health check
+bash scripts/09-start-all.sh    # Start + status + URLs
+bash scripts/10-stop-all.sh     # Stop all services
+bash scripts/11-verify.sh       # Health check
 ```
 
 ---
@@ -333,13 +333,13 @@ awsops/
 │   ├── 05-setup-cognito.sh       # Step 5: Cognito auth
 │   ├── 06-setup-agentcore.sh     # Step 6: Wrapper (6a->6b->6c->6d->6e)
 │   ├── 06a~06e-setup-agentcore-* # Step 6a-6e: AgentCore (split)
-│   ├── 06e-setup-agentcore-memory.sh  # Step 6e: Memory Store (365-day retention)
-│   ├── 06f-setup-opencost.sh           # Step 6f: Prometheus + OpenCost (EKS cost)
-│   ├── 07-setup-cloudfront-auth.sh # Step 7: Lambda@Edge
-│   ├── 11-setup-multi-account.sh  # Step 11: Multi-account setup
-│   ├── 08-start-all.sh           # Start all services
-│   ├── 09-stop-all.sh            # Stop all services
-│   ├── 10-verify.sh              # Health check
+│   ├── 06f-setup-agentcore-memory.sh  # Step 6f: Memory Store (365-day retention)
+│   ├── 07-setup-opencost.sh            # Step 7: Prometheus + OpenCost (EKS cost)
+│   ├── 08-setup-cloudfront-auth.sh # Step 8: Lambda@Edge
+│   ├── 12-setup-multi-account.sh  # Step 12: Multi-account setup
+│   ├── 09-start-all.sh           # Start all services
+│   ├── 10-stop-all.sh            # Stop all services
+│   ├── 11-verify.sh              # Health check
 │   ├── install-all.sh            # Auto: 01->02->03->10
 │   └── ARCHITECTURE.md           # Full architecture documentation
 ├── docs/                         # Guides + Troubleshooting

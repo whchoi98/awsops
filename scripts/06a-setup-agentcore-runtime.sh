@@ -37,6 +37,18 @@ run_or_fail() {
     echo "$output"
 }
 
+# -- Pre-flight: Docker check / Docker 사전 체크 --------------------------------
+if ! command -v docker &>/dev/null; then
+    echo -e "${RED}ERROR: Docker not installed. CDK UserData should install Docker automatically.${NC}"
+    echo -e "${YELLOW}Fix: sudo dnf install -y docker && sudo systemctl start docker${NC}"
+    exit 1
+fi
+if ! docker info &>/dev/null; then
+    echo -e "${RED}ERROR: Docker daemon not running.${NC}"
+    echo -e "${YELLOW}Fix: sudo systemctl start docker${NC}"
+    exit 1
+fi
+
 # -- Preflight: verify AWS credentials / AWS 자격 증명 확인 -------------------
 echo ""
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>&1) || {

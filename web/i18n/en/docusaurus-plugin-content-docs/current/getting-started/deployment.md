@@ -111,29 +111,21 @@ bash scripts/06-setup-agentcore.sh
 | `06c-setup-agentcore-tools.sh` | 19 Lambda + register 125 tools across 8 Gateways |
 | `06d-setup-agentcore-interpreter.sh` | Create Code Interpreter |
 | `06e-setup-agentcore-config.sh` | Auto-configure `route.ts` / `agent.py` (ARNs, Gateway URLs, etc.) |
-| `06e-setup-agentcore-memory.sh` | Create Memory Store (365-day retention) — **must be run manually** |
-| `06f-setup-opencost.sh` | Prometheus + OpenCost (EKS cost analysis) |
+| `06f-setup-agentcore-memory.sh` | Create Memory Store (365-day retention) — **must be run manually** |
+| `07-setup-opencost.sh` | Prometheus + OpenCost (EKS cost analysis) |
 
-:::warning 06e file naming conflict
-Two files share the `06e` prefix: `06e-setup-agentcore-config.sh` and `06e-setup-agentcore-memory.sh`. The wrapper script (`06-setup-agentcore.sh`) only runs the config step, so Memory Store creation must be run separately:
-
-```bash
-bash scripts/06e-setup-agentcore-memory.sh
-```
-:::
-
-### Step 7: CloudFront Auth Integration (EC2)
+### Step 8: CloudFront Auth Integration (EC2)
 
 ```bash
-bash scripts/07-setup-cloudfront-auth.sh
+bash scripts/08-setup-cloudfront-auth.sh
 ```
 
 Connects Lambda@Edge to CloudFront viewer-request.
 
-### Step 8: Start All Services (EC2)
+### Step 9: Start All Services (EC2)
 
 ```bash
-bash scripts/08-start-all.sh
+bash scripts/09-start-all.sh
 ```
 
 Starts the following services in sequence:
@@ -141,18 +133,18 @@ Starts the following services in sequence:
 - **Next.js** production server (port 3000)
 - **OpenCost** (EKS cost analysis, if EKS is configured)
 
-### Step 9: Stop All Services (EC2)
+### Step 10: Stop All Services (EC2)
 
 ```bash
-bash scripts/09-stop-all.sh
+bash scripts/10-stop-all.sh
 ```
 
 Gracefully stops all running AWSops services. Use for maintenance or updates.
 
-### Step 10: Verify & Health Check (EC2)
+### Step 11: Verify & Health Check (EC2)
 
 ```bash
-bash scripts/10-verify.sh
+bash scripts/11-verify.sh
 ```
 
 Performs a 5-stage automated verification:
@@ -163,13 +155,13 @@ Performs a 5-stage automated verification:
 5. **Config file** — `data/config.json` validity check
 
 :::tip Required after deployment
-Run `10-verify.sh` after Step 3 or any update to confirm all components are healthy. It is also included in `install-all.sh`.
+Run `11-verify.sh` after Step 3 or any update to confirm all components are healthy. It is also included in `install-all.sh`.
 :::
 
-### Step 11: Multi-Account Setup (EC2, Optional)
+### Step 12: Multi-Account Setup (EC2, Optional)
 
 ```bash
-bash scripts/11-setup-multi-account.sh
+bash scripts/12-setup-multi-account.sh
 ```
 
 Configures multiple AWS accounts to be managed from a single AWSops instance:
@@ -223,10 +215,10 @@ For per-account deployment, just update `data/config.json`. No source code chang
 
 :::warning Deployment caveats
 
-**1. `06e` file naming conflict**
-`06e-setup-agentcore-config.sh` and `06e-setup-agentcore-memory.sh` share the same prefix. Memory Store creation is not included in the wrapper script, so it must be run manually:
+**1. Memory Store must be run manually**
+`06f-setup-agentcore-memory.sh` is not included in the wrapper script (`06-setup-agentcore.sh`), so it must be run manually:
 ```bash
-bash scripts/06e-setup-agentcore-memory.sh
+bash scripts/06f-setup-agentcore-memory.sh
 ```
 
 **2. systemd service configuration**

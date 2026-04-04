@@ -107,10 +107,9 @@ echo -e "${CYAN}[4/4] Detecting account type (Direct Payer vs MSP Payer)...${NC}
 mkdir -p "$WORK_DIR/data"
 CONFIG_FILE="$WORK_DIR/data/config.json"
 
-COST_RESULT=$(PGPASSWORD="$SP_PASSWORD" psql -h localhost -p 9193 -U steampipe -d steampipe \
-  -c "SELECT 1 FROM aws_cost_by_service_monthly LIMIT 1" -t -A 2>&1 || echo "COST_FAIL")
+COST_RESULT=$(steampipe query "SELECT 1 FROM aws_cost_by_service_monthly LIMIT 1" --output csv 2>&1 || echo "COST_FAIL")
 
-if echo "$COST_RESULT" | grep -q "^1$"; then
+if echo "$COST_RESULT" | grep -q "1"; then
     python3 -c "
 import json, os
 cfg = json.load(open('${CONFIG_FILE}')) if os.path.exists('${CONFIG_FILE}') else {}

@@ -12,6 +12,7 @@
 - `agentcore-stats.ts` — AgentCore 호출 통계 + 모델별 토큰 사용량 추적 (data/agentcore-stats.json)
 - `agentcore-memory.ts` — 대화 이력 저장/검색, 사용자별 분리 (data/memory/)
 - `auth-utils.ts` — Cognito JWT에서 사용자 정보 추출 (Lambda@Edge 검증 후 payload 디코딩)
+- `eks-optimize-queries.ts` — EKS 리소스 최적화 (Prometheus 메트릭 디스커버리 + K8s 리소스 수집 + 비용 분석 프롬프트)
 - `queries/*.ts` — 25개 SQL 쿼리 파일 (ebs, msk, opensearch, container-cost, eks-container-cost, bedrock 포함)
 
 ## 규칙
@@ -39,6 +40,7 @@ Core libraries: Steampipe database connection, SQL query definitions, inventory,
 - `agentcore-stats.ts` — AgentCore call stats + per-model token usage tracking (data/agentcore-stats.json)
 - `agentcore-memory.ts` — Conversation history save/search, per-user isolation (data/memory/)
 - `auth-utils.ts` — Extract Cognito user from JWT (payload decode after Lambda@Edge verification)
+- `eks-optimize-queries.ts` — EKS resource optimization (Prometheus metric discovery + K8s resource collection + cost analysis prompt)
 - `queries/*.ts` — 25 SQL query files (incl. ebs, msk, opensearch, container-cost, eks-container-cost, bedrock)
 
 ## Rules

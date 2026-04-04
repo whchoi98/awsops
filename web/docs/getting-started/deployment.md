@@ -111,29 +111,21 @@ bash scripts/06-setup-agentcore.sh
 | `06c-setup-agentcore-tools.sh` | 19 Lambda + 8 Gateway에 125 도구 등록 |
 | `06d-setup-agentcore-interpreter.sh` | Code Interpreter 생성 |
 | `06e-setup-agentcore-config.sh` | `route.ts` / `agent.py` 자동 설정 (ARN, Gateway URL 등) |
-| `06e-setup-agentcore-memory.sh` | Memory Store 생성 (365일 보관) — **수동 실행 필요** |
-| `06f-setup-opencost.sh` | Prometheus + OpenCost (EKS 비용 분석) |
+| `06f-setup-agentcore-memory.sh` | Memory Store 생성 (365일 보관) — **수동 실행 필요** |
+| `07-setup-opencost.sh` | Prometheus + OpenCost (EKS 비용 분석) |
 
-:::warning 06e 파일 네이밍 충돌
-`06e-setup-agentcore-config.sh`와 `06e-setup-agentcore-memory.sh` 두 파일이 같은 `06e` 접두사를 공유합니다. 래퍼 스크립트(`06-setup-agentcore.sh`)는 config만 실행하므로, Memory Store는 반드시 별도로 수동 실행해야 합니다:
-
-```bash
-bash scripts/06e-setup-agentcore-memory.sh
-```
-:::
-
-### Step 7: CloudFront 인증 연동 (EC2)
+### Step 8: CloudFront 인증 연동 (EC2)
 
 ```bash
-bash scripts/07-setup-cloudfront-auth.sh
+bash scripts/08-setup-cloudfront-auth.sh
 ```
 
 Lambda@Edge를 CloudFront viewer-request에 연결.
 
-### Step 8: 서비스 시작 (EC2)
+### Step 9: 서비스 시작 (EC2)
 
 ```bash
-bash scripts/08-start-all.sh
+bash scripts/09-start-all.sh
 ```
 
 다음 서비스를 순차적으로 시작합니다:
@@ -141,18 +133,18 @@ bash scripts/08-start-all.sh
 - **Next.js** 프로덕션 서버 (port 3000)
 - **OpenCost** (EKS 비용 분석, EKS가 설정된 경우)
 
-### Step 9: 서비스 중지 (EC2)
+### Step 10: 서비스 중지 (EC2)
 
 ```bash
-bash scripts/09-stop-all.sh
+bash scripts/10-stop-all.sh
 ```
 
 실행 중인 모든 AWSops 서비스를 안전하게 중지합니다. 유지보수 또는 업데이트 시 사용합니다.
 
-### Step 10: 검증 및 헬스 체크 (EC2)
+### Step 11: 검증 및 헬스 체크 (EC2)
 
 ```bash
-bash scripts/10-verify.sh
+bash scripts/11-verify.sh
 ```
 
 5단계 자동 검증을 수행합니다:
@@ -163,13 +155,13 @@ bash scripts/10-verify.sh
 5. **설정 파일** — `data/config.json` 유효성 검증
 
 :::tip 배포 후 필수
-Step 3 이후 또는 업데이트 후 `10-verify.sh`를 실행하여 모든 구성 요소가 정상인지 확인하세요. `install-all.sh`에도 포함되어 있습니다.
+Step 3 이후 또는 업데이트 후 `11-verify.sh`를 실행하여 모든 구성 요소가 정상인지 확인하세요. `install-all.sh`에도 포함되어 있습니다.
 :::
 
-### Step 11: 멀티 어카운트 설정 (EC2, 선택)
+### Step 12: 멀티 어카운트 설정 (EC2, 선택)
 
 ```bash
-bash scripts/11-setup-multi-account.sh
+bash scripts/12-setup-multi-account.sh
 ```
 
 여러 AWS 계정을 하나의 AWSops 인스턴스에서 관리하기 위한 설정입니다:
@@ -223,10 +215,10 @@ bash scripts/11-setup-multi-account.sh
 
 :::warning 배포 시 주의사항
 
-**1. `06e` 파일 네이밍 충돌**
-`06e-setup-agentcore-config.sh`와 `06e-setup-agentcore-memory.sh`가 같은 접두사를 사용합니다. Memory Store 생성은 래퍼 스크립트에 포함되지 않으므로 반드시 수동 실행하세요:
+**1. Memory Store 수동 실행 필요**
+`06f-setup-agentcore-memory.sh`는 래퍼 스크립트(`06-setup-agentcore.sh`)에 포함되지 않으므로 반드시 수동 실행하세요:
 ```bash
-bash scripts/06e-setup-agentcore-memory.sh
+bash scripts/06f-setup-agentcore-memory.sh
 ```
 
 **2. systemd 서비스 설정**

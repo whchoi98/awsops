@@ -51,6 +51,7 @@
   "sidebar.dashboard": "대시보드",
   "sidebar.aiAssistant": "AI 어시스턴트",
   "sidebar.agentcore": "AgentCore",
+  "sidebar.diagnosis": "종합진단",
   "sidebar.accounts": "계정 관리",
   "sidebar.compute": "컴퓨팅",
   "sidebar.ec2": "EC2",

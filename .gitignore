@@ -1,9 +1,12 @@
+# sample files
+*.pptx
+
 # dependencies
 node_modules/
 /.pnp
 .pnp.js
 .yarn/install-state.gz
-
+.sensitive/
 # next.js
 /.next/
 /out/

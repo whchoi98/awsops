@@ -56,4 +56,4 @@ const fetchData = useCallback(async (bustCache = false) => {
 
 ### 3. 검증 / Verify
 - `npm run build` 통과 확인 (`npm run build` passes)
-- `bash scripts/09-verify.sh`에서 새로운 실패 없음 확인 (`bash scripts/09-verify.sh` shows no new failures)
+- `bash scripts/11-verify.sh`에서 새로운 실패 없음 확인 (`bash scripts/11-verify.sh` shows no new failures)

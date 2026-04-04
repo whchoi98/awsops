@@ -125,7 +125,7 @@ Steampipe, Next.js 14, Amazon Bedrock AgentCore로 구축.
   ]
 }
 ```
-계정별 배포 시 이 파일만 변경 — 코드 수정 불필요. `accounts` 배열은 `scripts/11-setup-multi-account.sh`로 관리.
+계정별 배포 시 이 파일만 변경 — 코드 수정 불필요. `accounts` 배열은 `scripts/12-setup-multi-account.sh`로 관리.
 
 ## 배포 스크립트 (11단계)
 ```
@@ -138,10 +138,14 @@ Step 6a: 06a-setup-agentcore-runtime.sh  Runtime (IAM, ECR, Docker, Endpoint)
 Step 6b: 06b-setup-agentcore-gateway.sh  8 Gateway (MCP)
 Step 6c: 06c-setup-agentcore-tools.sh    19 Lambda + 8 Gateway, 125 도구
 Step 6d: 06d-setup-agentcore-interpreter.sh  Code Interpreter
-Step 6e: 06e-setup-agentcore-memory.sh   Memory Store (대화 이력, 365일 보관)
-Step 6f: 06f-setup-opencost.sh           Prometheus + OpenCost (EKS 비용 분석)
-Step 7:  07-setup-cloudfront-auth.sh     Lambda@Edge → CloudFront 연동
-Step 11: 11-setup-multi-account.sh       멀티 어카운트 설정 (선택, Aggregator + 교차 계정 IAM 역할)
+Step 6e: 06e-setup-agentcore-config.sh   AgentCore 설정 적용 (ARN, Gateway URL)
+Step 6f: 06f-setup-agentcore-memory.sh   Memory Store (대화 이력, 365일 보관)
+Step 7:  07-setup-opencost.sh            Prometheus + OpenCost (EKS 비용 분석)
+Step 8:  08-setup-cloudfront-auth.sh     Lambda@Edge → CloudFront 연동
+Step 9:  09-start-all.sh                 전체 서비스 시작
+Step 10: 10-stop-all.sh                  전체 서비스 중지
+Step 11: 11-verify.sh                    검증 (헬스체크)
+Step 12: 12-setup-multi-account.sh       멀티 어카운트 설정 (선택, Aggregator + 교차 계정 IAM 역할)
 ```
 
 ## AgentCore 알려진 이슈
@@ -295,7 +299,7 @@ AWS + Kubernetes operations dashboard with real-time resource monitoring, networ
   ]
 }
 ```
-Per-account deployment: only change this file — no code changes needed. `accounts` array managed by `scripts/11-setup-multi-account.sh`.
+Per-account deployment: only change this file — no code changes needed. `accounts` array managed by `scripts/12-setup-multi-account.sh`.
 
 ## Deployment Scripts (11 Steps)
 ```
@@ -308,10 +312,14 @@ Step 6a: 06a-setup-agentcore-runtime.sh  Runtime (IAM, ECR, Docker, Endpoint)
 Step 6b: 06b-setup-agentcore-gateway.sh  8 Gateways (MCP)
 Step 6c: 06c-setup-agentcore-tools.sh    19 Lambda + 8 Gateways, 125 tools
 Step 6d: 06d-setup-agentcore-interpreter.sh  Code Interpreter
-Step 6e: 06e-setup-agentcore-memory.sh   Memory Store (conversation history, 365-day retention)
-Step 6f: 06f-setup-opencost.sh           Prometheus + OpenCost (EKS cost analysis)
-Step 7:  07-setup-cloudfront-auth.sh     Lambda@Edge → CloudFront integration
-Step 11: 11-setup-multi-account.sh       Multi-account setup (optional, Aggregator + cross-account IAM role)
+Step 6e: 06e-setup-agentcore-config.sh   AgentCore config apply (ARN, Gateway URL)
+Step 6f: 06f-setup-agentcore-memory.sh   Memory Store (conversation history, 365-day retention)
+Step 7:  07-setup-opencost.sh            Prometheus + OpenCost (EKS cost analysis)
+Step 8:  08-setup-cloudfront-auth.sh     Lambda@Edge → CloudFront integration
+Step 9:  09-start-all.sh                 Start all services
+Step 10: 10-stop-all.sh                  Stop all services
+Step 11: 11-verify.sh                    Verification (health check)
+Step 12: 12-setup-multi-account.sh       Multi-account setup (optional, Aggregator + cross-account IAM role)
 ```
 
 ## AgentCore Known Issues

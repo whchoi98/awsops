@@ -8,8 +8,8 @@ set -e
 #   Usage:                                                                     #
 #     bash scripts/install-all.sh                                              #
 #                                                                              #
-#   Runs: Step 1 -> Step 2 -> Step 3 -> Step 9 (verify)                        #
-#   Optional: Steps 5 (Cognito), 6 (AgentCore), 7 (CloudFront Auth)           #
+#   Runs: Step 1 -> Step 2 -> Step 3 -> Step 11 (verify)                       #
+#   Optional: Steps 5 (Cognito), 6 (AgentCore), 8 (CloudFront Auth)           #
 #                                                                              #
 ################################################################################
 
@@ -36,7 +36,7 @@ echo "  Steps to run:"
 echo "    [1/4] Steampipe + Plugins + Powerpipe     (01-install-base.sh)"
 echo "    [2/4] Next.js + Steampipe Service          (02-setup-nextjs.sh)"
 echo "    [3/4] Production Build + Deploy            (03-build-deploy.sh)"
-echo "    [4/4] Verification                         (10-verify.sh)"
+echo "    [4/4] Verification                         (11-verify.sh)"
 echo ""
 echo "  선택 단계 (개별 실행) / Optional (run separately):"
 echo "    Step 4:  EKS 접근 설정              (04-setup-eks-access.sh)"
@@ -47,13 +47,15 @@ echo "      Step 6b: 8 Gateways              (06b-setup-agentcore-gateway.sh)"
 echo "      Step 6c: 19 Lambda + 19 Targets  (06c-setup-agentcore-tools.sh)"
 echo "      Step 6d: Code Interpreter        (06d-setup-agentcore-interpreter.sh)"
 echo "      Step 6e: 설정 적용 + 리빌드       (06e-setup-agentcore-config.sh)"
+echo "      Step 6f: Memory Store            (06f-setup-agentcore-memory.sh)"
 echo "      Docker: 재빌드 + Runtime 업데이트  (6e 후 수동 실행)"
-echo "    Step 7:  CloudFront Lambda@Edge    (07-setup-cloudfront-auth.sh)"
+echo "    Step 7:  OpenCost (EKS 비용)       (07-setup-opencost.sh)"
+echo "    Step 8:  CloudFront Lambda@Edge    (08-setup-cloudfront-auth.sh)"
 echo ""
 echo "  운영 스크립트 / Operations:"
-echo "    bash scripts/08-start-all.sh       # 서비스 시작 / Start services"
-echo "    bash scripts/09-stop-all.sh        # 서비스 중지 / Stop services"
-echo "    bash scripts/10-verify.sh          # 검증 (46항목) / Health check"
+echo "    bash scripts/09-start-all.sh       # 서비스 시작 / Start services"
+echo "    bash scripts/10-stop-all.sh        # 서비스 중지 / Stop services"
+echo "    bash scripts/11-verify.sh          # 검증 (46항목) / Health check"
 echo ""
 
 # -- Detect environment --------------------------------------------------------
@@ -87,7 +89,7 @@ if [ "$IS_EC2" = true ]; then
     echo ""
     echo -e "${CYAN}[4/4] Running verification...${NC}"
     echo "--------------------------------------------------------------"
-    bash "$SCRIPT_DIR/10-verify.sh"
+    bash "$SCRIPT_DIR/11-verify.sh"
 else
     echo -e "${YELLOW}[ENV] Not running on EC2. Deploy infrastructure first:${NC}"
     echo ""
@@ -144,6 +146,6 @@ fi
 echo "  다음 단계 / Next steps:"
 echo "    bash scripts/04-setup-eks-access.sh              # EKS 접근 설정"
 echo "    bash scripts/05-setup-cognito.sh                 # Cognito 인증"
-echo "    bash scripts/06-setup-agentcore.sh               # AgentCore AI (6a→6b→6c→6d→6e)"
-echo "    bash scripts/07-setup-cloudfront-auth.sh         # Lambda@Edge → CloudFront"
+echo "    bash scripts/06-setup-agentcore.sh               # AgentCore AI (6a→6b→6c→6d→6e→6f)"
+echo "    bash scripts/08-setup-cloudfront-auth.sh         # Lambda@Edge → CloudFront"
 echo ""

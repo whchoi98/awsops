@@ -363,7 +363,7 @@ Step 3: Build + Deploy                   ← 03-build-deploy.sh
   │     └─ npm run start (port 3000)
   │
   ▼
-Step 9: 검증 (46항목)                    ← 10-verify.sh
+Step 9: 검증 (46항목)                    ← 11-verify.sh
   │     ├─ Services (2)
   │     ├─ Queries (18 테이블)
   │     ├─ Pages (20 페이지)
@@ -425,7 +425,7 @@ Step 6: AgentCore AI                     ← 06-setup-agentcore.sh (래퍼)
             └─ networkConfiguration: {"networkMode":"PUBLIC"}
   │
   ▼
-Step 7: CloudFront Lambda@Edge 연동      ← 07-setup-cloudfront-auth.sh
+Step 8: CloudFront Lambda@Edge 연동      ← 08-setup-cloudfront-auth.sh
         ├─ CloudFront distribution 자동 감지
         ├─ Lambda@Edge ARN 자동 감지 (최신 published version)
         ├─ /awsops* behavior에 viewer-request 연결

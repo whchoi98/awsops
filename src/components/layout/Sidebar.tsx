@@ -37,6 +37,7 @@ import {
   SearchCode,
   ChevronDown,
   ChevronRight,
+  ClipboardCheck,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
@@ -60,6 +61,7 @@ const navGroups: NavGroup[] = [
       { labelKey: 'sidebar.dashboard', href: '/', icon: LayoutDashboard },
       { labelKey: 'sidebar.aiAssistant', href: '/ai', icon: BrainCircuit },
       { labelKey: 'sidebar.agentcore', href: '/agentcore', icon: Activity },
+      { labelKey: 'sidebar.diagnosis', href: '/diagnosis', icon: ClipboardCheck },
       { labelKey: 'sidebar.accounts', href: '/accounts', icon: Layers },
     ],
   },

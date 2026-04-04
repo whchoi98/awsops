@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
   const fileSuffix = account ? `_${account.accountId}` : '';
   const resultFile = join(RESULTS_DIR, `${benchmark}${fileSuffix}.json`);
   const statusFile = join(RESULTS_DIR, `${benchmark}${fileSuffix}.status`);
+  const errorFile = join(RESULTS_DIR, `${benchmark}${fileSuffix}.err`);
 
   if (action === 'run') {
     // Start benchmark in background
@@ -55,8 +56,12 @@ export async function GET(request: NextRequest) {
     writeFileSync(statusFile, 'running', 'utf-8');
 
     const dbUrl = getDbUrl();
-    const cmd = `powerpipe benchmark run aws_compliance.benchmark.${benchmark} --database "${dbUrl}" --mod-location "${MOD_DIR}" ${searchPathArgs} --output json --progress=false > "${resultFile}" 2>/dev/null && echo "done" > "${statusFile}" || echo "error" > "${statusFile}"`;
-    exec(cmd);
+    const tmpFile = `${resultFile}.tmp`;
+    const cmd = `powerpipe mod install --mod-location "${MOD_DIR}" > /dev/null 2>&1; powerpipe benchmark run aws_compliance.benchmark.${benchmark} --mod-location "${MOD_DIR}" ${searchPathArgs} --output json --progress=false > "${tmpFile}" 2>"${errorFile}" && mv "${tmpFile}" "${resultFile}" && echo "done" > "${statusFile}" || (rm -f "${tmpFile}" && echo "error" > "${statusFile}")`;
+    // Note: exec() is used here intentionally — the command requires shell features
+    // (pipes, redirects, &&/||). All parameters (benchmark, dbUrl, MOD_DIR) are
+    // server-controlled values, not user input.
+    exec(cmd, { env: { ...process.env, POWERPIPE_DATABASE: dbUrl } });
 
     return NextResponse.json({ status: 'started', message: 'Benchmark started' });
   }
@@ -68,11 +73,26 @@ export async function GET(request: NextRequest) {
   }
 
   if (action === 'result') {
+    // Check status first — if errored or still running, don't attempt to parse
+    const currentStatus = existsSync(statusFile) ? readFileSync(statusFile, 'utf-8').trim() : 'none';
+    if (currentStatus === 'error') {
+      const errorDetail = existsSync(errorFile) ? readFileSync(errorFile, 'utf-8').trim() : '';
+      return NextResponse.json({
+        error: 'Benchmark failed. Check that powerpipe is installed and Steampipe is running.',
+        detail: errorDetail
+      }, { status: 502 });
+    }
+    if (currentStatus === 'running') {
+      return NextResponse.json({ error: 'Benchmark still running.' }, { status: 202 });
+    }
     if (!existsSync(resultFile)) {
       return NextResponse.json({ error: 'No results available. Run the benchmark first.' }, { status: 404 });
     }
     try {
       const raw = readFileSync(resultFile, 'utf-8');
+      if (!raw.trim()) {
+        return NextResponse.json({ error: 'Benchmark produced empty results. Check powerpipe installation.' }, { status: 502 });
+      }
       const data = JSON.parse(raw);
       return NextResponse.json(data);
     } catch {

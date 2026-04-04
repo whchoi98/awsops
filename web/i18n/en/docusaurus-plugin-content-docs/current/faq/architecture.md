@@ -181,8 +181,8 @@ const DEFAULT_HOURLY_RATE = 0.236; // m5.xlarge fallback
 ### Installing OpenCost
 
 ```bash
-# Run scripts/06f-setup-opencost.sh
-bash scripts/06f-setup-opencost.sh
+# Run scripts/07-setup-opencost.sh
+bash scripts/07-setup-opencost.sh
 
 # Installs: Metrics Server -> Prometheus -> OpenCost
 # After install, add endpoint to data/config.json:
@@ -354,7 +354,7 @@ async function simulateStreaming(content, send) {
 AlertManager is currently **disabled** in AWSops:
 
 ```bash
-# scripts/06f-setup-opencost.sh
+# scripts/07-setup-opencost.sh
 helm install prometheus prometheus-community/prometheus \
   --set alertmanager.enabled=false   # Explicitly disabled
 ```
@@ -370,7 +370,7 @@ However, **CloudWatch alarm tools** already exist:
 
 **Step 1. Enable AlertManager**
 
-Modify `scripts/06f-setup-opencost.sh`:
+Modify `scripts/07-setup-opencost.sh`:
 ```bash
 helm upgrade prometheus prometheus-community/prometheus \
   --set alertmanager.enabled=true

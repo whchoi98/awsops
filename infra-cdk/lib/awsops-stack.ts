@@ -392,6 +392,7 @@ export class AwsopsStack extends cdk.Stack {
     const listener80 = this.alb.addListener('Listener80', {
       port: 80,
       protocol: elbv2.ApplicationProtocol.HTTP,
+      open: false,
       defaultAction: elbv2.ListenerAction.fixedResponse(403, {
         contentType: 'text/plain',
         messageBody: 'Access Denied',
@@ -428,6 +429,7 @@ export class AwsopsStack extends cdk.Stack {
     const listener3000 = this.alb.addListener('Listener3000', {
       port: 3000,
       protocol: elbv2.ApplicationProtocol.HTTP,
+      open: false,
       defaultAction: elbv2.ListenerAction.fixedResponse(403, {
         contentType: 'text/plain',
         messageBody: 'Access Denied',
