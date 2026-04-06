@@ -674,8 +674,8 @@ Prometheus가 있으면 HTTP 5xx 스파이크, CPU/Memory 이상 징후, Pod 재
     {n:"Network Arch",p:"Reliability",c:"#00d4ff"},{n:"Compute",p:"Reliability",c:"#00d4ff"},
     {n:"EKS Analysis",p:"Performance",c:"#a855f7"},{n:"DB Analysis",p:"Performance",c:"#a855f7"},
     {n:"MSK Analysis",p:"Performance",c:"#a855f7"},{n:"Storage",p:"Performance",c:"#a855f7"},
-    {n:"Executive Summary",p:"Synthesis",c:"#00ff88"},{n:"Recommendations",p:"Synthesis",c:"#00ff88"},
-    {n:"Appendix",p:"Synthesis",c:"#00ff88"}
+    {n:"Executive Summary",p:"AI Synthesis",c:"#00ff88"},{n:"Recommendations",p:"AI Synthesis",c:"#00ff88"},
+    {n:"Appendix",p:"AI Synthesis",c:"#00ff88"}
   ];
   var el=document.getElementById('dSc2'),bar=document.getElementById('dBar2'),
       pct=document.getElementById('dPct2'),tm=document.getElementById('dTm2'),
