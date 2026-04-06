@@ -159,3 +159,50 @@ Using an aggregator connection allows you to query data from multiple accounts i
 When using AWS Organizations, you can access member accounts through Cross-Account Roles.
 
 </details>
+
+<details>
+<summary>Can I connect external datasources (Prometheus, Loki, etc.)?</summary>
+
+Yes, you can register and query **7 types of external datasources** in a Grafana-style interface.
+
+**Supported Datasources**
+
+| Type | Query Language | Primary Use |
+|------|---------------|-------------|
+| **Prometheus** | PromQL | Metric collection/query |
+| **Loki** | LogQL | Log aggregation/search |
+| **Tempo** | TraceQL | Distributed tracing |
+| **ClickHouse** | SQL | Analytics data warehouse |
+| **Jaeger** | Trace API | Distributed tracing |
+| **Dynatrace** | API | APM / full-stack observability |
+| **Datadog** | API | Monitoring / APM |
+
+**How to Register**
+1. Click "Add Datasource" on the `/datasources` page
+2. Configure type, URL, and authentication method (None/Basic/Bearer/Custom Header)
+3. Click "Test Connection" to verify connectivity
+4. Save — stored in the `datasources[]` array in `data/config.json`
+
+**4 Authentication Methods**
+
+| Method | Use Case |
+|--------|----------|
+| **None** | No authentication required (local Prometheus, etc.) |
+| **Basic Auth** | Username + password (ClickHouse, etc.) |
+| **Bearer Token** | API token (Datadog, Dynatrace, etc.) |
+| **Custom Header** | Custom header (special authentication) |
+
+**Security**
+- **SSRF Defense**: Blocks private IPs, cloud metadata endpoints, loopback addresses
+- **SQL Injection Prevention**: Parameterized queries for ClickHouse
+- **Credential Masking**: Passwords/tokens shown as `***` in API responses
+- **Admin Only**: Datasource CRUD requires Admin privileges
+
+**AI Integration**
+Registered datasources are automatically used by Auto-Collect agents (Trace Analyze, Incident, EKS Optimize) in the AI Diagnosis report. Ask the AI assistant "Prometheus connection isn't working" and the datasource diagnostics agent will analyze network/authentication/SSL/DNS issues.
+
+:::info Datasource Management Principle
+Same pattern as the existing `accounts[]`. Modify only `data/config.json` to add/remove datasources without code changes.
+:::
+
+</details>

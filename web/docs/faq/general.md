@@ -159,3 +159,50 @@ connection "aws" {
 AWS Organizations를 사용하는 경우 Cross-Account Role을 통해 멤버 계정에 접근할 수 있습니다.
 
 </details>
+
+<details>
+<summary>외부 데이터소스(Prometheus, Loki 등)를 연결할 수 있나요?</summary>
+
+예, **7종의 외부 데이터소스**를 Grafana 스타일로 등록하고 쿼리할 수 있습니다.
+
+**지원 데이터소스**
+
+| 타입 | 쿼리 언어 | 주요 용도 |
+|------|-----------|-----------|
+| **Prometheus** | PromQL | 메트릭 수집/쿼리 |
+| **Loki** | LogQL | 로그 집계/검색 |
+| **Tempo** | TraceQL | 분산 추적 |
+| **ClickHouse** | SQL | 분석용 데이터 웨어하우스 |
+| **Jaeger** | Trace API | 분산 추적 |
+| **Dynatrace** | API | APM / 풀스택 관측 |
+| **Datadog** | API | 모니터링 / APM |
+
+**등록 방법**
+1. `/datasources` 페이지에서 "Add Datasource" 클릭
+2. 타입, URL, 인증 방식(None/Basic/Bearer/Custom Header) 설정
+3. "Test Connection"으로 연결 확인
+4. 저장 — `data/config.json`의 `datasources[]` 배열에 저장됨
+
+**인증 방식 4종**
+
+| 방식 | 용도 |
+|------|------|
+| **None** | 인증 불필요 (로컬 Prometheus 등) |
+| **Basic Auth** | 사용자명 + 비밀번호 (ClickHouse 등) |
+| **Bearer Token** | API 토큰 (Datadog, Dynatrace 등) |
+| **Custom Header** | 사용자 지정 헤더 (특수 인증) |
+
+**보안**
+- **SSRF 방어**: Private IP, Cloud metadata endpoint, Loopback 주소 차단
+- **SQL Injection 방지**: ClickHouse 파라미터화 쿼리 사용
+- **Credential 마스킹**: API 응답에서 비밀번호/토큰 `***` 처리
+- **Admin 전용**: 데이터소스 CRUD는 Admin 권한 필요
+
+**AI 연동**
+등록된 데이터소스는 AI 종합진단의 Auto-Collect 에이전트(Trace Analyze, Incident, EKS Optimize)가 자동으로 활용합니다. AI 어시스턴트에게 "Prometheus 연결 안 돼요"라고 질문하면 데이터소스 진단 에이전트가 네트워크/인증/SSL/DNS 문제를 분석합니다.
+
+:::info 데이터소스 관리 원칙
+기존 `accounts[]`와 동일한 패턴입니다. `data/config.json`만 수정하면 코드 변경 없이 데이터소스를 추가/제거할 수 있습니다.
+:::
+
+</details>

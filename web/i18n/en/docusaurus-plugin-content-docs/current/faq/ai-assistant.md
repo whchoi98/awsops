@@ -59,6 +59,10 @@ The AI assistant answers various questions through 10 specialized routes:
 **10. General (General)**
 - AWS-related questions not fitting the above categories
 
+**11. Datasource (Datasource Diagnostics)**
+- "Prometheus connection isn't working"
+- "Analyze datasource authentication issues"
+
 </details>
 
 <details>
@@ -218,5 +222,85 @@ AI responses are streamed via SSE (Server-Sent Events). Text is displayed in rea
 :::info Technical Details
 TTFT (Time To First Token) components and optimization strategies are covered in the [Architecture Deep Dive](./architecture).
 :::
+
+</details>
+
+<details>
+<summary>What is the AI Diagnosis report?</summary>
+
+AI Diagnosis (`/ai-diagnosis`) is a comprehensive report that analyzes your entire AWS environment across **15 sections**.
+
+**Analysis Sections (Well-Architected Based)**
+- **Cost Optimization**: EC2/RDS/ElastiCache rightsizing, idle resources, Savings Plans
+- **Security**: IAM policies, Security Groups, encryption, compliance
+- **Reliability**: EKS workloads, MSK clusters, database availability
+- **Operational Excellence**: Monitoring alarms, incidents, service tracing
+- **Executive Summary**: 6 Well-Architected pillar scores + key recommendations
+
+**Report Generation Process**
+1. 6 Auto-Collect agents gather data from multiple sources automatically
+2. 15 sections analyzed in 5 batches (3 per batch) via parallel Bedrock calls
+3. Progress polled by frontend every 5 seconds
+4. On completion, DOCX/MD uploaded to S3 with 7-day Presigned URLs
+
+**Export Formats**
+
+| Format | Method |
+|--------|--------|
+| **DOCX** | Download button (A4 professional report with cover, TOC, section styles) |
+| **Markdown** | Download button (all sections combined into a single `.md` file) |
+| **PDF** | "Print/Save as PDF" button → browser Print-to-PDF |
+
+:::info Scheduled Reports
+Reports can be auto-generated on a weekly/biweekly/monthly basis. Configure frequency, day, time, and language in the schedule settings panel on the AI Diagnosis page.
+:::
+
+</details>
+
+<details>
+<summary>What are Auto-Collect agents?</summary>
+
+Auto-Collect agents are **6 specialized agents** that automatically collect data from multiple sources for the AI Diagnosis report.
+
+| Agent | Data Collected |
+|-------|----------------|
+| **EKS Optimize** | Prometheus metrics + K8s resources + EKS cost (CPU/memory, throttling, pod restarts) |
+| **DB Optimize** | RDS/ElastiCache/OpenSearch instances + CloudWatch metrics (rightsizing analysis) |
+| **MSK Optimize** | MSK brokers + CloudWatch + Prometheus Kafka metrics (throughput, consumer lag) |
+| **Idle Scan** | Unattached EBS, gp2 volumes, unused EIPs, stopped EC2, old snapshots + cost estimation |
+| **Trace Analyze** | Tempo/Jaeger traces + Prometheus service metrics (error/slow traces) |
+| **Incident** | CloudWatch ALARMs + K8s Warning events + Prometheus anomalies |
+
+**How It Works**
+- All agents implement the same `Collector` interface
+- `Promise.allSettled` for parallel multi-source collection
+- `SendFn` callback for real-time progress streaming
+- Collected data is sent to Bedrock for per-section analysis
+
+**External Datasource Integration**
+Trace Analyze, Incident, and EKS Optimize agents provide richer analysis when external datasources (Prometheus, Tempo, Jaeger) are registered. Register datasources on the `/datasources` page.
+
+</details>
+
+<details>
+<summary>What are FinOps MCP tools?</summary>
+
+**5 FinOps-specific MCP tools** added to the Cost Gateway. They are automatically invoked when you ask the AI assistant about cost optimization.
+
+| Tool | Description |
+|------|-------------|
+| **Rightsizing Recommendations** | Compute Optimizer-based EC2/RDS/ECS/Lambda rightsizing + monthly savings |
+| **Savings Plans Recommendations** | Cost Explorer-based SP purchase recommendations (1yr/3yr, No Upfront) |
+| **Reserved Instance Recommendations** | RI purchase recommendations (EC2/RDS/ElastiCache/Redshift) |
+| **Cost Optimization Hub** | Unified optimization recommendations (Rightsize/Stop/Upgrade/SP) |
+| **Trusted Advisor Cost Checks** | Cost optimization category checks + flagged resources |
+
+**Cross-Account Support**
+All tools support multi-account environments via the `target_account_id` parameter.
+
+**Example Questions**
+- "Recommend cost savings strategies"
+- "Show me EC2 rightsizing recommendations"
+- "How much would I save with Savings Plans?"
 
 </details>
