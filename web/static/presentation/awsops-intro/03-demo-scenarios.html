@@ -25,30 +25,386 @@
   <div class="slide-header" data-remarp-id="s1-header"><h2>AI Assistant Demo</h2></div>
   <div class="slide-body" data-remarp-id="s1-body">
     <p><!-- Slide 2: AI Assistant Demo Flow --></p>
-<div class="flow-h">
-  <div class="flow-group bg-blue" data-fragment-index="1">
-    <div class="flow-group-label">Step 1: 질문</div>
-    <div class="flow-box">"VPC 구성을 분석해줘"</div>
+<div class="ai-query-demo-container">
+  <style>
+    /* Global CSS variables for theme */
+    :root {
+      --bg-color: #0f1629;
+      --text-color: #ffffff;
+      --accent-cyan: #00d4ff;
+      --accent-green: #00ff88;
+      --border-color: #333;
+      --button-bg: #444;
+      --button-hover-bg: #555;
+      --disabled-color: #666;
+      --error-color: #dc3545;
+      --error-hover-color: #c82333;
+    }
+
+    /* Basic reset and container styling */
+    .ai-query-demo-container {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      width: 100%;
+      max-width: 900px; /* Adjusted for better fit on a 1920x1080 slide */
+      max-height: 600px;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      box-sizing: border-box;
+      overflow: hidden; /* Important for max-height constraint */
+      margin: 0 auto;
+      border: 1px solid var(--border-color);
+    }
+
+    /* Utility class to hide elements */
+    .hidden {
+      display: none !important;
+    }
+
+    /* Input section styling */
+    .input-section {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    #queryInput {
+      flex-grow: 1;
+      padding: 12px 18px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      background-color: #1a2a4a;
+      color: var(--text-color);
+      font-size: 1.05em;
+      outline: none;
+      transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    }
+
+    #queryInput:focus {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.2);
+    }
+
+    #queryInput::placeholder {
+      color: var(--disabled-color);
+    }
+
+    /* Button styling */
+    button {
+      padding: 12px 25px;
+      border: none;
+      border-radius: 8px;
+      background-color: var(--button-bg);
+      color: var(--text-color);
+      font-size: 1.05em;
+      cursor: pointer;
+      transition: background-color 0.2s ease-in-out, transform 0.1s ease-out;
+      white-space: nowrap;
+    }
+
+    button:hover:not(:disabled) {
+      background-color: var(--button-hover-bg);
+      transform: translateY(-1px);
+    }
+
+    button:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      background-color: var(--disabled-color);
+      cursor: not-allowed;
+      color: #aaa;
+    }
+
+    /* Flow section for steps and details */
+    .flow-section {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      padding-top: 15px;
+      border-top: 1px dashed var(--border-color);
+    }
+
+    .step-indicators {
+      display: flex;
+      justify-content: center;
+      gap: 25px;
+      margin-bottom: 10px;
+    }
+
+    .step-circle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 35px;
+      height: 35px;
+      border-radius: 50%;
+      border: 2px solid var(--disabled-color);
+      color: var(--disabled-color);
+      font-weight: bold;
+      font-size: 1em;
+      transition: all 0.3s ease-in-out;
+      background-color: rgba(0, 0, 0, 0.2);
+    }
+
+    .step-circle.active {
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+      background-color: rgba(0, 212, 255, 0.15);
+      box-shadow: 0 0 8px var(--accent-cyan);
+    }
+
+    .step-details > div {
+      padding: 15px;
+      background-color: #1a2a4a;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      white-space: pre-wrap;
+      border: 1px solid rgba(0, 0, 0, 0.3);
+    }
+
+    .status-message {
+      font-size: 1.15em;
+      margin: 0 0 8px 0;
+      color: var(--text-color);
+    }
+
+    .route-info, .data-sources {
+      font-size: 0.95em;
+      color: #ccc;
+      margin: 0;
+    }
+
+    .accent-cyan {
+      color: var(--accent-cyan);
+    }
+
+    .accent-green {
+      color: var(--accent-green);
+    }
+
+    /* Output section for response and cursor */
+    .output-section {
+      position: relative;
+      flex-grow: 1; /* Allows it to take available space within max-height */
+      padding: 15px 0;
+      border-top: 1px dashed var(--border-color);
+      overflow-y: auto; /* Enable scrolling for long responses */
+      display: flex;
+      flex-direction: column;
+    }
+
+    #responseText {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-family: 'Dank Mono', 'Fira Code', 'Cascadia Code', monospace; /* Monospaced for code-like output */
+      font-size: 0.95em;
+      line-height: 1.7;
+      margin: 0;
+      padding-right: 15px; /* Space for cursor */
+      flex-grow: 1; /* Allow text to grow */
+    }
+
+    #cursor {
+      display: inline-block;
+      width: 8px;
+      height: 1.2em; /* Match line height of responseText */
+      background-color: var(--accent-cyan);
+      vertical-align: text-bottom;
+      animation: blink 1s step-end infinite;
+      margin-left: 3px;
+      transition: opacity 0.2s ease-in-out;
+    }
+
+    @keyframes blink {
+      from, to { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    #finalSavings {
+      font-size: 1.3em;
+      font-weight: bold;
+      color: var(--accent-green);
+      margin-top: 15px;
+      padding: 12px 15px;
+      background-color: rgba(0, 255, 136, 0.15);
+      border-radius: 8px;
+      border: 1px solid rgba(0, 255, 136, 0.3);
+      text-align: center;
+    }
+
+    /* Reset button specific styling */
+    #resetButton {
+      align-self: flex-end;
+      background-color: var(--error-color);
+    }
+
+    #resetButton:hover:not(:disabled) {
+      background-color: var(--error-hover-color);
+    }
+  </style>
+
+  <div class="input-section">
+    <input type="text" id="queryInput" value="EKS 비용 개선점 찾아줘" placeholder="AI에게 질문하세요...">
+    <button id="askButton">Ask</button>
   </div>
-  <div class="flow-arrow">&rarr;</div>
-  <div class="flow-group bg-orange" data-fragment-index="2">
-    <div class="flow-group-label">Step 2: 분류</div>
-    <div class="flow-box">Sonnet 4.6</div>
-    <div class="flow-box">Route: aws-data</div>
+
+  <div class="flow-section">
+    <div class="step-indicators">
+      <span class="step-circle" id="stepIndicator1">1</span>
+      <span class="step-circle" id="stepIndicator2">2</span>
+      <span class="step-circle" id="stepIndicator3">3</span>
+    </div>
+    <div class="step-details">
+      <div id="step1Details" class="hidden">
+        <p class="status-message">🔍 질문 분석 중...</p>
+        <p class="route-info">Route: <span class="accent-cyan">eks-optimize</span></p>
+      </div>
+      <div id="step2Details" class="hidden">
+        <p class="status-message">📊 데이터 수집 중...</p>
+        <p class="data-sources"><span class="accent-green">Prometheus ✅</span> <span class="accent-green">Steampipe ✅</span> <span class="accent-green">Cost API ✅</span></p>
+      </div>
+      <div id="step3Details" class="hidden">
+        <p class="status-message">🤖 Opus 4.6 분석 중...</p>
+      </div>
+    </div>
   </div>
-  <div class="flow-arrow">&rarr;</div>
-  <div class="flow-group bg-pink" data-fragment-index="3">
-    <div class="flow-group-label">Step 3: 실행</div>
-    <div class="flow-box">Steampipe SQL 생성</div>
-    <div class="flow-box">VPC/Subnet/SG 조회</div>
+
+  <div class="output-section">
+    <pre id="responseText"></pre>
+    <span id="cursor" class="hidden"></span> <!-- Initially hidden -->
+    <div id="finalSavings" class="hidden"></div>
   </div>
-  <div class="flow-arrow">&rarr;</div>
-  <div class="flow-group bg-green" data-fragment-index="4">
-    <div class="flow-group-label">Step 4: 분석</div>
-    <div class="flow-box">Bedrock 분석</div>
-    <div class="flow-box">SSE 스트리밍 응답</div>
-    <div class="flow-box">Tool Usage 표시</div>
-  </div>
+
+  <button id="resetButton" class="hidden">Reset</button>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const queryInput = document.getElementById('queryInput');
+      const askButton = document.getElementById('askButton');
+      const resetButton = document.getElementById('resetButton');
+
+      const stepIndicator1 = document.getElementById('stepIndicator1');
+      const stepIndicator2 = document.getElementById('stepIndicator2');
+      const stepIndicator3 = document.getElementById('stepIndicator3');
+
+      const step1Details = document.getElementById('step1Details');
+      const step2Details = document.getElementById('step2Details');
+      const step3Details = document.getElementById('step3Details');
+
+      const responseText = document.getElementById('responseText');
+      const cursor = document.getElementById('cursor');
+      const finalSavings = document.getElementById('finalSavings');
+
+      let currentTimeout; // To manage animation delays
+      let streamingInterval; // To manage character streaming
+
+      // AI response text to be streamed
+      const aiResponseContent = `Opus 4.6 분석 결과, EKS 클러스터의 비용 효율성을 개선할 수 있는 몇 가지 주요 영역이 확인되었습니다.
+1.  **워크로드 최적화:** 현재 클러스터에 불필요하게 높은 리소스를 할당하고 있는 워크로드가 감지되었습니다. 예를 들어, 일부 개발 환경 파드는 CPU 및 메모리 사용량이 낮음에도 불구하고 큰 인스턴스 타입에서 실행 중입니다.
+2.  **스케줄링 정책 개선:** 비즈니스 시간 외에는 불필요하게 가동되는 파드가 있습니다. 스케일 다운 정책 적용으로 유휴 시간을 최소화할 수 있습니다.
+3.  **Graviton2/3 인스턴스 전환:** 현재 사용 중인 x86 인스턴스 대비 Graviton2/3 인스턴스는 동일 성능에서 최대 20-40% 비용 절감 효과를 제공합니다. 호환성 검토 후 점진적인 전환을 권장합니다.
+
+이러한 개선 사항들을 적용할 경우, **월 350만원** 가량의 EKS 비용 절감이 예상됩니다.`;
+
+      function resetDemo() {
+        clearTimeout(currentTimeout);
+        clearInterval(streamingInterval);
+
+        queryInput.value = "EKS 비용 개선점 찾아줘";
+        queryInput.disabled = false;
+        askButton.disabled = false;
+        askButton.classList.remove('hidden');
+        resetButton.classList.add('hidden');
+
+        stepIndicator1.classList.remove('active');
+        stepIndicator2.classList.remove('active');
+        stepIndicator3.classList.remove('active');
+
+        step1Details.classList.add('hidden');
+        step2Details.classList.add('hidden');
+        step3Details.classList.add('hidden');
+
+        responseText.textContent = '';
+        cursor.classList.add('hidden'); // Ensure cursor is hidden
+        cursor.style.animation = 'none'; // Stop blinking animation
+        finalSavings.classList.add('hidden');
+        finalSavings.textContent = '';
+      }
+
+      function streamText(text, element, speed = 25) { // speed in ms per character
+        let i = 0;
+        cursor.classList.remove('hidden');
+        cursor.style.animation = 'blink 1s step-end infinite'; // Start blinking animation
+
+        function typeChar() {
+          if (i < text.length) {
+            element.textContent += text.charAt(i);
+            // Auto-scroll to bottom as text is added
+            element.scrollTop = element.scrollHeight;
+            i++;
+            streamingInterval = setTimeout(typeChar, speed);
+          } else {
+            cursor.classList.add('hidden'); // Hide cursor after streaming finishes
+            cursor.style.animation = 'none'; // Stop animation explicitly
+            finalSavings.classList.remove('hidden');
+            finalSavings.textContent = '적용 시 예상 절감액: 월 350만원';
+            resetButton.classList.remove('hidden'); // Show reset button at the very end
+          }
+        }
+        typeChar();
+      }
+
+      function animateStep3() {
+        stepIndicator2.classList.remove('active');
+        stepIndicator3.classList.add('active');
+        step2Details.classList.add('hidden');
+        step3Details.classList.remove('hidden');
+
+        currentTimeout = setTimeout(() => {
+          streamText(aiResponseContent, responseText, 25);
+        }, 2000); // 2 seconds delay for "Opus 4.6 분석 중..."
+      }
+
+      function animateStep2() {
+        stepIndicator1.classList.remove('active');
+        stepIndicator2.classList.add('active');
+        step1Details.classList.add('hidden');
+        step2Details.classList.remove('hidden');
+
+        currentTimeout = setTimeout(() => {
+          animateStep3();
+        }, 1500); // 1.5 seconds delay for data collection
+      }
+
+      function animateStep1() {
+        resetDemo(); // Clear previous state before starting new animation
+        queryInput.disabled = true;
+        askButton.disabled = true;
+        askButton.classList.add('hidden');
+
+        stepIndicator1.classList.add('active');
+        step1Details.classList.remove('hidden');
+
+        currentTimeout = setTimeout(() => {
+          animateStep2();
+        }, 1000); // 1 second delay for question analysis
+      }
+
+      // Event Listeners
+      askButton.addEventListener('click', animateStep1);
+      resetButton.addEventListener('click', resetDemo);
+
+      // Initial setup when the page loads
+      resetDemo();
+    });
+  </script>
 </div>
   </div>
 </div>
@@ -58,17 +414,17 @@
   <div class="slide-body" data-remarp-id="s2-body">
     <div class="columns">
 <div class="col">
-<div class="fragment fade-in" data-fragment-index="0"><h3>사용자 질문</h3>
+<h3>사용자 질문</h3>
 <blockquote><p>"EKS 비용 개선점 찾아줘"</p></blockquote>
-</div><div class="fragment fade-in" data-fragment-index="1"><h3>자동 수집 데이터</h3>
+<h3>자동 수집 데이터</h3>
 <p><strong>Prometheus (PromQL)</strong></p>
 <ul><li>CPU Usage vs Request per Container</li><li>Memory Usage vs Request per Container</li><li>CPU Throttling Rate</li><li>Pod Restart Counts</li><li>HTTP 5xx Error Rates</li><li>Node CPU / Memory Utilization</li></ul>
 <p><strong>Steampipe SQL</strong></p>
 <ul><li>K8s Pod resource requests/limits</li><li>EKS Container Cost (OpenCost)</li></ul>
 </div><div class="col">
-</div><div class="fragment fade-in" data-fragment-index="2"><h3>분석 결과 예시</h3>
+<h3>분석 결과 예시</h3>
 <ul><li>"<strong>payment</strong> Pod: CPU request 500m, 실사용 50m → <strong>90% 과할당</strong>"</li><li>"<strong>frontend</strong> Deployment: Memory limit 2Gi, 사용량 200Mi → <strong>다운사이징 권장</strong>"</li><li>"Node 3대 중 <strong>2대는 활용률 15% 미만</strong> → Karpenter로 통합 가능"</li><li>"예상 월 절감: <strong>$1,200</strong> (현재 $3,500)"</li></ul>
-</div><div class="fragment fade-in" data-fragment-index="3"><h3>MetricCandidate Pattern</h3>
+<h3>MetricCandidate Pattern</h3>
 <div class="code-block">{ key: <span class="string">'cpuUsage'</span>,
   <span class="key">queries</span>: [
     'container_cpu_usage_seconds_total
@@ -79,26 +435,26 @@
 </div>
 </div>
   </div>
-</div></div>
+</div>
 
 <div class="slide" data-remarp-id="s3" style="transition: transform var(--transition-normal), opacity var(--transition-normal)">
   <div class="slide-header" data-remarp-id="s3-header"><h2>Scenario 2: Idle Resource Scanner</h2></div>
   <div class="slide-body" data-remarp-id="s3-body">
     <div class="columns">
 <div class="col">
-<div class="fragment fade-in" data-fragment-index="0"><h3>사용자 질문</h3>
+<h3>사용자 질문</h3>
 <blockquote><p>"미사용 리소스 찾아줘"</p></blockquote>
-</div><div class="fragment fade-in" data-fragment-index="1"><h3>6 Categories Scan</h3>
+<h3>6 Categories Scan</h3>
 <table><thead><tr><th>Category</th><th>SQL Query</th></tr></thead><tbody><tr><td>Unattached EBS</td><td><code>status = 'available'</code></td></tr><tr><td>gp2 Volumes</td><td><code>volume_type = 'gp2'</code></td></tr><tr><td>Unassociated EIPs</td><td><code>association_id IS NULL</code></td></tr><tr><td>Stopped EC2</td><td><code>instance_state = 'stopped'</code></td></tr><tr><td>Old Snapshots</td><td><code>start_time < NOW() - 90 days</code></td></tr><tr><td>Unused SGs</td><td>ENI 참조 없음</td></tr></tbody></table>
 </div><div class="col">
-</div><div class="fragment fade-in" data-fragment-index="2"><h3>비용 추정 로직</h3>
+<h3>비용 추정 로직</h3>
 <ul><li>EBS: volume_type + size 기반 월 비용 계산</li><li>EIP: <strong>$3.6/month</strong> per unassociated IP</li><li>EC2: instance_type 기반 On-Demand 가격</li><li>Snapshot: size + storage 단가</li><li>gp2 → gp3: <strong>20% 절감</strong> 추정</li></ul>
-</div><div class="fragment fade-in" data-fragment-index="3"><h3>분석 결과 예시</h3>
+<h3>분석 결과 예시</h3>
 <blockquote><p>"6개 미연결 EBS (총 500GB) → <strong>$50/월</strong>" "3개 미연결 EIP → <strong>$10.8/월</strong>" "12개 gp2 볼륨 → gp3 전환 시 <strong>$30/월 절감</strong>" "<strong>총 예상 월 낭비: $240</strong>"</p></blockquote>
 </div>
 </div>
   </div>
-</div></div>
+</div>
 
 <div class="slide" data-remarp-id="s4" style="transition: transform var(--transition-normal), opacity var(--transition-normal)">
   <div class="slide-header" data-remarp-id="s4-header"><h2>Scenario 3: Incident Analysis</h2></div>
@@ -137,80 +493,144 @@
 <div class="slide" data-remarp-id="s5" style="transition: transform var(--transition-normal), opacity var(--transition-normal)">
   <div class="slide-header" data-remarp-id="s5-header"><h2>Comprehensive Diagnosis Report</h2></div>
   <div class="slide-body" data-remarp-id="s5-body">
-    <div class="columns">
-<div class="col">
-<div class="fragment fade-in" data-fragment-index="0"><h3>15 Sections</h3>
-<table><thead><tr><th>#</th><th>Section</th><th>Pillar</th></tr></thead><tbody><tr><td>1</td><td>Executive Summary</td><td>-</td></tr><tr><td>2</td><td>Cost Overview</td><td>Cost Optimization</td></tr><tr><td>3</td><td>Compute Cost</td><td>Cost Optimization</td></tr><tr><td>4</td><td>Network Cost</td><td>Cost Optimization</td></tr><tr><td>5</td><td>Storage Cost</td><td>Cost Optimization</td></tr><tr><td>6</td><td>Idle Resources</td><td>Cost Optimization</td></tr><tr><td>7</td><td>Security Posture</td><td>Security</td></tr><tr><td>8</td><td>Network Architecture</td><td>Reliability</td></tr><tr><td>9</td><td>Compute Analysis</td><td>Performance</td></tr><tr><td>10</td><td>EKS Analysis</td><td>Performance</td></tr><tr><td>11</td><td>Database Analysis</td><td>Performance</td></tr><tr><td>12</td><td>MSK Analysis</td><td>Performance</td></tr><tr><td>13</td><td>Storage Analysis</td><td>Operational</td></tr><tr><td>14</td><td>Recommendations</td><td>Sustainability</td></tr><tr><td>15</td><td>Appendix</td><td>-</td></tr></tbody></table>
-</div><div class="col">
-</div><div class="fragment fade-in" data-fragment-index="1"><h3>Architecture</h3>
-<div style="display: flex; flex-direction: column; gap: 12px;">
-  <div class="flow-box" style="background: rgba(0,212,255,0.1); border-color: rgba(0,212,255,0.3);">1. Data Collection (report-generator.ts)<br>Steampipe Batch + Auto-Collect Agents</div>
-  <div style="text-align: center; color: #00d4ff;">&darr;</div>
-  <div class="flow-box" style="background: rgba(0,255,136,0.1); border-color: rgba(0,255,136,0.3);">2. AI Analysis (5 batches x 3 sections)<br>Opus 4.6 per section, Well-Architected prompts</div>
-  <div style="text-align: center; color: #00ff88;">&darr;</div>
-  <div class="flow-box" style="background: rgba(168,85,247,0.1); border-color: rgba(168,85,247,0.3);">3. Background Worker + Progress<br>Async generation, SSE progress tracking</div>
-  <div style="text-align: center; color: #a855f7;">&darr;</div>
-  <div class="flow-box" style="background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.3);">4. S3 Storage + Download<br>DOCX / Markdown / Print-to-PDF</div>
-</div>
-</div><div class="fragment fade-in" data-fragment-index="2"><h3>Scheduling</h3>
-<ul><li>Weekly / Biweekly / Monthly 자동 실행</li><li>KST 기준 스케줄링</li><li>S3 보관 + 이력 관리</li></ul>
-</div>
-</div>
+    <p><!-- Slide 6: Comprehensive Diagnosis Report --></p>
+<style>
+.ds{font-family:'Segoe UI',sans-serif;color:#fff;width:100%;max-width:580px;max-height:520px;margin:0 auto;overflow-y:auto;background:#1a2233;border-radius:10px;padding:20px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px;border:1px solid #334466}
+.ds h3{text-align:center;color:#00d4ff;margin:0 0 8px;font-size:1.4em}
+.ds-bw{width:100%;background:#334466;border-radius:5px;height:8px;overflow:hidden}
+.ds-b{height:100%;width:0%;background:#00ff88;border-radius:5px;transition:width .3s}
+.ds-i{display:flex;justify-content:space-between;font-size:.85em;color:#bbb}
+.ds-btns{display:flex;justify-content:center;gap:12px}
+.ds .db{padding:10px 20px;border:none;border-radius:8px;cursor:pointer;font-size:.9em;font-weight:bold;color:#fff;transition:background .2s}
+.ds .db:disabled{background:#555 !important;cursor:not-allowed;opacity:.6}
+.ds .db1{background:#00d4ff}.ds .db2{background:#a855f7}.ds .db3{background:#334466}
+.ds-sc{display:flex;flex-direction:column;gap:10px}
+.ds-pg{background:#2a354d;border-radius:8px;padding:10px;border:1px solid #334466}
+.ds-ph{font-weight:bold;font-size:.95em;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid}
+.ds-si{display:flex;align-items:center;padding:4px 0;font-size:.85em}
+.ds-si .ic{margin-right:8px;min-width:18px;text-align:center}
+</style>
+<div class="ds">
+  <h3>종합진단 리포트</h3>
+  <div class="ds-bw"><div class="ds-b" id="dBar2"></div></div>
+  <div class="ds-i"><span>진행률: <span id="dPct2">0%</span></span><span>경과: <span id="dTm2">00:00</span></span></div>
+  <div class="ds-btns">
+    <button class="db db1" id="dSt2">진단 시작</button>
+    <button class="db db2" id="dDl2" disabled>&#x2193; DOCX / MD / PDF</button>
+    <button class="db db3" id="dRs2" disabled>재설정</button>
   </div>
-</div></div>
+  <div class="ds-sc" id="dSc2"></div>
+</div>
+<script>
+(function(){
+  var S=[
+    {n:"Cost Overview",p:"Cost Optimization",c:"#f59e0b"},{n:"Compute Cost",p:"Cost Optimization",c:"#f59e0b"},
+    {n:"Network Cost",p:"Cost Optimization",c:"#f59e0b"},{n:"Storage Cost",p:"Cost Optimization",c:"#f59e0b"},
+    {n:"Idle Resources",p:"Cost Optimization",c:"#f59e0b"},{n:"Security Posture",p:"Security",c:"#ef4444"},
+    {n:"Network Arch",p:"Reliability",c:"#00d4ff"},{n:"Compute",p:"Reliability",c:"#00d4ff"},
+    {n:"EKS Analysis",p:"Performance",c:"#a855f7"},{n:"DB Analysis",p:"Performance",c:"#a855f7"},
+    {n:"MSK Analysis",p:"Performance",c:"#a855f7"},{n:"Storage",p:"Performance",c:"#a855f7"},
+    {n:"Executive Summary",p:"Synthesis",c:"#00ff88"},{n:"Recommendations",p:"Synthesis",c:"#00ff88"},
+    {n:"Appendix",p:"Synthesis",c:"#00ff88"}
+  ];
+  var el=document.getElementById('dSc2'),bar=document.getElementById('dBar2'),
+      pct=document.getElementById('dPct2'),tm=document.getElementById('dTm2'),
+      bS=document.getElementById('dSt2'),bD=document.getElementById('dDl2'),bR=document.getElementById('dRs2');
+  var idx=0,run=false,t0=0,iv=null,to=null;
+  var TOTAL_SIM_SECS=925;
+  function fmt(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
+  function simTime(){return fmt(Math.round(idx/S.length*TOTAL_SIM_SECS))}
+  function render(){
+    while(el.firstChild)el.removeChild(el.firstChild);
+    var g={};S.forEach(function(s,i){if(!g[s.p])g[s.p]={c:s.c,items:[]};g[s.p].items.push({n:s.n,i:i})});
+    for(var p in g){
+      var d=document.createElement('div');d.className='ds-pg';
+      var h=document.createElement('div');h.className='ds-ph';h.textContent=p;h.style.borderColor=g[p].c;d.appendChild(h);
+      g[p].items.forEach(function(it){
+        var r=document.createElement('div');r.className='ds-si';r.setAttribute('data-idx',it.i);
+        var ic=document.createElement('span');ic.className='ic';ic.textContent='\u2B1C';
+        var nm=document.createElement('span');nm.textContent=it.n;
+        r.appendChild(ic);r.appendChild(nm);d.appendChild(r)});
+      el.appendChild(d)}
+  }
+  function setI(i,v){var r=el.querySelector('[data-idx="'+i+'"] .ic');if(r)r.textContent=v}
+  function prog(){var p=idx/S.length*100;bar.style.width=p+'%';pct.textContent=Math.round(p)+'%'}
+  function tick(){if(run)tm.textContent=simTime()}
+  function next(){
+    if(idx<S.length){if(idx>0)setI(idx-1,'\u2705');setI(idx,'\u23F3');prog();idx++;to=setTimeout(next,800)}
+    else{setI(S.length-1,'\u2705');prog();run=false;clearInterval(iv);tm.textContent='15:25';bD.disabled=false}
+  }
+  function start(){if(run)return;run=true;t0=Date.now();idx=0;bS.disabled=true;bR.disabled=false;bD.disabled=true;
+    clearTimeout(to);clearInterval(iv);render();prog();tm.textContent='00:00';iv=setInterval(tick,1000);next()}
+  function reset(){run=false;idx=0;clearInterval(iv);clearTimeout(to);render();bar.style.width='0%';pct.textContent='0%';
+    tm.textContent='00:00';bS.disabled=false;bD.disabled=true;bR.disabled=true}
+  render();bS.addEventListener('click',start);bR.addEventListener('click',reset);
+  bD.addEventListener('click',function(){alert('DOCX / MD / PDF download is a simulation.')});
+})();
+</script>
+  </div>
+</div>
 
 <div class="slide" data-remarp-id="s6" style="transition: transform var(--transition-normal), opacity var(--transition-normal)">
   <div class="slide-header" data-remarp-id="s6-header"><h2>FinOps MCP Tools</h2></div>
   <div class="slide-body" data-remarp-id="s6-body">
     <div class="columns">
 <div class="col">
-<div class="fragment fade-in" data-fragment-index="0"><h3>Cost Gateway (9 tools)</h3>
+<h3>Cost Gateway (9 tools)</h3>
 <ul><li><strong>Cost Explorer</strong> — 비용/사용량 분석, 기간 비교</li><li><strong>Cost Forecast</strong> — 비용 예측</li><li><strong>Pricing API</strong> — AWS 서비스 가격 조회</li><li><strong>Budgets</strong> — 예산 상태 확인</li></ul>
-</div><div class="fragment fade-in" data-fragment-index="1"><h3>Auto-Collect Agents</h3>
+<h3>Auto-Collect Agents</h3>
 <ul><li><strong>eks-optimize</strong> — K8s rightsizing</li><li><strong>db-optimize</strong> — RDS/ElastiCache/OpenSearch</li><li><strong>msk-optimize</strong> — Kafka broker sizing</li><li><strong>idle-scan</strong> — 낭비 리소스 탐지</li></ul>
 </div><div class="col">
-</div><div class="fragment fade-in" data-fragment-index="2"><h3>AWS Native FinOps</h3>
+<h3>AWS Native FinOps</h3>
 <ul><li><strong>Compute Optimizer</strong> — EC2/Lambda/EBS 권장</li><li><strong>RI/SP Recommendations</strong> — 예약 인스턴스/Savings Plan</li><li><strong>Cost Optimization Hub</strong> — 통합 최적화 권장</li><li><strong>Trusted Advisor</strong> — 비용 최적화 검사</li></ul>
-</div><div class="fragment fade-in" data-fragment-index="3"><h3>통합 비용 분석</h3>
+<h3>통합 비용 분석</h3>
 <ul><li>ECS: CloudWatch Container Insights + Fargate 가격</li><li>EKS: OpenCost API + Request 기반 폴백</li><li>멀티 어카운트: 계정별 비용 쿼리 → 태깅 병합</li></ul>
 </div>
 </div>
   </div>
-</div></div>
+</div>
 
 <div class="slide" data-remarp-id="s7" style="transition: transform var(--transition-normal), opacity var(--transition-normal)">
   <div class="slide-header" data-remarp-id="s7-header"><h2>Deployment — 30 Minutes</h2></div>
   <div class="slide-body" data-remarp-id="s7-body">
     <p><!-- Slide 8: Deployment --></p>
-<div class="flow-h">
-  <div class="flow-group bg-blue" data-fragment-index="1">
-    <div class="flow-group-label">Phase 1: Infra (5min)</div>
-    <div class="flow-box">00 CDK Deploy</div>
-    <div class="flow-box">01 Install Base</div>
-    <div class="flow-box">02 Setup Next.js</div>
-    <div class="flow-box">03 Build & Deploy</div>
+<div style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;gap:12px;align-items:stretch;">
+  <div style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);border-radius:8px;padding:16px;min-height:220px;display:flex;flex-direction:column;">
+    <div style="color:#00d4ff;font-weight:bold;font-size:14px;margin-bottom:12px;text-align:center;">Phase 1: Infra (5min)</div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+      <div style="background:rgba(0,212,255,0.15);border-radius:6px;padding:8px;font-size:13px;text-align:center;">00 CDK Deploy</div>
+      <div style="background:rgba(0,212,255,0.15);border-radius:6px;padding:8px;font-size:13px;text-align:center;">01 Install Base</div>
+      <div style="background:rgba(0,212,255,0.15);border-radius:6px;padding:8px;font-size:13px;text-align:center;">02 Setup Next.js</div>
+      <div style="background:rgba(0,212,255,0.15);border-radius:6px;padding:8px;font-size:13px;text-align:center;">03 Build & Deploy</div>
+    </div>
   </div>
-  <div class="flow-arrow">&rarr;</div>
-  <div class="flow-group bg-orange" data-fragment-index="2">
-    <div class="flow-group-label">Phase 2: Auth (5min)</div>
-    <div class="flow-box">05 Cognito</div>
-    <div class="flow-box">08 CloudFront Auth</div>
+  <div style="display:flex;align-items:center;color:#00d4ff;font-size:24px;">→</div>
+  <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:16px;min-height:220px;display:flex;flex-direction:column;">
+    <div style="color:#f59e0b;font-weight:bold;font-size:14px;margin-bottom:12px;text-align:center;">Phase 2: Auth (5min)</div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:6px;justify-content:center;">
+      <div style="background:rgba(245,158,11,0.15);border-radius:6px;padding:8px;font-size:13px;text-align:center;">05 Cognito</div>
+      <div style="background:rgba(245,158,11,0.15);border-radius:6px;padding:8px;font-size:13px;text-align:center;">08 CloudFront Auth</div>
+    </div>
   </div>
-  <div class="flow-arrow">&rarr;</div>
-  <div class="flow-group bg-pink" data-fragment-index="3">
-    <div class="flow-group-label">Phase 3: AI (15min)</div>
-    <div class="flow-box">06a Runtime</div>
-    <div class="flow-box">06b Gateways</div>
-    <div class="flow-box">06c Tools (125)</div>
-    <div class="flow-box">06d Interpreter</div>
-    <div class="flow-box">06e Memory</div>
+  <div style="display:flex;align-items:center;color:#f59e0b;font-size:24px;">→</div>
+  <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:16px;min-height:220px;display:flex;flex-direction:column;">
+    <div style="color:#ef4444;font-weight:bold;font-size:14px;margin-bottom:12px;text-align:center;">Phase 3: AI (15min)</div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+      <div style="background:rgba(239,68,68,0.15);border-radius:6px;padding:8px;font-size:13px;text-align:center;">06a Runtime</div>
+      <div style="background:rgba(239,68,68,0.15);border-radius:6px;padding:8px;font-size:13px;text-align:center;">06b Gateways</div>
+      <div style="background:rgba(239,68,68,0.15);border-radius:6px;padding:8px;font-size:13px;text-align:center;">06c Tools (125)</div>
+      <div style="background:rgba(239,68,68,0.15);border-radius:6px;padding:8px;font-size:13px;text-align:center;">06d Interpreter</div>
+      <div style="background:rgba(239,68,68,0.15);border-radius:6px;padding:8px;font-size:13px;text-align:center;">06e Memory</div>
+    </div>
   </div>
-  <div class="flow-arrow">&rarr;</div>
-  <div class="flow-group bg-green" data-fragment-index="4">
-    <div class="flow-group-label">Phase 4: Optional</div>
-    <div class="flow-box">07 OpenCost</div>
-    <div class="flow-box">12 Multi-Account</div>
-    <div class="flow-box">11 Verify</div>
+  <div style="display:flex;align-items:center;color:#00ff88;font-size:24px;">→</div>
+  <div style="background:rgba(0,255,136,0.1);border:1px solid rgba(0,255,136,0.3);border-radius:8px;padding:16px;min-height:220px;display:flex;flex-direction:column;">
+    <div style="color:#00ff88;font-weight:bold;font-size:14px;margin-bottom:12px;text-align:center;">Phase 4: Optional</div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:6px;justify-content:center;">
+      <div style="background:rgba(0,255,136,0.15);border-radius:6px;padding:8px;font-size:13px;text-align:center;">07 OpenCost</div>
+      <div style="background:rgba(0,255,136,0.15);border-radius:6px;padding:8px;font-size:13px;text-align:center;">12 Multi-Account</div>
+      <div style="background:rgba(0,255,136,0.15);border-radius:6px;padding:8px;font-size:13px;text-align:center;">11 Verify</div>
+    </div>
   </div>
 </div>
   </div>
@@ -221,19 +641,19 @@
   <div class="slide-body" data-remarp-id="s8-body">
     <div class="columns">
 <div class="col">
-<div class="fragment fade-in" data-fragment-index="0"><h3>AWSops가 해결하는 문제</h3>
+<h3>AWSops가 해결하는 문제</h3>
 <ul><li><strong>Console Hopping</strong> → 36페이지 Single Pane of Glass</li><li><strong>데이터 사일로</strong> → 7 Datasource 통합</li><li><strong>반복 수작업</strong> → 6 Auto-Collect Agents</li><li><strong>보고서 부담</strong> → 15섹션 자동 종합진단</li></ul>
-</div><div class="fragment fade-in" data-fragment-index="1"><h3>핵심 차별점</h3>
+<h3>핵심 차별점</h3>
 <ul><li>Zero SaaS Dependency</li><li>고객 VPC 내 100% 실행</li><li>Bedrock AI (외부 AI API 불필요)</li><li>30분 배포</li></ul>
 </div><div class="col">
-</div><div class="fragment fade-in" data-fragment-index="2"><h3>Getting Started</h3>
+<h3>Getting Started</h3>
 <ol><li>CDK로 인프라 배포</li><li><code>install-all.sh</code> 실행</li><li>Cognito 사용자 추가</li><li>AI 어시스턴트에서 질문 시작</li></ol>
-</div><div class="fragment fade-in" data-fragment-index="3"><h3>Next Steps</h3>
+<h3>Next Steps</h3>
 <ul><li>데이터소스 연동 (Prometheus, Loki, Tempo)</li><li>멀티 어카운트 설정</li><li>종합진단 리포트 자동 스케줄링</li><li>CIS 벤치마크 정기 실행</li></ul>
 </div>
 </div>
   </div>
-</div></div>
+</div>
 
 <div class="slide" data-remarp-id="s9" style="background:linear-gradient(135deg, #1a1f35 0%, #0d1117 50%, #161b2e 100%); padding:0; overflow:hidden;">
   <div style="position:absolute; top:-20%; right:-10%; width:60%; height:80%; background:radial-gradient(ellipse, rgba(108,92,231,0.15) 0%, transparent 70%); pointer-events:none;"></div>
@@ -249,6 +669,7 @@
 </div>
 <script src="./common/animation-utils.js"></script>
 <script src="./common/slide-framework.js"></script>
+<script src="./common/slide-patches.js"></script>
 <script src="./common/quiz-component.js"></script>
 <script src="./common/presenter-view.js"></script>
 

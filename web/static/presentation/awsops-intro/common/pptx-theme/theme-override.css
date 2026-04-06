@@ -75,3 +75,10 @@
   color: var(--text-secondary);
 }
 /* Original format: ‹#› */
+
+/* Cover slide background image — first slide only */
+.slide:first-child {
+  background-image: url('./images/Picture_13.png') !important;
+  background-size: cover !important;
+  background-position: center !important;
+}
