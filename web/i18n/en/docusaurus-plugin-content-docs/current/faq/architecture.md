@@ -530,3 +530,251 @@ Use **AlertManager** for EKS cluster monitoring and **CloudWatch + SNS** for bro
 :::
 
 </details>
+
+<details>
+<summary>Why is Steampipe pg Pool 660x faster than CLI?</summary>
+
+### CLI vs pg Pool Comparison
+
+```mermaid
+flowchart LR
+  subgraph CLI["steampipe query (CLI)"]
+    SPAWN["Process spawn"] --> FDW["FDW Plugin<br/>initialization"]
+    FDW --> EXEC1["SQL execution"]
+    EXEC1 --> EXIT["Process exit"]
+  end
+
+  subgraph POOL["pg Pool (runQuery)"]
+    CONN["Reuse existing<br/>connection"] --> EXEC2["SQL execution"]
+  end
+```
+
+### Benchmark
+
+| Method | `SELECT COUNT(*) FROM aws_ec2_instance` | Notes |
+|--------|----------------------------------------|-------|
+| `steampipe query "SQL"` CLI | ~3,300ms | Process spawn + FDW init each time |
+| pg Pool `runQuery()` | ~5ms (cache hit), ~200ms (cache miss) | Connection pool reuse |
+| **Performance gap** | **~660x** (cache hit) | |
+
+### Pool Configuration
+
+```typescript
+// src/lib/steampipe.ts
+const pool = new Pool({
+  host: '127.0.0.1',
+  port: 9193,
+  max: 10,                    // 10 connections maintained
+  idleTimeoutMillis: 30000,   // Idle return after 30s
+  connectionTimeoutMillis: 15000, // Fail if no connection in 15s
+  statement_timeout: 30000,   // 30s query timeout
+});
+```
+
+1. **Connection reuse**: 10 connections managed in pool, no per-query creation
+2. **node-cache**: Query results cached for 5 minutes (key: `sp:{accountId}:{SQL}`)
+3. **Steampipe service mode**: `steampipe service start` keeps FDW always loaded
+4. **No binary overhead**: Direct PostgreSQL protocol from Node.js process
+
+### Batch Queries
+
+Dashboard home loads 20+ queries using `batchQuery()`:
+
+```typescript
+// 8 queries in parallel (reserves 2 of 10 pool connections for other requests)
+const results = await batchQuery(queries);  // BATCH_SIZE = 8
+```
+
+</details>
+
+<details>
+<summary>What happens if Steampipe goes down?</summary>
+
+When the Steampipe process stops, pg Pool connections fail. Here's how each layer behaves.
+
+### Failure Propagation
+
+```mermaid
+flowchart TD
+  SP["Steampipe process down"] -->|"port 9193 unreachable"| POOL["pg Pool connection failure"]
+
+  POOL -->|"runQuery() catch"| ERR["{ rows: [], error: message }"]
+  ERR --> DASH["Dashboard: shows empty data"]
+  ERR --> AI_SQL["AI aws-data route: reports unavailability"]
+
+  SP -->|"no impact"| AC["AgentCore Gateway"]
+  AC --> LAMBDA["Lambda (direct AWS API calls)"]
+```
+
+### Impact by Layer
+
+| Layer | When Steampipe is down | Details |
+|-------|------------------------|---------|
+| **Dashboard pages** | Empty data displayed | `runQuery()` returns `{ rows: [], error }`, UI renders empty tables |
+| **AI aws-data route** | "Unable to query data" message | Steampipe SQL fails → Bedrock explains the error |
+| **AI Gateway routes** | **Works normally** | AgentCore → Lambda calls AWS APIs directly (no Steampipe dependency) |
+| **Cached data** | Normal for 5 minutes | Cache hits within TTL don't touch Steampipe |
+| **Cost data** | Snapshot fallback | Falls back to latest JSON in `data/cost/` (retained for 180 days) |
+
+### Error Handling
+
+```typescript
+// src/lib/steampipe.ts — runQuery()
+try {
+  const result = await pool.query(sql);
+  return { rows: result.rows };
+} catch (error) {
+  // Never throws → returns safe empty result to caller
+  return { rows: [], error: error.message };
+}
+```
+
+All queries are wrapped in try/catch — **Steampipe failure never crashes the Next.js server**.
+
+### Recovery
+
+```bash
+# 1. Check Steampipe service status
+steampipe service status
+
+# 2. Restart
+steampipe service restart --force
+
+# 3. Pool reset in Next.js (admin API or server restart)
+# resetPool() retries connection up to 15 times (1-second intervals)
+```
+
+### Zombie Connection Cleanup
+
+Slow Steampipe FDW API calls can exhaust the connection pool. A cleanup runs every 2 minutes:
+
+```typescript
+// Terminates SELECT queries running for 5+ minutes
+// Excludes FDW internal connections (client_addr IS NULL)
+pg_terminate_backend(pid)
+```
+
+</details>
+
+<details>
+<summary>How does pg Pool caching work?</summary>
+
+AWSops uses **node-cache** in-memory caching to store Steampipe query results for 5 minutes.
+
+### Cache Flow
+
+```mermaid
+flowchart TD
+  REQ["API request"] --> CHECK{"Result<br/>in cache?"}
+  CHECK -->|"hit"| RET["Return cached result<br/>(~0ms)"]
+  CHECK -->|"miss"| QUERY["Execute Steampipe SQL<br/>(100~500ms)"]
+  QUERY --> SAVE["Store in cache<br/>(TTL: 5min)"]
+  SAVE --> RET2["Return result"]
+
+  WARM["Cache Warmer<br/>(every 4min)"] -->|"pre-execute key queries"| SAVE
+```
+
+### Cache Key Structure
+
+```
+sp:{accountId}:{SQL statement}
+```
+
+- **Multi-account**: Scoped per account (`sp:111111111111:SELECT...`)
+- **Single account**: `sp:__all__:SELECT...`
+- **Cost availability**: `cost:available:{accountId}` (TTL: 1 hour)
+
+### Configuration
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| Default TTL | 300s (5 min) | General query cache lifetime |
+| Cost availability TTL | 3,600s (1 hour) | `checkCostAvailability` result |
+| Check period | 60s | Expired key cleanup interval |
+| Cache Warmer interval | 240s (4 min) | Refreshes before TTL expires |
+
+### Cache Invalidation
+
+| Method | Trigger | Action |
+|--------|---------|--------|
+| **Refresh button** | User click in UI | `bustCache: true` → skip cache, re-query |
+| **clearCache()** | Admin API | `cache.flushAll()` wipes everything |
+| **resetPool()** | Pool recreation | Flushes cache + pool simultaneously |
+| **Natural expiry** | TTL elapsed | Expired keys cleaned every 60s |
+
+### Cache Warmer (Pre-warming)
+
+Starting 5 seconds after server boot, runs every 4 minutes to pre-populate cache with key dashboard queries:
+
+```typescript
+// src/lib/cache-warmer.ts
+// Warms: EC2, S3, RDS, Lambda, VPC, IAM, ECS, DynamoDB, etc. (~22 queries)
+// CloudWatch monitoring queries EXCLUDED (slow FDW API causes zombie connections)
+```
+
+- Multi-account: Warms up to 3 accounts sequentially
+- `isWarming` flag prevents overlapping runs
+
+</details>
+
+<details>
+<summary>Does batchQuery incur AWS API costs?</summary>
+
+### Short Answer
+
+**Zero cost on cache hits. AWS API calls only on cache misses.**
+
+### Cost Structure
+
+```mermaid
+flowchart LR
+  BQ["batchQuery()<br/>8 in parallel"] --> CACHE{"Cache<br/>hit?"}
+  CACHE -->|"hit"| FREE["No cost<br/>(returned from memory)"]
+  CACHE -->|"miss"| SP["Steampipe FDW"]
+  SP -->|"AWS API call"| AWS["AWS API<br/>(mostly free)"]
+```
+
+### AWS API Call Costs
+
+Steampipe FDW calls **real AWS APIs** on cache miss. Most `Describe`/`List` APIs are free:
+
+| API Type | Cost | Examples |
+|----------|------|---------|
+| EC2 Describe* | Free | `DescribeInstances`, `DescribeVpcs` |
+| S3 List* | $0.005/1,000 req | `ListBuckets` |
+| IAM List/Get* | Free | `ListUsers`, `ListRoles` |
+| CloudWatch GetMetricData | $0.01/1,000 metrics | Metric queries |
+| Cost Explorer GetCostAndUsage | $0.01/request | Cost data |
+| CloudTrail LookupEvents | Free (last 90 days) | Event lookup |
+
+### Real-World Cost Scenarios
+
+**Dashboard home load (~22 queries)**:
+
+| Scenario | API Calls | Est. Cost |
+|----------|-----------|-----------|
+| Cache hit (revisit within 5 min) | 0 | $0 |
+| Cache miss (first load) | ~22 Describe/List | ~$0 (mostly free APIs) |
+| Cache Warmer per hour (15 cycles) | ~330 | ~$0 |
+
+**APIs with meaningful costs**:
+
+| API | Unit Price | Monthly Est. (4-min warming) |
+|-----|-----------|------------------------------|
+| Cost Explorer | $0.01/req | ~$3.24 (6 req/hr × 24h × 30d × $0.01) |
+| CloudWatch GetMetricData | $0.01/1,000 | < $0.01 |
+| S3 ListBuckets | $0.005/1,000 | < $0.01 |
+
+### Cost Optimization Design
+
+1. **5-minute cache**: Zero API calls on page revisits
+2. **Cache Warmer**: Pre-fills cache → most requests are cache hits
+3. **Cost availability 1-hour cache**: `checkCostAvailability()` probes only once per hour
+4. **Batch size 8**: Uses 8 of 10 pool connections, reserves 2 for real-time requests
+5. **CloudWatch queries excluded from warming**: Slow FDW API causes zombie connections → only executed on user request
+
+:::info Cost Explorer Cost Reduction
+Cost Explorer API has the highest per-call cost. `checkCostAvailability()` uses a dedicated 10-second timeout for quick detection, and MSP environments set `costEnabled: false` to skip API calls entirely.
+:::
+
+</details>
