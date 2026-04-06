@@ -98,6 +98,7 @@ const sidebars: SidebarsConfig = {
         'faq/ai-assistant',
         'faq/architecture',
         'faq/agentcore-memory',
+        'faq/datasource-development',
       ],
     },
   ],
