@@ -12,6 +12,10 @@
 - `agentcore-stats.ts` — AgentCore 호출 통계 + 모델별 토큰 사용량 추적 (data/agentcore-stats.json)
 - `agentcore-memory.ts` — 대화 이력 저장/검색, 사용자별 분리 (data/memory/)
 - `auth-utils.ts` — Cognito JWT에서 사용자 정보 추출 (Lambda@Edge 검증 후 payload 디코딩)
+- `eks-optimize-queries.ts` — EKS 리소스 최적화 (Prometheus 메트릭 디스커버리 + K8s 리소스 수집 + 비용 분석 프롬프트)
+- `report-pptx.ts` — PPTX 리포트 생성 (WADD 스타일: 타이틀바, 요약바, 2컬럼/카드 레이아웃, 인라인 테이블, 마크다운 파싱)
+- `report-docx.ts` — DOCX 리포트 생성 (docx 패키지, A4/라이트 테마, TOC, 마크다운→문단/테이블/블릿 변환, 헤더/푸터/페이지 번호)
+- `report-scheduler.ts` — 리포트 스케줄러 (주기적 자동 진단, weekly/biweekly/monthly, KST 기준, data/report-schedule.json)
 - `queries/*.ts` — 25개 SQL 쿼리 파일 (ebs, msk, opensearch, container-cost, eks-container-cost, bedrock 포함)
 
 ## 규칙
@@ -39,6 +43,10 @@ Core libraries: Steampipe database connection, SQL query definitions, inventory,
 - `agentcore-stats.ts` — AgentCore call stats + per-model token usage tracking (data/agentcore-stats.json)
 - `agentcore-memory.ts` — Conversation history save/search, per-user isolation (data/memory/)
 - `auth-utils.ts` — Extract Cognito user from JWT (payload decode after Lambda@Edge verification)
+- `eks-optimize-queries.ts` — EKS resource optimization (Prometheus metric discovery + K8s resource collection + cost analysis prompt)
+- `report-pptx.ts` — PPTX report generation (WADD-style: title bars, summary bars, 2-column/card layouts, inline tables, markdown parsing)
+- `report-docx.ts` — DOCX report generation (docx package, A4/light theme, TOC, markdown→paragraph/table/bullet conversion, header/footer/page numbers)
+- `report-scheduler.ts` — Report scheduler (periodic auto-diagnosis, weekly/biweekly/monthly, KST-based, data/report-schedule.json)
 - `queries/*.ts` — 25 SQL query files (incl. ebs, msk, opensearch, container-cost, eks-container-cost, bedrock)
 
 ## Rules

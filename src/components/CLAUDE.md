@@ -28,6 +28,9 @@
 ### table/ — 데이터 테이블 (1)
 - `table/DataTable.tsx` — 범용 데이터 테이블 (정렬, render 함수, 멀티어카운트 시 Account 컬럼 자동 추가)
 
+### report/ — 리포트 (1)
+- `ReportMarkdown.tsx` — 진단 리포트 마크다운 렌더러 (ReactMarkdown + remarkGfm, 다크 테마, 섹션별 강조색)
+
 ### k8s/ — K8s 전용 (4)
 - `k8s/K9sResourceTable.tsx`, `K9sDetailPanel.tsx`, `K9sClusterHeader.tsx`, `NamespaceFilter.tsx`
 
@@ -68,6 +71,9 @@ Shared React components across pages: layout, cards, charts, tables, K8s UI.
 
 ### table/ — Data Table (1)
 - `table/DataTable.tsx` — Generic data table (sorting, render functions, auto Account column in multi-account mode)
+
+### report/ — Report (1)
+- `ReportMarkdown.tsx` — Diagnosis report markdown renderer (ReactMarkdown + remarkGfm, dark theme, per-section accent colors)
 
 ### k8s/ — K8s Components (4)
 - `k8s/K9sResourceTable.tsx`, `K9sDetailPanel.tsx`, `K9sClusterHeader.tsx`, `NamespaceFilter.tsx`
