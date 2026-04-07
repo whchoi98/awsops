@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- External datasource integration with 7 observability platforms: Prometheus, Loki, Tempo, ClickHouse, Jaeger, Dynatrace, Datadog ([#10](https://github.com/whchoi98/awsops/pull/10))
+- Datasource management page (`/datasources`) with CRUD, connection test, and auth configuration
+- Datasource Explore page (`/datasources/explore`) with direct query execution and AI query generation (natural language to PromQL/LogQL/TraceQL/SQL)
+- Multi-datasource AI correlation: cross-analyze external metrics with AWS resources via `datasource` route
+- AI routing expanded from 10 to 11 routes (added `datasource` route for external platform queries)
+- SSRF protection with allowlist-based private network access and defense-in-depth URL validation
 - Converse Stream API for multi-route synthesis with real-time SSE streaming
 - Typing effect simulation for AgentCore gateway responses
 - Automatic zombie PostgreSQL connection cleanup (queries running longer than 5 minutes)
@@ -25,6 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove monitoring queries from cache warmer to prevent pg pool exhaustion from slow CloudWatch FDW calls
 - Add time range filters to all monitoring metric queries to prevent unbounded query execution
 - Prevent AI chat bubble width jump during SSE streaming ([#8](https://github.com/whchoi98/awsops/pull/8))
+
+### Security
+
+- SSRF defense in depth: URL validation in `datasource-client.ts` protects all outbound fetch paths including AI route
+- Admin-only access enforced on datasource query and AI query generation actions
+- IPv6 private/link-local address detection added (`fc00::/7`, `fe80::/10`)
+- Regex capture groups for safe Tempo/Jaeger trace ID URL insertion
 
 ## [1.7.0] - 2026-03-24
 
@@ -275,6 +288,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- 7종 외부 관측성 플랫폼 연동: Prometheus, Loki, Tempo, ClickHouse, Jaeger, Dynatrace, Datadog ([#10](https://github.com/whchoi98/awsops/pull/10))
+- 데이터소스 관리 페이지(`/datasources`) — CRUD, 연결 테스트, 인증 설정
+- 데이터소스 Explore 페이지(`/datasources/explore`) — 직접 쿼리 실행 + AI 쿼리 생성 (자연어 → PromQL/LogQL/TraceQL/SQL)
+- 멀티 데이터소스 AI 상관 분석: `datasource` 라우트로 외부 메트릭과 AWS 리소스 교차 분석
+- AI 라우팅 10개 → 11개로 확장 (외부 플랫폼 쿼리용 `datasource` 라우트 추가)
+- SSRF 방지: allowlist 기반 사설 네트워크 접근 제어 + 심층 방어 URL 검증
 - 멀티 라우트 합성에 Converse Stream API 적용 (실시간 SSE 스트리밍)
 - AgentCore 게이트웨이 응답에 타이핑 효과 시뮬레이션 추가
 - 좀비 PostgreSQL 연결 자동 정리 (5분 이상 실행 쿼리 종료)
@@ -285,6 +304,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CloudWatch FDW의 느린 API 호출로 인한 pg 풀 고갈 방지를 위해 캐시 워머에서 모니터링 쿼리 제거
 - 모든 모니터링 메트릭 쿼리에 시간 범위 필터 추가 (무제한 쿼리 실행 방지)
 - AI 채팅 버블이 SSE 스트리밍 중 폭이 점프하는 현상 수정 ([#8](https://github.com/whchoi98/awsops/pull/8))
+
+### Security
+
+- SSRF 심층 방어: `datasource-client.ts`에 URL 검증 추가 (AI route 포함 모든 outbound fetch 보호)
+- 데이터소스 쿼리 및 AI 쿼리 생성 액션에 관리자 전용 접근 적용
+- IPv6 사설/링크로컬 주소 차단 추가 (`fc00::/7`, `fe80::/10`)
+- Tempo/Jaeger trace ID URL 삽입에 정규식 캡처 그룹 사용
 
 ## [1.7.0] - 2026-03-24
 
