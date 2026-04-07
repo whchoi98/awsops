@@ -2,9 +2,13 @@ import { chromium, type Page, type Browser, type BrowserContext } from 'playwrig
 import * as path from 'path';
 import * as fs from 'fs';
 
-const BASE_URL = 'https://awsops.whchoi.net/awsops';
-const LOGIN_EMAIL = 'admin@awsops.local';
-const LOGIN_PASSWORD = '!234Qwer';
+const BASE_URL = process.env.SCREENSHOT_BASE_URL || 'https://awsops.whchoi.net/awsops';
+const LOGIN_EMAIL = process.env.SCREENSHOT_EMAIL || 'admin@awsops.local';
+const LOGIN_PASSWORD = process.env.SCREENSHOT_PASSWORD || '';
+if (!LOGIN_PASSWORD) {
+  console.error('ERROR: Set SCREENSHOT_PASSWORD environment variable. Never hardcode credentials.');
+  process.exit(1);
+}
 const OUTPUT_DIR = path.join(__dirname, '..', 'static', 'screenshots');
 
 // DPR resolution map: viewport stays 1920x1080, only pixel density changes

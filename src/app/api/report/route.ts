@@ -21,7 +21,11 @@ import { randomUUID } from 'crypto';
 const bedrockClient = new BedrockRuntimeClient({ region: 'ap-northeast-2' });
 const s3Client = new S3Client({ region: 'ap-northeast-2' });
 const MODEL_ID = 'global.anthropic.claude-opus-4-6-v1';
-const REPORT_BUCKET = 'awsops-deploy-180294183052';
+// Read bucket from config — no hardcoded account IDs / config에서 버킷 읽기
+function getReportBucket(): string {
+  const { getConfig: gc } = require('@/lib/app-config');
+  return gc().reportBucket || process.env.getReportBucket() || '';
+}
 const REPORT_S3_PREFIX = 'reports/';
 const REPORTS_META_DIR = path.join(process.cwd(), 'data', 'reports');
 
@@ -419,13 +423,13 @@ async function generateReportBackground(
   const s3KeyMd = `${REPORT_S3_PREFIX}${reportId}.md`;
   await Promise.all([
     s3Client.send(new PutObjectCommand({
-      Bucket: REPORT_BUCKET,
+      Bucket: getReportBucket(),
       Key: s3KeyDocx,
       Body: docxBuffer,
       ContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     })),
     s3Client.send(new PutObjectCommand({
-      Bucket: REPORT_BUCKET,
+      Bucket: getReportBucket(),
       Key: s3KeyMd,
       Body: mdBuffer,
       ContentType: 'text/markdown; charset=utf-8',
@@ -435,8 +439,8 @@ async function generateReportBackground(
   // Generate presigned URLs (valid for 7 days)
   // 7일간 유효한 사전 서명 URL 생성
   const [downloadUrlDocx, downloadUrlMd] = await Promise.all([
-    getSignedUrl(s3Client, new GetObjectCommand({ Bucket: REPORT_BUCKET, Key: s3KeyDocx }), { expiresIn: 7 * 24 * 60 * 60 }),
-    getSignedUrl(s3Client, new GetObjectCommand({ Bucket: REPORT_BUCKET, Key: s3KeyMd }), { expiresIn: 7 * 24 * 60 * 60 }),
+    getSignedUrl(s3Client, new GetObjectCommand({ Bucket: getReportBucket(), Key: s3KeyDocx }), { expiresIn: 7 * 24 * 60 * 60 }),
+    getSignedUrl(s3Client, new GetObjectCommand({ Bucket: getReportBucket(), Key: s3KeyMd }), { expiresIn: 7 * 24 * 60 * 60 }),
   ]);
 
   updateReportMeta(reportId, {
@@ -602,7 +606,7 @@ export async function GET(request: NextRequest) {
         refreshPromises.push((async () => {
           try {
             downloadUrlDocx = await getSignedUrl(s3Client, new GetObjectCommand({
-              Bucket: REPORT_BUCKET, Key: meta.s3KeyDocx!,
+              Bucket: getReportBucket(), Key: meta.s3KeyDocx!,
             }), { expiresIn: 7 * 24 * 60 * 60 });
           } catch { /* keep existing */ }
         })());
@@ -611,7 +615,7 @@ export async function GET(request: NextRequest) {
         refreshPromises.push((async () => {
           try {
             downloadUrlMd = await getSignedUrl(s3Client, new GetObjectCommand({
-              Bucket: REPORT_BUCKET, Key: meta.s3KeyMd!,
+              Bucket: getReportBucket(), Key: meta.s3KeyMd!,
             }), { expiresIn: 7 * 24 * 60 * 60 });
           } catch { /* keep existing */ }
         })());
@@ -648,7 +652,7 @@ export async function GET(request: NextRequest) {
 
     try {
       const freshUrl = await getSignedUrl(s3Client, new GetObjectCommand({
-        Bucket: REPORT_BUCKET,
+        Bucket: getReportBucket(),
         Key: meta.s3KeyDocx,
       }), { expiresIn: 60 * 60 });
 
@@ -688,7 +692,7 @@ export async function GET(request: NextRequest) {
     if (meta.s3KeyMd) {
       try {
         const freshUrl = await getSignedUrl(s3Client, new GetObjectCommand({
-          Bucket: REPORT_BUCKET, Key: meta.s3KeyMd,
+          Bucket: getReportBucket(), Key: meta.s3KeyMd,
         }), { expiresIn: 60 * 60 });
         return NextResponse.redirect(freshUrl, 302);
       } catch { /* fallback below */ }
