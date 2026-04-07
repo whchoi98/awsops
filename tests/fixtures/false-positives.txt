@@ -1,0 +1,6 @@
+# False positive samples — these should NOT be flagged
+arn:aws:bedrock-agentcore:REGION:ACCOUNT:runtime/RUNTIME_ID
+accountId: "111111111111"
+const BEDROCK_REGION = 'ap-northeast-2';
+aws_cost_by_service_monthly
+password: spPassword
