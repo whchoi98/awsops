@@ -3,7 +3,51 @@
 // Supports Prometheus, Loki, Tempo, ClickHouse via their HTTP APIs
 import NodeCache from 'node-cache';
 import type { DatasourceConfig, DatasourceType } from './app-config';
+import { getDatasourceAllowedNetworks } from './app-config';
 import { DATASOURCE_TYPES } from './datasource-registry';
+
+// --- SSRF validation (defense in depth) / SSRF 검증 (심층 방어) ---
+// Duplicated core logic from route.ts so ALL outbound fetch paths are protected,
+// including the AI route which calls queryDatasource() directly.
+function validateDatasourceUrl(urlStr: string): void {
+  let parsed: URL;
+  try { parsed = new URL(urlStr); } catch { throw new Error('Invalid datasource URL'); }
+  const hostname = parsed.hostname.toLowerCase();
+  // Block metadata endpoints / 메타데이터 엔드포인트 차단
+  if (hostname === '169.254.169.254' || hostname === 'metadata.google.internal' || hostname === '100.100.100.200') {
+    throw new Error('SSRF: metadata endpoint blocked');
+  }
+  // Block loopback / 루프백 차단
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]') {
+    throw new Error('SSRF: loopback address blocked');
+  }
+  // Protocol check / 프로토콜 확인
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('SSRF: only http/https allowed');
+  }
+  // Private/internal check with allowlist / 사설/내부 주소 allowlist 확인
+  const h = hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname;
+  const isPrivate = hostname.endsWith('.internal') || hostname.endsWith('.local')
+    || /^fe80:/i.test(h) || /^f[cd][0-9a-f]{2}:/i.test(h)
+    || (() => {
+      const m = h.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+      if (!m) return false;
+      const [, a, b] = m.map(Number);
+      return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254);
+    })();
+  if (isPrivate) {
+    const allowlist = getDatasourceAllowedNetworks();
+    const allowed = allowlist.some(entry => {
+      if (/^\d+\.\d+\.\d+\.\d+(\/\d+)?$/.test(entry) && /^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
+        return hostname === entry.split('/')[0]; // simplified check
+      }
+      const p = entry.toLowerCase();
+      if (p.startsWith('*.')) return hostname.endsWith(p.slice(1)) || hostname === p.slice(2);
+      return hostname === p;
+    });
+    if (!allowed) throw new Error('SSRF: private address not in allowlist');
+  }
+}
 
 // --- Types ---
 
@@ -243,11 +287,11 @@ async function queryTempo(ds: DatasourceConfig, query: string, opts?: QueryOptio
   const headers = buildHeaders(ds);
   const baseUrl = ds.url.trim().replace(/\/$/, '');
 
-  // Detect trace ID lookup vs TraceQL search
-  const isTraceId = /^[a-f0-9]{16,32}$/i.test(query.trim());
+  // Detect trace ID lookup vs TraceQL search — use capture group for safe URL
+  const traceMatch = query.trim().match(/^([a-f0-9]{16,32})$/i);
 
-  if (isTraceId) {
-    const resp = await fetchWithTimeout(`${baseUrl}/api/traces/${query.trim()}`, { headers }, timeout);
+  if (traceMatch) {
+    const resp = await fetchWithTimeout(`${baseUrl}/api/traces/${traceMatch[1]}`, { headers }, timeout);
     if (!resp.ok) throw new Error(`Tempo error ${resp.status}: ${await resp.text()}`);
     const data = await resp.json();
     return normalizeTempoTrace(data, ds);
@@ -371,11 +415,11 @@ async function queryJaeger(ds: DatasourceConfig, query: string, opts?: QueryOpti
   const headers = buildHeaders(ds);
   const baseUrl = ds.url.trim().replace(/\/$/, '');
 
-  // Detect trace ID lookup vs service search
-  const isTraceId = /^[a-f0-9]{16,32}$/i.test(query.trim());
+  // Detect trace ID lookup vs service search — use capture group for safe URL
+  const jTraceMatch = query.trim().match(/^([a-f0-9]{16,32})$/i);
 
-  if (isTraceId) {
-    const resp = await fetchWithTimeout(`${baseUrl}/api/traces/${query.trim()}`, { headers }, timeout);
+  if (jTraceMatch) {
+    const resp = await fetchWithTimeout(`${baseUrl}/api/traces/${jTraceMatch[1]}`, { headers }, timeout);
     if (!resp.ok) throw new Error(`Jaeger error ${resp.status}: ${await resp.text()}`);
     const data = await resp.json();
     return normalizeJaegerTrace(data, ds);
@@ -612,6 +656,10 @@ const QUERY_HANDLERS: Record<DatasourceType, (ds: DatasourceConfig, query: strin
 };
 
 export async function queryDatasource(ds: DatasourceConfig, query: string, opts?: QueryOptions): Promise<QueryResult> {
+  // SSRF defense in depth: validate URL before any outbound fetch
+  // SSRF 심층 방어: outbound fetch 전 URL 검증
+  validateDatasourceUrl(ds.url);
+
   const key = cacheKey(ds.id, query, opts);
   const cached = dsCache.get<QueryResult>(key);
   if (cached) return cached;
@@ -629,6 +677,10 @@ export async function queryDatasource(ds: DatasourceConfig, query: string, opts?
 }
 
 export async function testConnection(ds: DatasourceConfig): Promise<TestResult> {
+  // SSRF defense in depth / SSRF 심층 방어
+  try { validateDatasourceUrl(ds.url); } catch (e: any) {
+    return { ok: false, latency: 0, error: e.message };
+  }
   const meta = DATASOURCE_TYPES[ds.type];
   if (!meta) return { ok: false, latency: 0, error: `Unknown type: ${ds.type}` };
 
