@@ -121,7 +121,9 @@ export default function K8sOverviewPage() {
     setEniLoading(true);
     setNodeTraffic(null);
     try {
-      const ipPrefix = nodeName.split('.')[0];
+      // Sanitize node name to prevent SQL injection / SQL 인젝션 방지
+      const ipPrefix = nodeName.split('.')[0].replace(/[^a-zA-Z0-9-]/g, '');
+      if (!ipPrefix) { setNodeEnis([]); setEniLoading(false); return; }
       const eniSql = `SELECT network_interface_id, status, interface_type, private_ip_address::text AS primary_ip, attachment_status, private_ip_addresses::text AS all_ips FROM aws_ec2_network_interface WHERE attached_instance_id IN (SELECT instance_id FROM aws_ec2_instance WHERE private_dns_name LIKE '${ipPrefix}%')`;
       const res = await fetch('/awsops/api/steampipe', {
         method: 'POST',
@@ -134,8 +136,15 @@ export default function K8sOverviewPage() {
 
       // Fetch per-ENI traffic from CloudWatch / ENI별 트래픽 조회
       if (eniRows.length > 0) {
-        const eniIds = eniRows.map((e: any) => `'${e.network_interface_id}'`).join(',');
-        const trafficSql = `SELECT dimension_value AS eni_id, metric_name, average, timestamp FROM aws_cloudwatch_metric_statistic_data_point WHERE namespace = 'AWS/EC2' AND metric_name IN ('NetworkIn', 'NetworkOut', 'NetworkPacketsIn', 'NetworkPacketsOut') AND dimension_name = 'NetworkInterfaceId' AND dimension_value IN (${eniIds}) AND period = 300 AND timestamp >= NOW() - INTERVAL '1 hour' ORDER BY dimension_value, metric_name, timestamp DESC`;
+        // Validate ENI IDs before SQL interpolation / SQL 보간 전 ENI ID 검증
+        const ENI_PATTERN = /^eni-[0-9a-f]{8,17}$/;
+        const safeEniIds = eniRows
+          .map((e: any) => String(e.network_interface_id))
+          .filter((id: string) => ENI_PATTERN.test(id))
+          .map((id: string) => `'${id}'`)
+          .join(',');
+        if (!safeEniIds) { setEniLoading(false); return; }
+        const trafficSql = `SELECT dimension_value AS eni_id, metric_name, average, timestamp FROM aws_cloudwatch_metric_statistic_data_point WHERE namespace = 'AWS/EC2' AND metric_name IN ('NetworkIn', 'NetworkOut', 'NetworkPacketsIn', 'NetworkPacketsOut') AND dimension_name = 'NetworkInterfaceId' AND dimension_value IN (${safeEniIds}) AND period = 300 AND timestamp >= NOW() - INTERVAL '1 hour' ORDER BY dimension_value, metric_name, timestamp DESC`;
         try {
           const tRes = await fetch('/awsops/api/steampipe', {
             method: 'POST',
