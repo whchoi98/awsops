@@ -132,8 +132,9 @@ function markStaleReportsAsFailed(): void {
         const meta: ReportMeta = JSON.parse(fs.readFileSync(path.join(REPORTS_META_DIR, file), 'utf-8'));
         if (meta.status === 'generating') {
           const created = new Date(meta.createdAt).getTime();
-          // If generating for more than 15 minutes, it's stale (worker died)
-          if (now - created > 15 * 60 * 1000) {
+          // If generating for more than 30 minutes, it's stale (worker died)
+          // Opus 모델 15섹션 기준 최대 25분 소요 가능 → 30분으로 설정
+          if (now - created > 30 * 60 * 1000) {
             updateReportMeta(meta.reportId, {
               status: 'failed',
               error: 'Report generation was interrupted (server restart). Please start a new diagnosis.',
@@ -262,18 +263,28 @@ async function analyzeSection(
     ],
   });
 
-  const resp = await bedrockClient.send(
-    new InvokeModelCommand({
-      modelId: MODEL_ID,
-      contentType: 'application/json',
-      accept: 'application/json',
-      body: new TextEncoder().encode(body),
-    }),
-  );
+  // 5-minute timeout per section — prevents infinite hang on Bedrock throttling/slowness
+  // 섹션당 5분 타임아웃 — Bedrock 쓰로틀링/지연 시 무한 대기 방지
+  const abortController = new AbortController();
+  const timeout = setTimeout(() => abortController.abort(), 5 * 60 * 1000);
 
-  const decoded = JSON.parse(new TextDecoder().decode(resp.body));
-  const text: string = decoded.content?.[0]?.text || '';
-  return { section, title, content: text };
+  try {
+    const resp = await bedrockClient.send(
+      new InvokeModelCommand({
+        modelId: MODEL_ID,
+        contentType: 'application/json',
+        accept: 'application/json',
+        body: new TextEncoder().encode(body),
+      }),
+      { abortSignal: abortController.signal },
+    );
+
+    const decoded = JSON.parse(new TextDecoder().decode(resp.body));
+    const text: string = decoded.content?.[0]?.text || '';
+    return { section, title, content: text };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // ============================================================================
@@ -342,37 +353,45 @@ async function generateReportBackground(
   let completed = 0;
 
   for (const batch of SECTION_BATCHES) {
-    // Update status with sub-topics for each section in the batch
-    const batchTopics = batch.flatMap(s => (SECTION_SUBTOPICS[s] || [s]).slice(0, 2)).join(', ');
     console.log(`[Report] ${reportId} — Batch: ${batch.join(', ')}`);
-    updateReportMeta(reportId, {
-      progress: { current: completed, total: 15, currentSection: batch[0], statusMessage: batchTopics, completedSections },
-    });
 
-    const results = await Promise.allSettled(
-      batch.map(section => analyzeSection(section, reportData, !!isEn, sectionResults)),
-    );
+    // Wrap each section call to update progress immediately on completion
+    // 각 섹션 호출을 래핑하여 완료 즉시 progress 업데이트
+    const wrappedCalls = batch.map(section => {
+      // Update progress when this section starts analyzing
+      const topics = (SECTION_SUBTOPICS[section] || [section]).slice(0, 3).join(', ');
+      updateReportMeta(reportId, {
+        progress: { current: completed, total: 15, currentSection: section, statusMessage: topics, completedSections },
+      });
 
-    for (let i = 0; i < results.length; i++) {
-      const r = results[i];
-      if (r.status === 'fulfilled') {
-        sectionResults.push(r.value);
-      } else {
-        sectionResults.push({
-          section: batch[i],
-          title: batch[i],
-          content: isEn
-            ? `Analysis failed: ${r.reason?.message || 'Unknown error'}`
-            : `분석 실패: ${r.reason?.message || '알 수 없는 오류'}`,
+      return analyzeSection(section, reportData, !!isEn, sectionResults)
+        .then(result => {
+          sectionResults.push(result);
+          completed++;
+          completedSections.push(section);
+          updateReportMeta(reportId, {
+            progress: { current: completed, total: 15, currentSection: section, statusMessage: '', completedSections },
+          });
+          console.log(`[Report] ${reportId} — ✓ ${section} (${completed}/15)`);
+          return result;
+        })
+        .catch(err => {
+          const msg = err?.name === 'AbortError'
+            ? (isEn ? 'Analysis timed out (5 min limit)' : '분석 시간 초과 (5분 제한)')
+            : (isEn ? `Analysis failed: ${err?.message || 'Unknown error'}` : `분석 실패: ${err?.message || '알 수 없는 오류'}`);
+          const fallback: SectionResult = { section, title: section, content: msg };
+          sectionResults.push(fallback);
+          completed++;
+          completedSections.push(section);
+          updateReportMeta(reportId, {
+            progress: { current: completed, total: 15, currentSection: section, statusMessage: '', completedSections },
+          });
+          console.warn(`[Report] ${reportId} — ✗ ${section}: ${msg}`);
+          return fallback;
         });
-      }
-      completed++;
-      completedSections.push(batch[i]);
-    }
-
-    updateReportMeta(reportId, {
-      progress: { current: completed, total: 15, currentSection: batch[batch.length - 1], statusMessage: '', completedSections },
     });
+
+    await Promise.all(wrappedCalls);
   }
 
   // Reorder: executive-summary first, appendix last
