@@ -42,7 +42,13 @@ function matchesHostnamePattern(hostname: string, pattern: string): boolean {
 // Check if hostname is a private/internal address / 사설/내부 주소 여부 확인
 function isPrivateOrLocal(hostname: string): boolean {
   if (hostname.endsWith('.internal') || hostname.endsWith('.local')) return true;
-  const ipMatch = hostname.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  // Strip IPv6 brackets / IPv6 괄호 제거
+  const h = hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname;
+  // IPv6 private/link-local / IPv6 사설/링크로컬 주소
+  if (/^fe80:/i.test(h)) return true;                   // Link-local
+  if (/^f[cd][0-9a-f]{2}:/i.test(h)) return true;      // Unique local (fc00::/7)
+  // IPv4 private ranges / IPv4 사설 대역
+  const ipMatch = h.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
   if (ipMatch) {
     const [, a, b] = ipMatch.map(Number);
     if (a === 10) return true;                          // 10.0.0.0/8
@@ -219,8 +225,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ allowedNetworks: cleaned });
     }
 
-    // --- Execute query / 쿼리 실행 ---
+    // --- Execute query (admin-only) / 쿼리 실행 (관리자 전용) ---
     if (action === 'query') {
+      const adminCheck = checkAdmin(request);
+      if (adminCheck.error) return adminCheck.error;
+
       const { datasourceId, query, options } = body as {
         datasourceId: string;
         query: string;
@@ -233,6 +242,10 @@ export async function POST(request: NextRequest) {
       if (!ds) {
         return NextResponse.json({ error: 'Datasource not found' }, { status: 404 });
       }
+      // SSRF prevention: validate stored URL before querying
+      if (!isAllowedUrl(ds.url)) {
+        return NextResponse.json({ error: 'Datasource URL not allowed (SSRF protection)' }, { status: 403 });
+      }
       try {
         const result = await queryDatasource(ds, query, options);
         return NextResponse.json(result);
@@ -242,8 +255,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // --- AI query generation / AI 쿼리 생성 ---
+    // --- AI query generation (admin-only) / AI 쿼리 생성 (관리자 전용) ---
     if (action === 'generate-query') {
+      const adminCheck = checkAdmin(request);
+      if (adminCheck.error) return adminCheck.error;
       const { datasourceType, naturalLanguage, timeRange: tr } = body as {
         datasourceType?: string;
         naturalLanguage?: string;
@@ -308,6 +323,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // SSRF prevention: validate URL before persisting
+    if (!isAllowedUrl(url.trim())) {
+      return NextResponse.json({ error: 'URL not allowed: private/internal addresses are blocked' }, { status: 400 });
+    }
+
     const now = new Date().toISOString();
     const newDs: DatasourceConfig = {
       id: crypto.randomUUID(),
@@ -354,6 +374,11 @@ export async function PUT(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json({ error: 'Missing id field' }, { status: 400 });
+    }
+
+    // SSRF prevention: validate URL if provided
+    if (updates.url && !isAllowedUrl(updates.url.trim())) {
+      return NextResponse.json({ error: 'URL not allowed: private/internal addresses are blocked' }, { status: 400 });
     }
 
     // Validate type if provided / type이 제공된 경우 검증
