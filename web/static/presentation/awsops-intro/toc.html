@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AWSops — AI-Powered AWS Operations Dashboard - Table of Contents</title>
+  <link rel="stylesheet" href="./common/theme.css">
+  <style>
+    body { display: flex; flex-direction: column; min-height: 100vh; }
+    .toc-container {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 2rem; gap: 1.5rem;
+    }
+    .toc-title { font-size: 2.5rem; color: var(--text-primary); }
+    .block-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem; max-width: 800px; width: 100%;
+    }
+    .block-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: .5rem; padding: 1.5rem; text-align: center;
+      display: flex; flex-direction: column; gap: 0.5rem;
+      transition: all var(--transition-fast);
+    }
+    .block-card:hover {
+      border-color: var(--accent); box-shadow: 0 0 20px var(--accent-glow);
+    }
+    .block-link { text-decoration: none; flex: 1; }
+    .block-card h3 { color: var(--text-primary); margin: 0; }
+    .block-export-row { display: flex; gap: 0.25rem; justify-content: center; }
+    .btn-sm { padding: 0.2rem 0.5rem; font-size: 0.7rem; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 0.2rem; color: var(--text-secondary); cursor: pointer; }
+    .btn-sm:hover { border-color: var(--accent); color: var(--text-primary); }
+    .export-toolbar {
+      display: flex; gap: 0.5rem; margin-top: 1.5rem;
+    }
+    .export-toolbar .btn {
+      padding: 0.5rem 1rem; font-size: 0.875rem;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 0.25rem; color: var(--text-primary);
+      cursor: pointer; transition: all var(--transition-fast);
+    }
+    .export-toolbar .btn:hover {
+      border-color: var(--accent); background: var(--bg-elevated);
+    }
+  </style>
+</head>
+<body>
+<div class="toc-container">
+  <h1 class="toc-title">AWSops — AI-Powered AWS Operations Dashboard</h1>
+  <div class="block-grid">
+        <div class="block-card">
+      <a href="01-why-awsops.html" class="block-link"><h3>01-why-awsops</h3></a>
+      <div class="block-export-row">
+        <button class="btn-sm" onclick="ExportUtils.exportPDF({title:'01-why-awsops',blocks:['01-why-awsops.html']})">PDF</button>
+        <button class="btn-sm" onclick="ExportUtils.downloadZIP({blocks:['01-why-awsops.html']})">ZIP</button>
+        <button class="btn-sm" onclick="ExportUtils.exportPPTX({title:'01-why-awsops',blocks:['01-why-awsops.html']})">PPTX</button>
+      </div>
+    </div>
+    <div class="block-card">
+      <a href="02-architecture.html" class="block-link"><h3>02-architecture</h3></a>
+      <div class="block-export-row">
+        <button class="btn-sm" onclick="ExportUtils.exportPDF({title:'02-architecture',blocks:['02-architecture.html']})">PDF</button>
+        <button class="btn-sm" onclick="ExportUtils.downloadZIP({blocks:['02-architecture.html']})">ZIP</button>
+        <button class="btn-sm" onclick="ExportUtils.exportPPTX({title:'02-architecture',blocks:['02-architecture.html']})">PPTX</button>
+      </div>
+    </div>
+    <div class="block-card">
+      <a href="03-demo-scenarios.html" class="block-link"><h3>03-demo-scenarios</h3></a>
+      <div class="block-export-row">
+        <button class="btn-sm" onclick="ExportUtils.exportPDF({title:'03-demo-scenarios',blocks:['03-demo-scenarios.html']})">PDF</button>
+        <button class="btn-sm" onclick="ExportUtils.downloadZIP({blocks:['03-demo-scenarios.html']})">ZIP</button>
+        <button class="btn-sm" onclick="ExportUtils.exportPPTX({title:'03-demo-scenarios',blocks:['03-demo-scenarios.html']})">PPTX</button>
+      </div>
+    </div>
+  </div>
+  <div class="export-toolbar">
+    <button class="btn" onclick="ExportUtils.exportPDF({title:'AWSops — AI-Powered AWS Operations Dashboard'})">Export PDF</button>
+    <button class="btn" onclick="ExportUtils.downloadZIP()">Download ZIP</button>
+    <button class="btn" onclick="ExportUtils.exportPPTX({title:'AWSops — AI-Powered AWS Operations Dashboard'})">Export PPTX</button>
+  </div>
+</div>
+<script src="./common/export-utils.js"></script>
+</body>
+</html>
