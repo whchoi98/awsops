@@ -9,7 +9,21 @@
   ],
   "permissions": {
     "allow": [],
-    "deny": []
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(git push --force:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean -f:*)",
+      "Bash(git branch -D:*)",
+      "Bash(chmod 777:*)",
+      "Bash(eval:*)",
+      "Bash(shutdown:*)",
+      "Bash(reboot:*)",
+      "Bash(curl*|*bash:*)",
+      "Bash(curl*|*sh:*)",
+      "Bash(wget*|*bash:*)",
+      "Bash(wget*|*sh:*)"
+    ]
   },
   "skills": {
     "code-review": ".claude/skills/code-review/SKILL.md",
@@ -19,6 +33,37 @@
     "sync-guides": ".claude/skills/sync-guides/SKILL.md"
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/session-context.sh 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/secret-scan.sh \"$TOOL_INPUT_PATH\" 2>/dev/null"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/pre-commit.sh 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Write|Edit",
@@ -34,6 +79,21 @@
           {
             "type": "command",
             "command": "bash .claude/hooks/check-guide-i18n-sync.sh \"$TOOL_INPUT_PATH\" 2>/dev/null || true"
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/check-menu-guide-sync.sh \"$TOOL_INPUT_PATH\" 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/post-build.sh 2>/dev/null || true"
           }
         ]
       }

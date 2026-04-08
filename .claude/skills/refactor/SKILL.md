@@ -1,3 +1,9 @@
+---
+name: refactor
+description: Refactor pages, components, or queries for consistency
+triggers: refactor, cleanup, improve
+---
+
 # 스킬: 리팩토링 / Skill: Refactor
 
 ## 사용 시점 / When to Use

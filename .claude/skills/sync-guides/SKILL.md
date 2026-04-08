@@ -1,3 +1,9 @@
+---
+name: sync-guides
+description: Batch-generate web guide docs and i18n translations
+triggers: sync guides, guide update
+---
+
 # 가이드 문서 동기화 / Sync Guides
 
 src 코드 변경에 따라 web 가이드 문서(한국어)와 i18n 영어 번역을 일괄 생성/업데이트합니다.

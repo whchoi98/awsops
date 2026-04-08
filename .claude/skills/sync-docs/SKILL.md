@@ -1,3 +1,9 @@
+---
+name: sync-docs
+description: Synchronize project documentation with current code state
+triggers: sync docs, documentation update
+---
+
 # 문서 동기화 스킬 / Sync Docs Skill
 
 프로젝트 문서를 현재 코드 상태와 동기화합니다.

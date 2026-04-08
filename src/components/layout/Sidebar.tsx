@@ -60,6 +60,7 @@ const navGroups: NavGroup[] = [
     items: [
       { labelKey: 'sidebar.dashboard', href: '/', icon: LayoutDashboard },
       { labelKey: 'sidebar.aiAssistant', href: '/ai', icon: BrainCircuit },
+      { labelKey: 'sidebar.diagnosis', href: '/ai-diagnosis', icon: ClipboardCheck },
       { labelKey: 'sidebar.agentcore', href: '/agentcore', icon: Activity },
       { labelKey: 'sidebar.diagnosis', href: '/ai-diagnosis', icon: ClipboardCheck },
       { labelKey: 'sidebar.accounts', href: '/accounts', icon: Layers },
@@ -339,7 +340,7 @@ export default function Sidebar() {
           <span>{t('sidebar.costToggle')} {costEnabled ? t('sidebar.costOn') : t('sidebar.costOff')}</span>
           <span className={`w-1.5 h-1.5 rounded-full ${costEnabled ? 'bg-accent-green' : 'bg-gray-600'}`} />
         </button>
-        <p className="text-xs text-gray-600 font-mono">v1.6.0</p>
+        <p className="text-xs text-gray-600 font-mono">v{process.env.NEXT_PUBLIC_APP_VERSION || '1.8.0'}</p>
       </div>
     </aside>
   );

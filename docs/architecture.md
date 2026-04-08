@@ -1,7 +1,7 @@
 # Architecture
 
 ## System Overview
-AWSops Dashboard is an AWS + Kubernetes operations dashboard providing real-time resource monitoring, network troubleshooting, CIS compliance scanning, and AI-powered analysis. Data is sourced from Steampipe's embedded PostgreSQL, rendered via a Next.js 14 frontend, and augmented with Amazon Bedrock AgentCore for intelligent analysis.
+AWSops Dashboard (v1.8.0) is an AWS + Kubernetes operations dashboard providing real-time resource monitoring, network troubleshooting, CIS compliance scanning, AI-powered analysis, external datasource integration (Prometheus/Loki/Tempo/ClickHouse/Jaeger/Dynatrace/Datadog), and AI comprehensive diagnosis. Data is sourced from Steampipe's embedded PostgreSQL, rendered via a Next.js 14 frontend, and augmented with Amazon Bedrock AgentCore for intelligent analysis.
 
 ## Components
 
@@ -10,10 +10,11 @@ AWSops Dashboard is an AWS + Kubernetes operations dashboard providing real-time
 - **Styling**: Tailwind CSS dark navy theme with custom accent colors
 - **Charts**: Recharts for metrics visualization
 - **Topology**: React Flow for network topology diagrams
-- **페이지**: 36개 리소스 페이지 (EC2, EBS, S3, VPC, IAM, Lambda, RDS, ECS, MSK, OpenSearch, Inventory 등)
-  (36 resource pages)
+- **페이지**: 40개 리소스 페이지 (EC2, EBS, S3, VPC, IAM, Lambda, RDS, ECS, MSK, OpenSearch, Inventory, Datasources, AI Diagnosis 등)
+  (40 resource pages)
 - 멀티 어카운트 지원 (AccountSelector, AccountContext)
 - Bedrock 모델 사용량 모니터링, i18n 다국어(ko/en) 지원
+- 외부 데이터소스 연동 (Prometheus, Loki, Tempo, ClickHouse, Jaeger, Dynatrace, Datadog)
 
 ### Data Layer (`src/lib/`)
 - **Steampipe**: Embedded PostgreSQL on port 9193 — 380+ AWS tables, 60+ K8s tables
@@ -24,12 +25,14 @@ AWSops Dashboard is an AWS + Kubernetes operations dashboard providing real-time
 - **Cost Snapshot**: Cost data fallback for MSP accounts (data/cost/)
 - **Config**: App config (data/config.json, costEnabled auto-detect)
 - **Multi-Account**: Steampipe Aggregator로 복수 계정 쿼리, 캐시키에 accountId 접두사 / Multi-account queries via Steampipe Aggregator, cache key prefixed with accountId
+- **External Datasources**: 7종 관측성 플랫폼 HTTP 클라이언트 (SSRF 방지, allowlist, AI 쿼리 생성) / 7 observability platform HTTP clients (SSRF-protected, allowlist, AI query generation)
 
 ### AI Layer (`src/app/api/ai/`)
 - **Models**: Bedrock Sonnet/Opus 4.6
 - **AgentCore**: Runtime (Strands) + 8 Gateways (125 MCP tools via 19 Lambda)
 - **Code Interpreter**: Sandboxed code execution for analysis
-- **Routing**: 10-route priority system (Code → Network → Container → IaC → Data → Security → Monitoring → Cost → AWS → General)
+- **Routing**: 11-route priority system (Code → Network → Container → IaC → Data → Security → Monitoring → Cost → Datasource → AWS → General)
+- **Diagnosis**: 15-section Bedrock Opus analysis with DOCX/MD/PDF export and auto-scheduling
 - **CloudWatch Metrics API**: MSK, RDS, ElastiCache, OpenSearch — AWS CLI `cloudwatch get-metric-data`로 실시간 메트릭 조회
   (Real-time metrics via AWS CLI for 4 data services)
 - **Config 기반 설정**: `data/config.json`에서 `agentRuntimeArn`, `codeInterpreterName`, `costEnabled` 읽기 — 계정별 하드코딩 없음

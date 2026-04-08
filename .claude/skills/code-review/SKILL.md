@@ -1,3 +1,9 @@
+---
+name: code-review
+description: Review changed code against AWSops project conventions
+triggers: review, PR, code quality
+---
+
 # 스킬: 코드 리뷰 / Skill: Code Review
 
 ## 사용 시점 / When to Use

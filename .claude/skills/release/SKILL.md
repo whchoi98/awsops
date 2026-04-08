@@ -1,3 +1,9 @@
+---
+name: release
+description: Prepare a new release with build, verify, changelog, and git tag
+triggers: release, version, tag
+---
+
 # 스킬: 릴리스 / Skill: Release
 
 ## 사용 시점 / When to Use

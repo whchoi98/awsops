@@ -1,25 +1,28 @@
-# AWSops 대시보드 v1.7.0 — Claude 컨텍스트
+# AWSops 대시보드 v1.8.0 — Claude 컨텍스트
 
 ## 프로젝트 개요
-실시간 AWS/Kubernetes 리소스 모니터링, 네트워크 문제 해결, CIS 컴플라이언스, AI 기반 분석을 제공하는 운영 대시보드.
+실시간 AWS/Kubernetes 리소스 모니터링, 네트워크 문제 해결, CIS 컴플라이언스, AI 기반 분석, 외부 데이터소스 연동, AI 종합 진단을 제공하는 운영 대시보드.
 Steampipe, Next.js 14, Amazon Bedrock AgentCore로 구축.
 
 ## 아키텍처
 - **프론트엔드**: Next.js 14 (App Router) + Tailwind CSS 다크 테마 + Recharts + React Flow
 - **데이터**: Steampipe 내장 PostgreSQL (포트 9193) — AWS 380+ 테이블, K8s 60+ 테이블, 멀티 어카운트 Aggregator
+- **외부 데이터소스**: Prometheus, Loki, Tempo, ClickHouse, Jaeger, Dynatrace, Datadog (SSRF 방지 + allowlist)
 - **AI 엔진**: Bedrock Sonnet/Opus 4.6 + AgentCore Runtime (Strands) + 8 Gateway (125 MCP 도구) + 19 Lambda
+- **AI 진단**: 15섹션 Bedrock Opus 분석 + DOCX/MD/PDF 내보내기 + 자동 스케줄링
 - **인증**: Cognito User Pool + Lambda@Edge (Python 3.12, us-east-1) + CloudFront
 - **인프라**: CDK (`infra-cdk/`) → CloudFront (CACHING_DISABLED) → ALB → EC2 (t4g.2xlarge, Private Subnet)
 
-## 현황 (v1.7.0)
+## 현황 (v1.8.0)
 | 항목 | 수치 |
 |------|------|
-| 페이지 | 36 (/accounts 추가) |
-| 라우트 | 50 |
+| 페이지 | 40 (/datasources, /ai-diagnosis 추가) |
+| 라우트 | 54 |
 | SQL 쿼리 파일 | 25 |
-| API 라우트 | 13 |
-| 컴포넌트 | 17 (AccountBadge, AccountSelector 추가) |
+| API 라우트 | 16 (datasources, k8s, report 추가) |
+| 컴포넌트 | 18 (ReportMarkdown 추가) |
 | MCP 도구 | 125 (8 Gateway, 19 Lambda) |
+| AI 라우트 | 11 (datasource 라우트 추가) |
 | ADR | 8 (001-008) |
 
 ## 필수 규칙
@@ -53,7 +56,7 @@ Steampipe, Next.js 14, Amazon Bedrock AgentCore로 구축.
 - SQL에서 `$` 사용 금지 — `conditions::text LIKE '%..%'` 사용
 
 ### AI 라우팅 (`src/app/api/ai/route.ts`)
-10단계 우선순위 — 목록/현황 질문은 `aws-data` (Steampipe SQL), 트러블슈팅/진단은 전문 Gateway로 분류:
+11단계 우선순위 — 목록/현황 질문은 `aws-data` (Steampipe SQL), 트러블슈팅/진단은 전문 Gateway, 외부 메트릭은 `datasource`로 분류:
 
 | 우선순위 | 라우트 | 대상 |
 |----------|--------|------|
@@ -65,8 +68,9 @@ Steampipe, Next.js 14, Amazon Bedrock AgentCore로 구축.
 | 6 | security | Security Gateway — IAM, 정책 시뮬레이션 |
 | 7 | monitoring | Monitoring Gateway — CloudWatch, CloudTrail |
 | 8 | cost | Cost Gateway — 비용 분석, 예측, 예산 |
-| 9 | aws-data | Steampipe SQL + Bedrock 분석 (목록/현황/구성 분석) |
-| 10 | general | Ops Gateway → Bedrock 폴백 |
+| 9 | datasource | 외부 데이터소스 — Prometheus, Loki, Tempo, ClickHouse, Jaeger, Dynatrace, Datadog |
+| 10 | aws-data | Steampipe SQL + Bedrock 분석 (목록/현황/구성 분석) |
+| 11 | general | Ops Gateway → Bedrock 폴백 |
 
 - AgentCore 설정은 `data/config.json`에서 읽음 — 계정별 하드코딩 없음
 - AgentCore 응답에서 도구 사용 내역을 키워드 매칭으로 추론하여 UI에 표시
@@ -87,10 +91,18 @@ Steampipe, Next.js 14, Amazon Bedrock AgentCore로 구축.
 - `agentcore-stats.ts` — AgentCore 호출 통계 (총 호출, 평균 응답시간, 게이트웨이별, 모델별 토큰 사용량)
 - `agentcore-memory.ts` — 대화 이력 영구 저장/검색 (사용자별 분리, data/memory/)
 - `auth-utils.ts` — Cognito JWT에서 사용자 정보 추출 (email, sub)
-- `cache-warmer.ts` — 백그라운드 캐시 프리워밍 (대시보드 23개 + 모니터링 10개 쿼리, 4분 주기)
+- `cache-warmer.ts` — 백그라운드 캐시 프리워밍 (대시보드 23개 쿼리, 4분 주기)
+- `datasource-client.ts` — 외부 데이터소스 HTTP 클라이언트 (7종: Prometheus, Loki, Tempo, ClickHouse, Jaeger, Dynatrace, Datadog)
+- `datasource-registry.ts` — 데이터소스 타입 레지스트리 (헬스체크 엔드포인트, 쿼리 언어)
+- `datasource-prompts.ts` — 데이터소스 AI 쿼리 생성 프롬프트
+- `report-generator.ts` — 종합 진단 데이터 수집 오케스트레이터
+- `report-prompts.ts` — 15섹션 진단 프롬프트 정의
+- `report-docx.ts` — DOCX 리포트 생성 (A4, TOC, 마크다운 변환)
+- `report-pptx.ts` — PPTX 리포트 생성 (WADD 스타일)
+- `report-scheduler.ts` — 자동 진단 스케줄러 (weekly/biweekly/monthly)
 
-### API 라우트 (`src/app/api/`, 13개)
-- `ai/route.ts` — AI 라우팅 (10 routes, 멀티 라우트, SSE 스트리밍, 도구 추론)
+### API 라우트 (`src/app/api/`, 16개)
+- `ai/route.ts` — AI 라우팅 (11 routes, 멀티 라우트, SSE 스트리밍, 도구 추론, datasource 라우트)
 - `steampipe/route.ts` — Steampipe 쿼리 + Cost 가용성 + 인벤토리 (POST/GET/PUT)
 - `auth/route.ts` — 로그아웃 (HttpOnly 쿠키 서버 사이드 삭제)
 - `msk/route.ts` — MSK 브로커 노드 + CloudWatch 메트릭
@@ -103,6 +115,9 @@ Steampipe, Next.js 14, Amazon Bedrock AgentCore로 구축.
 - `container-cost/route.ts` — ECS 컨테이너 비용 (CloudWatch Container Insights + Fargate 가격)
 - `eks-container-cost/route.ts` — EKS 컨테이너 비용 (OpenCost API + Request 기반 폴백)
 - `bedrock-metrics/route.ts` — Bedrock 모델 사용량 메트릭 (CloudWatch + AWSops 앱 토큰 통계)
+- `datasources/route.ts` — 외부 데이터소스 CRUD + 쿼리 실행 + AI 쿼리 생성 (SSRF 방지)
+- `k8s/route.ts` — EKS kubeconfig 등록
+- `report/route.ts` — AI 종합 진단 리포트 생성 + S3 저장 + 스케줄링
 
 ### 인프라
 - `infra-cdk/lib/awsops-stack.ts` — CDK 인프라 (VPC, EC2, ALB, CloudFront)
@@ -175,27 +190,30 @@ Step 12: 12-setup-multi-account.sh       멀티 어카운트 설정 (선택, Agg
 
 ---
 
-# AWSops Dashboard v1.7.0 — Claude Context (English)
+# AWSops Dashboard v1.8.0 — Claude Context (English)
 
 ## Project Overview
-AWS + Kubernetes operations dashboard with real-time resource monitoring, network troubleshooting, CIS compliance, and AI-powered analysis. Built with Steampipe, Next.js 14, and Amazon Bedrock AgentCore.
+AWS + Kubernetes operations dashboard with real-time resource monitoring, network troubleshooting, CIS compliance, AI-powered analysis, external datasource integration, and AI comprehensive diagnosis. Built with Steampipe, Next.js 14, and Amazon Bedrock AgentCore.
 
 ## Architecture
 - **Frontend**: Next.js 14 (App Router) + Tailwind CSS dark theme + Recharts + React Flow
 - **Data**: Steampipe embedded PostgreSQL (port 9193) — 380+ AWS tables, 60+ K8s tables, multi-account Aggregator
+- **External Datasources**: Prometheus, Loki, Tempo, ClickHouse, Jaeger, Dynatrace, Datadog (SSRF-protected + allowlist)
 - **AI**: Bedrock Sonnet/Opus 4.6 + AgentCore Runtime (Strands) + 8 Gateways (125 MCP tools) + 19 Lambda
+- **AI Diagnosis**: 15-section Bedrock Opus analysis + DOCX/MD/PDF export + auto-scheduling
 - **Auth**: Cognito User Pool + Lambda@Edge (Python 3.12, us-east-1) + CloudFront
 - **Infra**: CDK → CloudFront (CACHING_DISABLED) → ALB → EC2 (t4g.2xlarge, Private Subnet)
 
-## Stats (v1.7.0)
+## Stats (v1.8.0)
 | Item | Count |
 |------|-------|
-| Pages | 36 (incl. /accounts) |
-| Routes | 50 |
+| Pages | 40 (incl. /datasources, /ai-diagnosis) |
+| Routes | 54 |
 | SQL Query Files | 25 |
-| API Routes | 13 |
-| Components | 17 (incl. AccountBadge, AccountSelector) |
+| API Routes | 16 (incl. datasources, k8s, report) |
+| Components | 18 (incl. ReportMarkdown) |
 | MCP Tools | 125 (8 Gateways, 19 Lambda) |
+| AI Routes | 11 (incl. datasource route) |
 | ADRs | 8 (001-008) |
 
 ## Critical Rules
@@ -227,7 +245,7 @@ AWS + Kubernetes operations dashboard with real-time resource monitoring, networ
 - No `$` in SQL — use `conditions::text LIKE '%..%'`
 
 ### AI Routing (`src/app/api/ai/route.ts`)
-10-route priority. Listing/status queries → `aws-data` (Steampipe SQL). Troubleshooting → specialized Gateway.
+11-route priority. Listing/status → `aws-data` (Steampipe SQL). Troubleshooting → specialized Gateway. External metrics → `datasource`.
 
 | Priority | Route | Target |
 |----------|-------|--------|
@@ -239,8 +257,9 @@ AWS + Kubernetes operations dashboard with real-time resource monitoring, networ
 | 6 | security | Security Gateway — IAM, policy simulation |
 | 7 | monitoring | Monitoring Gateway — CloudWatch, CloudTrail |
 | 8 | cost | Cost Gateway — billing, forecast, budget |
-| 9 | aws-data | Steampipe SQL + Bedrock analysis (listing/status/config analysis) |
-| 10 | general | Ops Gateway → Bedrock fallback |
+| 9 | datasource | External datasources — Prometheus, Loki, Tempo, ClickHouse, Jaeger, Dynatrace, Datadog |
+| 10 | aws-data | Steampipe SQL + Bedrock analysis (listing/status/config analysis) |
+| 11 | general | Ops Gateway → Bedrock fallback |
 
 - AgentCore config from `data/config.json` — no hardcoded account ARNs
 - Tool usage inferred from response content keywords and shown in UI
@@ -261,10 +280,18 @@ AWS + Kubernetes operations dashboard with real-time resource monitoring, networ
 - `agentcore-stats.ts` — AgentCore call stats (total calls, avg time, per-gateway, per-model token usage)
 - `agentcore-memory.ts` — Conversation history persistence/search (per-user, data/memory/)
 - `auth-utils.ts` — Extract Cognito user info from JWT (email, sub)
-- `cache-warmer.ts` — Background cache pre-warming (dashboard 23 + monitoring 10 queries, 4-min interval)
+- `cache-warmer.ts` — Background cache pre-warming (dashboard 23 queries, 4-min interval)
+- `datasource-client.ts` — External datasource HTTP client (7 platforms: Prometheus, Loki, Tempo, ClickHouse, Jaeger, Dynatrace, Datadog)
+- `datasource-registry.ts` — Datasource type registry (health endpoints, query languages)
+- `datasource-prompts.ts` — AI query generation prompts per datasource type
+- `report-generator.ts` — Diagnosis report data collection orchestrator
+- `report-prompts.ts` — 15-section diagnosis prompt definitions
+- `report-docx.ts` — DOCX report generation (A4, TOC, markdown conversion)
+- `report-pptx.ts` — PPTX report generation (WADD-style)
+- `report-scheduler.ts` — Auto-diagnosis scheduler (weekly/biweekly/monthly)
 
-### API Routes (`src/app/api/`, 13 routes)
-- `ai/route.ts` — AI routing (10 routes, multi-route, SSE streaming, tool inference)
+### API Routes (`src/app/api/`, 16 routes)
+- `ai/route.ts` — AI routing (11 routes, multi-route, SSE streaming, tool inference, datasource route)
 - `steampipe/route.ts` — Steampipe queries + Cost availability + Inventory (POST/GET/PUT)
 - `auth/route.ts` — Logout (server-side HttpOnly cookie deletion)
 - `msk/route.ts` — MSK broker nodes + CloudWatch metrics
@@ -277,6 +304,9 @@ AWS + Kubernetes operations dashboard with real-time resource monitoring, networ
 - `container-cost/route.ts` — ECS Container Cost (CloudWatch Container Insights + Fargate pricing)
 - `eks-container-cost/route.ts` — EKS Container Cost (OpenCost API + request-based fallback)
 - `bedrock-metrics/route.ts` — Bedrock model usage metrics (CloudWatch + AWSops app token stats)
+- `datasources/route.ts` — External datasource CRUD + query execution + AI query generation (SSRF-protected)
+- `k8s/route.ts` — EKS kubeconfig registration
+- `report/route.ts` — AI diagnosis report generation + S3 storage + scheduling
 
 ### Infrastructure
 - `infra-cdk/lib/awsops-stack.ts` — CDK infra (VPC, EC2, ALB, CloudFront)

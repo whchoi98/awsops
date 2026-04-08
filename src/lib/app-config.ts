@@ -73,6 +73,7 @@ export interface AppConfig {
   customerName?: string;       // Customer name displayed next to logo / 로고 옆에 표시할 고객명
   customerLogoBg?: string;     // Logo background: "light" (white bg) or "dark" (transparent) / 로고 배경: light=흰색, dark=투명
   adminEmails?: string[];      // Admin user emails allowed to access /accounts / 계정 관리 접근 허용 이메일
+  reportBucket?: string;       // S3 bucket for diagnosis reports / 진단 리포트 S3 버킷
   accounts?: AccountConfig[];
   datasources?: DatasourceConfig[];  // External datasources / 외부 데이터소스
   datasourceAllowedNetworks?: string[];  // Allowed private CIDRs/hostnames for datasource SSRF allowlist
