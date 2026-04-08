@@ -80,6 +80,14 @@ export interface AppConfig {
   snsTopicArn?: string;               // SNS topic ARN for email notifications / 이메일 알림용 SNS 토픽 ARN
   notificationEmails?: string[];      // Mailing list for report/benchmark notifications / 리포트/벤치마크 알림 메일링 리스트
   notificationEnabled?: boolean;      // Enable auto-notification on report completion / 리포트 완료 시 자동 알림 활성화
+  departments?: DepartmentConfig[];   // Department-based account filtering / 부서별 계정 필터링
+}
+
+// Department → Account mapping / 부서 → 계정 매핑
+export interface DepartmentConfig {
+  name: string;            // Display name ("DevTeam", "OpsTeam")
+  cognitoGroup: string;    // Cognito User Pool group name
+  accounts: string[];      // Allowed account IDs ("*" = all) / 허용 계정 ID ("*" = 전체)
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -164,4 +172,36 @@ export function getDatasourcesByType(type: DatasourceType): DatasourceConfig[] {
 
 export function getDatasourceAllowedNetworks(): string[] {
   return getConfig().datasourceAllowedNetworks || [];
+}
+
+// --- Department-based filtering / 부서별 필터링 ---
+
+export function getDepartments(): DepartmentConfig[] {
+  return getConfig().departments || [];
+}
+
+// Cognito 그룹 목록으로 허용된 계정 ID 반환 / Get allowed account IDs for user's Cognito groups
+// departments 미설정 시 null 반환 (= 필터링 비활성, 전체 접근) / Returns null if no departments configured (= no filtering)
+export function getAllowedAccountIds(groups: string[]): string[] | null {
+  const departments = getDepartments();
+  if (departments.length === 0) return null; // 부서 필터 미설정 → 전체 접근
+
+  const matched = departments.filter(d => groups.includes(d.cognitoGroup));
+  if (matched.length === 0) return []; // 그룹 매칭 없음 → 접근 불가
+
+  // "*" 포함 시 전체 접근 / If any department has "*", grant full access
+  if (matched.some(d => d.accounts.includes('*'))) return null;
+
+  // 허용 계정 합산 (중복 제거) / Union of all allowed accounts (deduplicated)
+  const accountSet = new Set<string>();
+  matched.forEach(d => d.accounts.forEach(a => accountSet.add(a)));
+  return Array.from(accountSet);
+}
+
+// 특정 accountId가 사용자에게 허용되는지 검증 / Check if accountId is allowed for user
+export function isAccountAllowed(accountId: string | undefined, groups: string[]): boolean {
+  const allowed = getAllowedAccountIds(groups);
+  if (allowed === null) return true; // 필터링 비활성 → 전체 접근
+  if (!accountId || accountId === ALL_ACCOUNTS) return false; // 부서 제한 있으면 "All" 불가
+  return allowed.includes(accountId);
 }

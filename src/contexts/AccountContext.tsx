@@ -18,6 +18,7 @@ interface AccountContextType {
   currentAccount: AccountInfo | undefined;
   getFeatures: () => { costEnabled: boolean; eksEnabled: boolean; k8sEnabled: boolean };
   refetchAccounts: () => Promise<void>;
+  isDepartmentFiltered: boolean;  // true when departments config restricts this user
 }
 
 export const ALL_ACCOUNTS = '__all__';
@@ -31,6 +32,7 @@ const defaultContext: AccountContextType = {
   currentAccount: undefined,
   getFeatures: () => ({ costEnabled: true, eksEnabled: true, k8sEnabled: true }),
   refetchAccounts: async () => {},
+  isDepartmentFiltered: false,
 };
 
 const AccountContext = createContext<AccountContextType>(defaultContext);
@@ -42,25 +44,48 @@ export function useAccountContext() {
 export default function AccountProvider({ children }: { children: ReactNode }) {
   const [accounts, setAccounts] = useState<AccountInfo[]>([]);
   const [currentAccountId, setCurrentAccountIdState] = useState<string>(ALL_ACCOUNTS);
+  const [isDepartmentFiltered, setIsDepartmentFiltered] = useState(false);
 
   const refetchAccounts = useCallback(async () => {
     try {
-      const r = await fetch('/awsops/api/steampipe?action=config');
-      const config = await r.json();
+      // Fetch config and allowed accounts in parallel
+      // config + 부서 허용 계정을 병렬로 조회
+      const [configRes, allowedRes] = await Promise.all([
+        fetch('/awsops/api/steampipe?action=config'),
+        fetch('/awsops/api/steampipe?action=allowed-accounts'),
+      ]);
+      const config = await configRes.json();
+      const { allowedAccountIds } = await allowedRes.json() as { allowedAccountIds: string[] | null };
+
       if (config.accounts && config.accounts.length > 0) {
-        const fetched: AccountInfo[] = config.accounts.map((a: Record<string, unknown>) => ({
+        let fetched: AccountInfo[] = config.accounts.map((a: Record<string, unknown>) => ({
           accountId: a.accountId as string,
           alias: a.alias as string,
           region: a.region as string,
           isHost: a.isHost as boolean | undefined,
           features: a.features as { costEnabled: boolean; eksEnabled: boolean; k8sEnabled: boolean } | undefined,
         }));
+
+        // Apply department filtering if configured / 부서 필터링 적용
+        const filtered = allowedAccountIds !== null;
+        setIsDepartmentFiltered(filtered);
+        if (filtered) {
+          fetched = fetched.filter(a => allowedAccountIds.includes(a.accountId));
+        }
+
         setAccounts(fetched);
         setCurrentAccountIdState(prev => {
+          // If department-filtered, don't allow ALL_ACCOUNTS / 부서 제한 시 "전체" 불가
+          if (filtered && prev === ALL_ACCOUNTS) {
+            const first = fetched[0]?.accountId || ALL_ACCOUNTS;
+            try { localStorage.setItem(LS_KEY, first); } catch {}
+            return first;
+          }
           if (prev === ALL_ACCOUNTS) return prev;
           if (fetched.some(a => a.accountId === prev)) return prev;
-          try { localStorage.setItem(LS_KEY, ALL_ACCOUNTS); } catch {}
-          return ALL_ACCOUNTS;
+          const fallback = filtered ? (fetched[0]?.accountId || ALL_ACCOUNTS) : ALL_ACCOUNTS;
+          try { localStorage.setItem(LS_KEY, fallback); } catch {}
+          return fallback;
         });
       }
     } catch {}
@@ -98,8 +123,8 @@ export default function AccountProvider({ children }: { children: ReactNode }) {
   }, [isMultiAccount, currentAccountId, accounts, currentAccount]);
 
   const contextValue = useMemo(() => ({
-    currentAccountId, accounts, isMultiAccount, setCurrentAccountId, currentAccount, getFeatures, refetchAccounts,
-  }), [currentAccountId, accounts, isMultiAccount, setCurrentAccountId, currentAccount, getFeatures, refetchAccounts]);
+    currentAccountId, accounts, isMultiAccount, setCurrentAccountId, currentAccount, getFeatures, refetchAccounts, isDepartmentFiltered,
+  }), [currentAccountId, accounts, isMultiAccount, setCurrentAccountId, currentAccount, getFeatures, refetchAccounts, isDepartmentFiltered]);
 
   return (
     <AccountContext.Provider value={contextValue}>

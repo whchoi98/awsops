@@ -5,7 +5,7 @@ import { homedir } from 'os';
 import { batchQuery, clearCache, checkCostAvailability, runCostQueriesPerAccount, resetPool } from '@/lib/steampipe';
 import { saveSnapshot, getHistory } from '@/lib/resource-inventory';
 import { saveCostSnapshot, getLatestCostSnapshot } from '@/lib/cost-snapshot';
-import { getConfig, saveConfig, validateAccountId, getAccounts, isMultiAccount } from '@/lib/app-config';
+import { getConfig, saveConfig, validateAccountId, getAccounts, isMultiAccount, getAllowedAccountIds, isAccountAllowed } from '@/lib/app-config';
 import type { AccountConfig } from '@/lib/app-config';
 import { getCacheWarmerStatus, ensureCacheWarmerStarted } from '@/lib/cache-warmer';
 import { getUserFromRequest } from '@/lib/auth-utils';
@@ -71,6 +71,14 @@ export async function GET(request: NextRequest) {
       const message = err instanceof Error ? err.message : 'Inventory fetch failed';
       return NextResponse.json({ error: message }, { status: 500 });
     }
+  }
+
+  // Department-based account filtering — returns allowed account IDs for current user
+  // 부서 기반 계정 필터링 — 현재 사용자에게 허용된 계정 ID 반환
+  if (action === 'allowed-accounts') {
+    const user = getUserFromRequest(request);
+    const allowedAccountIds = getAllowedAccountIds(user.groups);
+    return NextResponse.json({ allowedAccountIds });
   }
 
   if (action === 'config') {
@@ -513,6 +521,16 @@ export async function POST(request: NextRequest) {
     }
 
     const safeAccountId = accountId && validateAccountId(accountId) ? accountId : undefined;
+
+    // Department-based authorization: verify user can access the requested account
+    // 부서 기반 권한 검증: 요청된 계정 접근 허용 여부 확인
+    const user = getUserFromRequest(request);
+    if (!isAccountAllowed(safeAccountId, user.groups)) {
+      return NextResponse.json(
+        { error: 'Access denied. Your department does not have access to this account.' },
+        { status: 403 }
+      );
+    }
 
     let results: Record<string, { rows: unknown[]; error?: string }>;
 
