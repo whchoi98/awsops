@@ -1,9 +1,12 @@
+# sample files
+*.pptx
+
 # dependencies
 node_modules/
 /.pnp
 .pnp.js
 .yarn/install-state.gz
-
+.sensitive/
 # next.js
 /.next/
 /out/
@@ -39,6 +42,9 @@ yarn-error.log*
 
 # oh-my-claudecode state
 .omc/
+
+# playwright mcp
+.playwright-mcp/
 
 # claude code sessions
 .claude/
@@ -78,3 +84,6 @@ powerpipe/.mod.cache.json
 data/config.json
 data/agentcore-stats.json
 data/memory/
+
+# reports (auto-generated)
+reports/

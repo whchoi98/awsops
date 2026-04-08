@@ -236,6 +236,36 @@ SKILL_BASE = {
 - Always suggest optimization opportunities""",
 
 
+    "diagnostics": """You are AWSops Datasource Connectivity Diagnostics Specialist.
+Systematically diagnose datasource connection issues using a 6-step workflow.
+
+## Decision Patterns — Match user question to tool chain:
+| User asks about... | Tool chain |
+|---|---|
+| 데이터소스 연결 진단, 전체 진단 | run_full_diagnosis |
+| URL 검증, SSRF 확인 | validate_datasource_url |
+| DNS 해석, IP 확인 | resolve_dns |
+| NLB 타겟 헬스, 로드밸런서 | check_nlb_targets |
+| 보안그룹 체인, SG 분석 | analyze_security_groups |
+| 네트워크 경로, TGW, 크로스VPC | trace_network_path |
+| HTTP 연결 테스트, 레이턴시 | test_http_connectivity |
+| K8s 서비스 엔드포인트, Pod 매칭 | check_k8s_service_endpoints |
+
+## Diagnostic Workflow (run_full_diagnosis):
+1. validate_datasource_url → URL structure, SSRF risk
+2. resolve_dns → IP resolution, VPC CIDR mapping
+3. check_nlb_targets (if NLB) → target group health
+4. analyze_security_groups → SG chain analysis (source → destination)
+5. trace_network_path (if cross-VPC) → TGW/Peering route verification
+6. test_http_connectivity → actual HTTP health check
+
+## Rules:
+- For general "연결 안됨" or "진단해줘" → always use run_full_diagnosis
+- For specific issues → use the targeted tool
+- Always report pass/fail/warn status per step
+- Provide actionable remediation for each failure""",
+
+
     "iac": """You are AWSops IaC Specialist. Help with Infrastructure as Code tools and best practices.
 
 ## Decision Patterns:
@@ -364,6 +394,7 @@ def handler(payload):
         return "No input provided."
 
     gateway_role = payload.get("gateway", DEFAULT_GATEWAY)
+    skill_role = payload.get("skill", gateway_role)  # skill override for SKILL_BASE / SKILL_BASE용 스킬 오버라이드
     gateway_url = GATEWAYS.get(gateway_role, GATEWAYS[DEFAULT_GATEWAY])
 
     # Extract cross-account info / 크로스 어카운트 정보 추출
@@ -387,7 +418,7 @@ def handler(payload):
 
             # Build skill prompt: static patterns + dynamic tool list + account directive
             # 스킬 프롬프트 구성: 정적 패턴 + 동적 도구 목록 + 어카운트 지시문
-            system_prompt = build_skill_prompt(gateway_role, tools) + account_directive
+            system_prompt = build_skill_prompt(skill_role, tools) + account_directive
 
             agent = Agent(
                 model=model,
@@ -402,7 +433,7 @@ def handler(payload):
     except Exception as e:
         logging.error(f"Gateway MCP error [{gateway_role}]: {e}")
         # Fallback: Bedrock direct with base prompt only / 폴백: 베이스 프롬프트만으로 Bedrock 직접 호출
-        base_prompt = SKILL_BASE.get(gateway_role, SKILL_BASE[DEFAULT_GATEWAY]) + COMMON_FOOTER + account_directive
+        base_prompt = SKILL_BASE.get(skill_role, SKILL_BASE[DEFAULT_GATEWAY]) + COMMON_FOOTER + account_directive
         agent = Agent(
             model=model,
             system_prompt=base_prompt,

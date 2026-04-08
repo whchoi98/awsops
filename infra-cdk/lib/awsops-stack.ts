@@ -4,6 +4,9 @@ import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as elbv2_targets from 'aws-cdk-lib/aws-elasticloadbalancingv2-targets';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
+import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as route53targets from 'aws-cdk-lib/aws-route53-targets';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 
@@ -53,11 +56,9 @@ export class AwsopsStack extends cdk.Stack {
     // -------------------------------------------------------
     // VPC: 기존 VPC 사용 또는 새로 생성 / Use existing or create new
     // -------------------------------------------------------
-    const useExistingVpc = new cdk.CfnCondition(this, 'UseExistingVpc', {
-      expression: cdk.Fn.conditionNot(cdk.Fn.conditionEquals(existingVpcId.valueAsString, '')),
-    });
 
     // 기존 VPC 조회 또는 새 VPC 생성 / Lookup existing or create new
+    const newVpcCidr = (this.node.tryGetContext('newVpcCidr') as string) || '10.10.0.0/16';
     if (this.node.tryGetContext('useExistingVpc') === 'true') {
       // 기존 VPC 사용 모드 / Use existing VPC mode
       const vpcId = this.node.tryGetContext('vpcId') || '';
@@ -65,7 +66,7 @@ export class AwsopsStack extends cdk.Stack {
     } else {
       // 새 VPC 생성 모드 / Create new VPC mode
       this.vpc = new ec2.Vpc(this, 'VPC', {
-        ipAddresses: ec2.IpAddresses.cidr('10.254.0.0/16'),
+        ipAddresses: ec2.IpAddresses.cidr(newVpcCidr),
         maxAzs: 2,
         natGateways: 1,
         subnetConfiguration: [
@@ -83,6 +84,45 @@ export class AwsopsStack extends cdk.Stack {
       });
       // 새 VPC에 이름 태그 / Tag new VPC with name
       cdk.Tags.of(this.vpc).add('Name', `${this.stackName}-VPC`);
+    }
+
+    // -------------------------------------------------------
+    // Transit Gateway Attachment (optional, both new and existing VPC)
+    // -------------------------------------------------------
+    const tgwId = this.node.tryGetContext('transitGatewayId') as string | undefined;
+    if (tgwId) {
+      const tgwAttachment = new ec2.CfnTransitGatewayAttachment(this, 'TGWAttachment', {
+        transitGatewayId: tgwId,
+        vpcId: this.vpc.vpcId,
+        subnetIds: this.vpc.selectSubnets({ subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS }).subnetIds,
+        tags: [{ key: 'Name', value: `${this.stackName}-TGW-Attachment` }],
+      });
+
+      // Multiple TGW route CIDRs (comma-separated) with backward compat
+      const tgwRouteCidrsStr = (this.node.tryGetContext('tgwRouteCidrs') as string)
+        || (this.node.tryGetContext('tgwRouteCidr') as string)
+        || '';
+      const tgwRouteCidrs = tgwRouteCidrsStr
+        ? tgwRouteCidrsStr.split(',').map((c: string) => c.trim()).filter(Boolean)
+        : [];
+
+      tgwRouteCidrs.forEach((cidr: string, cidrIdx: number) => {
+        this.vpc.privateSubnets.forEach((subnet, subnetIdx) => {
+          const routeId = tgwRouteCidrs.length === 1
+            ? `TGWRoute${subnetIdx}`
+            : `TGWRoute-S${subnetIdx}-C${cidrIdx}`;
+          new ec2.CfnRoute(this, routeId, {
+            routeTableId: subnet.routeTable.routeTableId,
+            destinationCidrBlock: cidr,
+            transitGatewayId: tgwId,
+          }).addDependency(tgwAttachment);
+        });
+      });
+
+      new cdk.CfnOutput(this, 'TGWAttachmentId', {
+        value: tgwAttachment.ref,
+        description: 'Transit Gateway Attachment ID',
+      });
     }
 
     // -------------------------------------------------------
@@ -133,7 +173,7 @@ export class AwsopsStack extends cdk.Stack {
       // Use VPC CIDR instead of hardcoded range for existing VPCs
       const vpcCidr = this.node.tryGetContext('useExistingVpc') === 'true'
         ? (this.node.tryGetContext('vpcCidr') || '10.0.0.0/8')
-        : '10.254.0.0/16';
+        : newVpcCidr;
       ssmSg.addIngressRule(ec2.Peer.ipv4(vpcCidr), ec2.Port.tcp(443), 'HTTPS from VPC CIDR');
 
       new ec2.InterfaceVpcEndpoint(this, 'SSMEndpoint', {
@@ -179,6 +219,38 @@ export class AwsopsStack extends cdk.Stack {
       description: 'AWSops EC2 role - SSM, CloudWatch, ReadOnlyAccess for Steampipe',
     });
 
+    // Bedrock model invoke permissions (AI assistant uses Sonnet/Opus 4.6 via global inference profiles)
+    ec2Role.addToPolicy(new iam.PolicyStatement({
+      actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
+      resources: [
+        'arn:aws:bedrock:*:*:inference-profile/global.*',
+        'arn:aws:bedrock:*::foundation-model/anthropic.*',
+      ],
+    }));
+
+    // S3 report upload (diagnosis report PPTX → awsops-deploy bucket)
+    ec2Role.addToPolicy(new iam.PolicyStatement({
+      actions: ['s3:PutObject', 's3:GetObject'],
+      resources: [`arn:aws:s3:::awsops-deploy-${this.account}/reports/*`],
+    }));
+
+    // EKS Access Entry management (register Steampipe read-only access to EKS clusters)
+    // AssociateAccessPolicy requires access-entry resource, so use wildcard
+    ec2Role.addToPolicy(new iam.PolicyStatement({
+      actions: ['eks:CreateAccessEntry', 'eks:AssociateAccessPolicy'],
+      resources: ['*'],
+    }));
+
+    // CloudFront + Lambda@Edge management (08-setup-cloudfront-auth.sh)
+    ec2Role.addToPolicy(new iam.PolicyStatement({
+      actions: [
+        'cloudfront:GetDistribution',
+        'cloudfront:GetDistributionConfig',
+        'cloudfront:UpdateDistribution',
+      ],
+      resources: [`arn:aws:cloudfront::${this.account}:distribution/*`],
+    }));
+
     // -------------------------------------------------------
     // EC2 Instance (Private Subnet, ARM64 Graviton by default)
     // -------------------------------------------------------
@@ -210,8 +282,9 @@ export class AwsopsStack extends cdk.Stack {
       'curl -fsSL https://rpm.nodesource.com/setup_20.x | bash - || true',
       'dnf install -y nodejs || true',
       'if ! command -v node &>/dev/null || [ "$(node -v | cut -d. -f1 | tr -d v)" -lt 20 ]; then',
+      '  export HOME=/root',
       '  curl -fsSL https://fnm.vercel.app/install | bash',
-      '  export FNM_DIR="/root/.local/share/fnm"',
+      '  FNM_DIR="$(find /root/.local /.local -maxdepth 2 -name fnm -type f 2>/dev/null | head -1 | xargs dirname)"',
       '  export PATH="$FNM_DIR:$PATH"',
       '  eval "$(fnm env)"',
       '  fnm install 20 && fnm use 20',
@@ -234,6 +307,14 @@ export class AwsopsStack extends cdk.Stack {
       'dnf install -y docker',
       'systemctl enable docker && systemctl start docker',
       'usermod -aG docker ec2-user',
+      '',
+      '# kubectl',
+      'if [ "$ARCH" = "aarch64" ]; then',
+      '  curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/arm64/kubectl"',
+      'else',
+      '  curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"',
+      'fi',
+      'install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && rm -f kubectl',
       '',
       '# Steampipe',
       '# Steampipe: install as root (/usr/local/bin requires root), plugins as ec2-user',
@@ -316,6 +397,7 @@ export class AwsopsStack extends cdk.Stack {
       ],
     });
     cdk.Tags.of(this.instance).add('Name', `${this.stackName}-AWSops-Server`);
+    cdk.Tags.of(this.instance).add('UserDataVersion', '2');
 
     // -------------------------------------------------------
     // Application Load Balancer (Internet-facing)
@@ -336,6 +418,7 @@ export class AwsopsStack extends cdk.Stack {
     const listener80 = this.alb.addListener('Listener80', {
       port: 80,
       protocol: elbv2.ApplicationProtocol.HTTP,
+      open: false,
       defaultAction: elbv2.ListenerAction.fixedResponse(403, {
         contentType: 'text/plain',
         messageBody: 'Access Denied',
@@ -372,6 +455,7 @@ export class AwsopsStack extends cdk.Stack {
     const listener3000 = this.alb.addListener('Listener3000', {
       port: 3000,
       protocol: elbv2.ApplicationProtocol.HTTP,
+      open: false,
       defaultAction: elbv2.ListenerAction.fixedResponse(403, {
         contentType: 'text/plain',
         messageBody: 'Access Denied',
@@ -433,7 +517,39 @@ export class AwsopsStack extends cdk.Stack {
     // Origin request policy: forward all viewer headers, cookies, query strings
     const allViewerOriginPolicy = cloudfront.OriginRequestPolicy.ALL_VIEWER;
 
+    // -------------------------------------------------------
+    // Custom Domain (optional, via CDK context)
+    // Usage: cdk deploy -c customDomain=awsops.example.com
+    // Optionally: -c hostedZoneName=example.com
+    // -------------------------------------------------------
+    const customDomain = this.node.tryGetContext('customDomain') as string | undefined;
+    const hostedZoneNameCtx = this.node.tryGetContext('hostedZoneName') as string | undefined;
+
+    let domainProps: { domainNames?: string[]; certificate?: acm.ICertificate } = {};
+    let hostedZone: route53.IHostedZone | undefined;
+
+    if (customDomain) {
+      // Derive hosted zone name from domain (e.g., 'awsops.atomai.click' → 'atomai.click')
+      const zoneName = hostedZoneNameCtx || customDomain.split('.').slice(-2).join('.');
+      hostedZone = route53.HostedZone.fromLookup(this, 'HostedZone', {
+        domainName: zoneName,
+      });
+
+      // ACM certificate in us-east-1 (required for CloudFront)
+      const certificate = new acm.DnsValidatedCertificate(this, 'Certificate', {
+        domainName: customDomain,
+        hostedZone,
+        region: 'us-east-1',
+      });
+
+      domainProps = {
+        domainNames: [customDomain],
+        certificate,
+      };
+    }
+
     this.distribution = new cloudfront.Distribution(this, 'CloudFrontDistribution', {
+      ...domainProps,
       comment: `AWSops Dashboard distribution for ${this.stackName}`,
       defaultBehavior: {
         origin: albOriginVSCode,
@@ -461,6 +577,17 @@ export class AwsopsStack extends cdk.Stack {
     });
     cdk.Tags.of(this.distribution).add('Name', `${this.stackName}-CloudFront`);
 
+    // Route 53 A record (alias) pointing custom domain to CloudFront
+    if (customDomain && hostedZone) {
+      new route53.ARecord(this, 'DomainARecord', {
+        zone: hostedZone,
+        recordName: customDomain,
+        target: route53.RecordTarget.fromAlias(
+          new route53targets.CloudFrontTarget(this.distribution),
+        ),
+      });
+    }
+
     // -------------------------------------------------------
     // Outputs
     // -------------------------------------------------------
@@ -471,7 +598,9 @@ export class AwsopsStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, 'CloudFrontURL', {
-      value: `https://${this.distribution.distributionDomainName}`,
+      value: customDomain
+        ? `https://${customDomain}`
+        : `https://${this.distribution.distributionDomainName}`,
       description: 'CloudFront Distribution URL',
       exportName: `${this.stackName}-CloudFront-URL`,
     });

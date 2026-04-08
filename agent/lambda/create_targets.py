@@ -283,6 +283,35 @@ if gw:
             ('list_budgets', 'List budgets', {'type': 'object', 'properties': {}}),
         ]])
 
+    create_target(gw, 'finops-mcp-target', 'awsops-finops-mcp',
+        'FinOps Optimization - Compute Optimizer, RI/SP Recommendations, Cost Optimization Hub, Trusted Advisor (5 tools)',
+        [{'name': n, 'description': d, 'inputSchema': s} for n, d, s in [
+            ('get_rightsizing_recommendations', 'EC2/RDS/ECS/Lambda rightsizing recommendations from Compute Optimizer',
+                {'type': 'object', 'properties': {'resource_type': prop('string', 'all, ec2, rds, ecs, or lambda')}}),
+            ('get_savings_plans_recommendations', 'Savings Plans purchase recommendations from Cost Explorer',
+                {'type': 'object', 'properties': {
+                    'savings_plan_type': prop('string', 'COMPUTE_SP or EC2_INSTANCE_SP'),
+                    'term': prop('string', 'ONE_YEAR or THREE_YEARS'),
+                    'payment_option': prop('string', 'NO_UPFRONT, PARTIAL_UPFRONT, or ALL_UPFRONT'),
+                }}),
+            ('get_reserved_instance_recommendations', 'Reserved Instance purchase recommendations from Cost Explorer',
+                {'type': 'object', 'properties': {
+                    'service': prop('string', 'e.g. Amazon Elastic Compute Cloud - Compute, Amazon RDS, Amazon ElastiCache'),
+                    'term': prop('string', 'ONE_YEAR or THREE_YEARS'),
+                    'payment_option': prop('string', 'NO_UPFRONT, PARTIAL_UPFRONT, or ALL_UPFRONT'),
+                }}),
+            ('get_cost_optimization_hub_recommendations', 'Unified optimization recommendations across all AWS services from Cost Optimization Hub',
+                {'type': 'object', 'properties': {
+                    'action_type': prop('string', 'Rightsize, Stop, Upgrade, PurchaseSavingsPlans, PurchaseReservedInstances, MigrateToGraviton'),
+                    'resource_type': prop('string', 'Ec2Instance, RdsDbInstance, LambdaFunction, EcsService, ElastiCacheReservedInstances'),
+                    'max_results': prop('string', 'Max results (default 50, max 100)'),
+                }}),
+            ('get_trusted_advisor_cost_checks', 'Cost optimization checks from AWS Trusted Advisor',
+                {'type': 'object', 'properties': {
+                    'category': prop('string', 'cost_optimizing (default), security, fault_tolerance, performance'),
+                }}),
+        ]])
+
 # ========== OPS GATEWAY ==========
 print('\n=== Ops Gateway ===')
 gw = find_gateway('ops-gateway')
@@ -307,5 +336,22 @@ if gw:
         'Steampipe SQL (580+ tables)',
         [{'name': 'run_steampipe_query', 'description': 'Execute SQL against 580+ AWS tables',
           'inputSchema': {'type': 'object', 'properties': {'sql': prop('string', 'SQL query')}, 'required': ['sql']}}])
+
+# ========== DATASOURCE DIAGNOSTICS (Monitoring Gateway) ==========
+print('\n=== Datasource Diagnostics (Monitoring Gateway) ===')
+gw = find_gateway('monitoring-gateway')
+if gw:
+    create_target(gw, 'datasource-diag-target', 'awsops-datasource-diag-mcp',
+        'Datasource connectivity diagnostics - URL, DNS, NLB, SG, network path, HTTP (8 tools)',
+        [{'name': n, 'description': d, 'inputSchema': s} for n, d, s in [
+            ('validate_datasource_url', 'Validate URL structure, protocol, SSRF risk, detect NLB/ALB', {'type': 'object', 'properties': {'url': prop('string', 'Datasource URL'), 'datasource_type': prop('string', 'Type: prometheus/loki/tempo/clickhouse')}, 'required': ['url']}),
+            ('resolve_dns', 'Resolve hostname to IPs, map to VPC CIDRs', {'type': 'object', 'properties': {'hostname': prop('string', 'Hostname to resolve')}, 'required': ['hostname']}),
+            ('check_nlb_targets', 'Check NLB target groups and target health', {'type': 'object', 'properties': {'nlb_dns': prop('string', 'NLB DNS name'), 'nlb_arn': prop('string', 'NLB ARN (alternative)'), 'port': prop('integer', 'Target port')}}),
+            ('analyze_security_groups', 'Analyze SG chain for source→destination connectivity', {'type': 'object', 'properties': {'source_cidr': prop('string', 'Source CIDR'), 'destination_ip': prop('string', 'Destination IP'), 'port': prop('integer', 'Port'), 'protocol': prop('string', 'Protocol (default: tcp)')}, 'required': ['destination_ip', 'port']}),
+            ('trace_network_path', 'Trace network path between VPCs (TGW/Peering)', {'type': 'object', 'properties': {'source_vpc_id': prop('string', 'Source VPC ID'), 'destination_vpc_id': prop('string', 'Destination VPC ID'), 'destination_ip': prop('string', 'Destination IP'), 'destination_port': prop('integer', 'Destination port')}, 'required': ['source_vpc_id', 'destination_vpc_id']}),
+            ('test_http_connectivity', 'Test HTTP endpoint reachability, status, latency', {'type': 'object', 'properties': {'url': prop('string', 'URL to test'), 'timeout_seconds': prop('integer', 'Timeout (default: 10)')}, 'required': ['url']}),
+            ('check_k8s_service_endpoints', 'Check K8s Service endpoints and Pod matching', {'type': 'object', 'properties': {'cluster_name': prop('string', 'EKS cluster'), 'namespace': prop('string', 'Namespace'), 'service_name': prop('string', 'Service name')}, 'required': ['cluster_name', 'service_name']}),
+            ('run_full_diagnosis', 'Run full 6-step diagnostic workflow', {'type': 'object', 'properties': {'url': prop('string', 'Datasource URL'), 'datasource_type': prop('string', 'Type'), 'source_vpc_id': prop('string', 'Source VPC ID (for cross-VPC analysis)')}, 'required': ['url']}),
+        ]])
 
 print('\nDONE')

@@ -39,7 +39,7 @@
 
 | 증상 | 원인 | 해결 |
 |------|------|------|
-| EKS 비용 0 표시 | OpenCost 미설치 | `bash scripts/06f-setup-opencost.sh` 실행 |
+| EKS 비용 0 표시 | OpenCost 미설치 | `bash scripts/07-setup-opencost.sh` 실행 |
 | EKS fallback 모드 | OpenCost API 접근 불가 | Prometheus + OpenCost pod 상태 확인 |
 | ECS 비용 부정확 | Container Insights 미활성 | ECS 클러스터에서 Container Insights 활성화 |
 
@@ -47,13 +47,13 @@
 
 ```bash
 # 전체 시작
-bash scripts/08-start-all.sh
+bash scripts/09-start-all.sh
 
 # 전체 중지
-bash scripts/09-stop-all.sh
+bash scripts/10-stop-all.sh
 
 # 헬스 체크
-bash scripts/10-verify.sh
+bash scripts/11-verify.sh
 
 # Steampipe 강제 재시작
 steampipe service stop --force && sleep 2 && steampipe service start --database-listen network --database-port 9193

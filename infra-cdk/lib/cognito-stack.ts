@@ -11,6 +11,11 @@ export interface CognitoStackProps extends cdk.StackProps {
    * Lambda@Edge will be attached to viewer-request events.
    */
   distribution: cloudfront.Distribution;
+  /**
+   * Optional custom domain for the dashboard (e.g., 'awsops.example.com').
+   * When set, Cognito callback URLs will use this domain instead of the CloudFront domain.
+   */
+  customDomain?: string;
 }
 
 export class CognitoStack extends cdk.Stack {
@@ -24,6 +29,9 @@ export class CognitoStack extends cdk.Stack {
     // -------------------------------------------------------
     // Cognito User Pool
     // -------------------------------------------------------
+    // Callback domain: use custom domain if provided, otherwise CloudFront distribution domain
+    const callbackDomain = props.customDomain || props.distribution.distributionDomainName;
+
     this.userPool = new cognito.UserPool(this, 'AWSopsUserPool', {
       userPoolName: 'awsops-user-pool',
       selfSignUpEnabled: false,
@@ -58,9 +66,8 @@ export class CognitoStack extends cdk.Stack {
       oAuth: {
         flows: { authorizationCodeGrant: true },
         scopes: [cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL, cognito.OAuthScope.PROFILE],
-        // CallbackURLs will be set after CloudFront domain is known
-        callbackUrls: ['https://placeholder.cloudfront.net/awsops/_callback'],
-        logoutUrls: ['https://placeholder.cloudfront.net/awsops/'],
+        callbackUrls: [`https://${callbackDomain}/awsops/_callback`],
+        logoutUrls: [`https://${callbackDomain}/awsops/`],
       },
       authFlows: {
         userPassword: true,
