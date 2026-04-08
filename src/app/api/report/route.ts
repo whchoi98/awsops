@@ -31,6 +31,7 @@ const REPORTS_META_DIR = path.join(process.cwd(), 'data', 'reports');
 
 interface SectionResult {
   section: string;
+  key: string;
   title: string;
   content: string;
 }
@@ -215,7 +216,7 @@ async function analyzeSection(
   // 부록: Bedrock 호출 없이 인벤토리 데이터를 직접 포맷
   if (section === 'appendix') {
     const context = await formatReportForBedrock(data, 'appendix');
-    return { section, title, content: context || (isEn ? 'No inventory data.' : '인벤토리 데이터가 없습니다.') };
+    return { section, key: section, title, content: context || (isEn ? 'No inventory data.' : '인벤토리 데이터가 없습니다.') };
   }
 
   // Build context from formatReportForBedrock
@@ -234,6 +235,7 @@ async function analyzeSection(
   if (!context || context.includes('No data') || context.trim() === '') {
     return {
       section,
+      key: section,
       title,
       content: isEn ? 'No data available for this section.' : '이 섹션에 대한 데이터가 없습니다.',
     };
@@ -269,7 +271,7 @@ async function analyzeSection(
 
   const decoded = JSON.parse(new TextDecoder().decode(resp.body));
   const text: string = decoded.content?.[0]?.text || '';
-  return { section, title, content: text };
+  return { section, key: section, title, content: text };
 }
 
 // ============================================================================
@@ -356,6 +358,7 @@ async function generateReportBackground(
       } else {
         sectionResults.push({
           section: batch[i],
+          key: batch[i],
           title: batch[i],
           content: isEn
             ? `Analysis failed: ${r.reason?.message || 'Unknown error'}`
@@ -450,6 +453,23 @@ async function generateReportBackground(
     downloadUrlMd,
     sections: ordered,
   });
+
+  // Send SNS notification on completion
+  // 완료 시 SNS 알림 발송
+  try {
+    const { notifyReportCompleted } = await import('@/lib/sns-notification');
+    const execSummary = ordered.find((s: SectionResult) => s.key === 'executive-summary');
+    const summaryText = execSummary?.content?.slice(0, 500) || '';
+    await notifyReportCompleted({
+      reportId,
+      accountAlias: accountAlias || undefined,
+      executiveSummary: summaryText,
+      downloadUrlDocx,
+      downloadUrlMd,
+    });
+  } catch {
+    // SNS notification is best-effort; don't fail the report
+  }
 }
 
 // ============================================================================

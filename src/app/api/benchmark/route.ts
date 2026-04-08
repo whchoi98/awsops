@@ -62,8 +62,30 @@ export async function GET(request: NextRequest) {
     const cmd = `powerpipe mod install --mod-location "${MOD_DIR}" > /dev/null 2>&1; powerpipe benchmark run aws_compliance.benchmark.${benchmark} --mod-location "${MOD_DIR}" ${searchPathArgs} --output json --progress=false > "${tmpFile}" 2>"${errorFile}"; if [ -s "${tmpFile}" ]; then mv "${tmpFile}" "${resultFile}" && echo "done" > "${statusFile}"; else rm -f "${tmpFile}" && echo "error" > "${statusFile}"; fi`;
     // Note: exec() is used here intentionally — the command requires shell features
     // (pipes, redirects, &&/||). All parameters (benchmark, dbUrl, MOD_DIR) are
-    // server-controlled values, not user input.
-    exec(cmd, { env: { ...process.env, POWERPIPE_DATABASE: dbUrl } });
+    // server-controlled values, not user input. No user input is interpolated.
+    exec(cmd, { env: { ...process.env, POWERPIPE_DATABASE: dbUrl } }, () => {
+      // Send SNS notification on benchmark completion (best-effort)
+      try {
+        const st = existsSync(statusFile) ? readFileSync(statusFile, 'utf-8').trim() : 'error';
+        if (st === 'done') {
+          let totalControls = 0, alarmCount = 0, okCount = 0;
+          try {
+            const raw = readFileSync(resultFile, 'utf-8');
+            const result = JSON.parse(raw);
+            const groups = result?.groups || [];
+            for (const g of groups) {
+              totalControls += g?.summary?.control?.total || 0;
+              alarmCount += g?.summary?.control?.alarm || 0;
+              okCount += g?.summary?.control?.ok || 0;
+            }
+          } catch { /* parse error — send without counts */ }
+
+          import('@/lib/sns-notification').then(({ notifyBenchmarkCompleted }) => {
+            notifyBenchmarkCompleted({ benchmark, accountAlias: account?.alias, totalControls, alarmCount, okCount });
+          }).catch(() => {});
+        }
+      } catch { /* notification is best-effort */ }
+    });
 
     return NextResponse.json({ status: 'started', message: 'Benchmark started' });
   }
