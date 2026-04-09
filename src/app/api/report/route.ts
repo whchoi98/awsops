@@ -1,7 +1,7 @@
 // AWSops AI Diagnosis Report API — Async background generation + S3 storage + Scheduling
 // AWSops AI 종합진단 리포트 API — 비동기 백그라운드 생성 + S3 저장 + 스케줄링
 import { NextRequest, NextResponse } from 'next/server';
-import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
+import { BedrockRuntimeClient, InvokeModelWithResponseStreamCommand } from '@aws-sdk/client-bedrock-runtime';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { collectReportData, formatReportForBedrock } from '@/lib/report-generator';
@@ -263,14 +263,21 @@ async function analyzeSection(
     ],
   });
 
-  // 5-minute timeout per section — prevents infinite hang on Bedrock throttling/slowness
-  // 섹션당 5분 타임아웃 — Bedrock 쓰로틀링/지연 시 무한 대기 방지
+  // Streaming with idle timeout — abort if no token received for 60 seconds
+  // 스트리밍 + 유휴 타임아웃 — 60초간 토큰이 없으면 중단
+  const IDLE_TIMEOUT_MS = 60 * 1000;
   const abortController = new AbortController();
-  const timeout = setTimeout(() => abortController.abort(), 5 * 60 * 1000);
+  let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const resetIdleTimer = () => {
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => abortController.abort(), IDLE_TIMEOUT_MS);
+  };
 
   try {
+    resetIdleTimer();
     const resp = await bedrockClient.send(
-      new InvokeModelCommand({
+      new InvokeModelWithResponseStreamCommand({
         modelId: MODEL_ID,
         contentType: 'application/json',
         accept: 'application/json',
@@ -279,11 +286,22 @@ async function analyzeSection(
       { abortSignal: abortController.signal },
     );
 
-    const decoded = JSON.parse(new TextDecoder().decode(resp.body));
-    const text: string = decoded.content?.[0]?.text || '';
-    return { section, title, content: text };
+    let fullContent = '';
+    if (resp.body) {
+      for await (const event of resp.body) {
+        resetIdleTimer(); // token received — reset idle timer / 토큰 수신 — 유휴 타이머 리셋
+        if (event.chunk?.bytes) {
+          const parsed = JSON.parse(new TextDecoder().decode(event.chunk.bytes));
+          if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+            fullContent += parsed.delta.text;
+          }
+        }
+      }
+    }
+
+    return { section, title, content: fullContent };
   } finally {
-    clearTimeout(timeout);
+    if (idleTimer) clearTimeout(idleTimer);
   }
 }
 
@@ -377,7 +395,7 @@ async function generateReportBackground(
         })
         .catch(err => {
           const msg = err?.name === 'AbortError'
-            ? (isEn ? 'Analysis timed out (5 min limit)' : '분석 시간 초과 (5분 제한)')
+            ? (isEn ? 'Analysis timed out (no response for 60s)' : '분석 시간 초과 (60초간 응답 없음)')
             : (isEn ? `Analysis failed: ${err?.message || 'Unknown error'}` : `분석 실패: ${err?.message || '알 수 없는 오류'}`);
           const fallback: SectionResult = { section, title: section, content: msg };
           sectionResults.push(fallback);
