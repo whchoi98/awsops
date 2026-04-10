@@ -22,16 +22,21 @@ A page for viewing the overall status of EKS clusters, node resources, and Pod s
 ### EKS Cluster Cards
 Display key information for each cluster in card format:
 - Cluster Name, Status (ACTIVE)
-- Kubernetes Version
-- VPC ID
-- Platform Version
-- Region
+- Kubernetes Version, VPC ID, Platform Version, Region
+- **Access Entry badge**: K8s Connected (green) / No Access (red)
+- **Register ViewPolicy button**: Auto-register Access Entry + AdminViewPolicy for unregistered clusters
+- **Click to filter**: Click a cluster card to filter all data to that cluster (cyan border)
 
-### Stats Cards
-- **Nodes**: Total nodes / Ready nodes
-- **Pods**: Total Pods / Running Pods
-- **Deployments**: Total Deployments / Fully Available count
-- **Services**: Total services
+:::tip Cluster Access
+Unregistered clusters cannot display data. Use the "Register ViewPolicy" button or ask the cluster owner to follow the [Authentication Guide](./eks-auth).
+:::
+
+### Stats Cards (Click to Navigate)
+Click each card to navigate to the detail page:
+- **Nodes** → Node Details (`/k8s/nodes`)
+- **Pods** → Pod Details (`/k8s/pods`)
+- **Deployments** → Deployment Details (`/k8s/deployments`)
+- **Services** → Service Details (`/k8s/services`)
 
 ### Node Card Grid
 Visually display resource usage for each node:
@@ -46,9 +51,15 @@ Click a node card to navigate to the detail page:
 - **ENI list**: IP allocation per network interface, traffic (NetworkIn/Out)
 - **Pods table**: List of Pods running on that node
 
-### Visualization Charts
-- **Pod Status Distribution**: Running, Pending, Failed, Succeeded distribution
-- **Namespaces**: Resource distribution by namespace
+### Visualization Charts (Tab Switching)
+
+**Pod Analysis tab:**
+- **Pod Status Distribution**: Running, Pending, Failed, Succeeded distribution (pie chart)
+- **Pods per Namespace**: Pod count by namespace (bar chart)
+
+**Service Resources tab:**
+- **CPU per Service (millicores)**: Sum of CPU requests for pods belonging to each Service (bar chart)
+- **Memory per Service (MiB)**: Sum of memory requests for pods belonging to each Service (bar chart)
 
 ### Warning Events Table
 Display Kubernetes Warning events in real-time:
@@ -56,12 +67,13 @@ Display Kubernetes Warning events in real-time:
 
 ## How to Use
 
-1. Click **Compute > K8s** in the sidebar
-2. Select specific cluster/VPC using the cluster filter
-3. Review overall status from the stats cards
+1. Click **Compute > EKS** in the sidebar
+2. Click a cluster card to filter to a specific cluster
+3. Click stats cards to navigate to Pods/Nodes/Deployments/Services detail pages
 4. Identify nodes with high resource usage from the node cards
 5. Click a node to view detailed resources and Pod list
-6. Monitor problem events in Warning Events
+6. Switch to **Service Resources** tab to analyze CPU/Memory allocation per Service
+7. Monitor problem events in Warning Events
 
 ## Tips
 
@@ -79,7 +91,10 @@ You can analyze with the AI Assistant using queries like "EKS cluster status", "
 
 ## Related Pages
 
-- [EKS Explorer](../compute/eks-explorer) - K9s-style terminal UI
-- [EKS Pods](../compute/eks-pods) - Pod detailed list
-- [EKS Nodes](../compute/eks-nodes) - Node detailed list
-- [EKS Container Cost](../compute/eks-container-cost) - Pod cost analysis
+- [EKS Authentication Setup](./eks-auth) - Access Entry / aws-auth authentication guide
+- [EKS Explorer](./eks-explorer) - K9s-style terminal UI
+- [EKS Pods](./eks-pods) - Pod detailed list
+- [EKS Nodes](./eks-nodes) - Node detailed list
+- [EKS Deployments](./eks-deployments) - Deployment list
+- [EKS Services](./eks-services) - Service list
+- [EKS Container Cost](./eks-container-cost) - Pod cost analysis (OpenCost)

@@ -5,6 +5,7 @@ description: AWSops AI 어시스턴트 상세 가이드 - 10단계 라우팅 및
 ---
 
 import Screenshot from '@site/src/components/Screenshot';
+import AIStreamingFlow from '@site/src/components/diagrams/AIStreamingFlow';
 
 # AI 어시스턴트
 
@@ -206,11 +207,28 @@ CloudWatch 및 CloudTrail 분석에 사용됩니다.
 
 ### 스트리밍 이벤트
 
-| 이벤트 | 설명 |
-|--------|------|
-| `status` | 진행 상태 메시지 |
-| `done` | 완료된 응답 데이터 |
-| `error` | 오류 메시지 |
+| 이벤트 | 설명 | 데이터 |
+|--------|------|--------|
+| `status` | 진행 상태 메시지 | `{ step, message }` |
+| `chunk` | 실시간 텍스트 스트리밍 | `{ delta: string }` |
+| `done` | 완료된 응답 데이터 | `{ content, route, usedTools, ... }` |
+| `error` | 오류 메시지 | `{ message }` |
+
+### 스트리밍 모드
+
+응답 경로에 따라 3가지 스트리밍 모드가 자동으로 선택됩니다:
+
+<AIStreamingFlow />
+
+| 모드 | 적용 경로 | 방식 |
+|------|----------|------|
+| **Real Streaming** | 멀티 라우트 합성 | Bedrock Converse API — 토큰 단위 즉시 전송 |
+| **Simulated Streaming** | 단일 Gateway 응답 | 50자 청크 + 15ms 딜레이 — 타이핑 효과 |
+| **Direct Streaming** | aws-data (Steampipe+Bedrock) | Bedrock 네이티브 스트리밍 |
+
+:::info 멀티 라우트 합성 스트리밍
+2-3개 라우트의 병렬 실행 결과를 합성할 때, Bedrock Converse Stream API(`ConverseStreamCommand`)를 사용하여 합성 과정을 실시간으로 스트리밍합니다. 사용자는 합성 결과가 생성되는 즉시 화면에서 확인할 수 있습니다.
+:::
 
 ## 도구 사용 표시
 

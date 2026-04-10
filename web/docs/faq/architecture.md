@@ -181,8 +181,8 @@ const DEFAULT_HOURLY_RATE = 0.236; // 매칭 실패 시 m5.xlarge 기준
 ### OpenCost 설치
 
 ```bash
-# scripts/06f-setup-opencost.sh 실행
-bash scripts/06f-setup-opencost.sh
+# scripts/07-setup-opencost.sh 실행
+bash scripts/07-setup-opencost.sh
 
 # 설치 내용: Metrics Server → Prometheus → OpenCost
 # 설치 후 data/config.json에 엔드포인트 추가:
@@ -316,8 +316,46 @@ const keepaliveInterval = setInterval(() => {
 }, 15000);
 ```
 
-**6. 스트리밍 응답 개선 (향후)**
-현재는 AgentCore의 전체 응답을 받은 후 `done` 이벤트로 전송합니다. AgentCore가 토큰 단위 스트리밍을 지원하면 FTTT를 크게 단축할 수 있습니다.
+**6. 3가지 스트리밍 모드 (구현 완료)**
+
+AWSops는 경로별로 최적화된 3가지 스트리밍 모드를 제공합니다:
+
+| 모드 | 적용 경로 | 방식 | 지연 |
+|------|----------|------|------|
+| **Real Streaming** | 멀티 라우트 합성 | `ConverseStreamCommand` (Bedrock Converse API) | 토큰 단위 즉시 전송 |
+| **Simulated Streaming** | 단일 Gateway 응답 | `simulateStreaming()` (50자/15ms 청킹) | 타이핑 효과 |
+| **Direct Streaming** | Bedrock Direct (aws-data) | `InvokeModelWithResponseStreamCommand` | 토큰 단위 즉시 전송 |
+
+```typescript
+// 멀티 라우트 합성: Converse Stream API로 실시간 스트리밍
+async function synthesizeResponsesStreaming(results, send) {
+  const command = new ConverseStreamCommand({
+    modelId: 'anthropic.claude-sonnet-4-6-20250514-v1:0',
+    messages: [{ role: 'user', content: [{ text: synthesisPrompt }] }],
+  });
+  const response = await bedrockClient.send(command);
+  for await (const event of response.stream) {
+    if (event.contentBlockDelta?.delta?.text) {
+      send('chunk', { delta: event.contentBlockDelta.delta.text });
+    }
+  }
+}
+
+// 단일 Gateway 응답: 타이핑 효과 시뮬레이션
+async function simulateStreaming(content, send) {
+  const CHUNK_SIZE = 50, CHUNK_DELAY_MS = 15;
+  for (let i = 0; i < content.length; i += CHUNK_SIZE) {
+    send('chunk', { delta: content.slice(i, i + CHUNK_SIZE) });
+    await new Promise(r => setTimeout(r, CHUNK_DELAY_MS));
+  }
+}
+```
+
+:::info 왜 3가지 모드인가?
+- **AgentCore Gateway**는 전체 응답을 한 번에 반환하므로 simulateStreaming으로 타이핑 효과 제공
+- **멀티 라우트 합성**은 여러 Gateway 결과를 Bedrock이 통합하므로 Converse API의 네이티브 스트리밍 활용
+- **Bedrock Direct**는 원래부터 토큰 스트리밍을 지원
+:::
 
 </details>
 
@@ -329,7 +367,7 @@ const keepaliveInterval = setInterval(() => {
 현재 AWSops에서 AlertManager는 **비활성화** 상태입니다:
 
 ```bash
-# scripts/06f-setup-opencost.sh
+# scripts/07-setup-opencost.sh
 helm install prometheus prometheus-community/prometheus \
   --set alertmanager.enabled=false   # ← 명시적 비활성화
 ```
@@ -345,7 +383,7 @@ Prometheus는 OpenCost의 메트릭 수집용으로만 설치되어 있습니다
 
 **Step 1. AlertManager 활성화**
 
-`scripts/06f-setup-opencost.sh` 수정:
+`scripts/07-setup-opencost.sh` 수정:
 ```bash
 helm upgrade prometheus prometheus-community/prometheus \
   --set alertmanager.enabled=true
@@ -550,13 +588,15 @@ flowchart LR
 const pool = new Pool({
   host: '127.0.0.1',
   port: 9193,
-  max: 5,                     // 커넥션 5개 유지
-  statement_timeout: 120000,   // 2분 타임아웃
+  max: 10,                    // 커넥션 10개 유지
+  idleTimeoutMillis: 30000,   // 유휴 30초 후 반환
+  connectionTimeoutMillis: 15000, // 15초 내 연결 실패 시 에러
+  statement_timeout: 30000,   // 30초 쿼리 타임아웃
 });
 ```
 
-1. **커넥션 재사용**: 5개 커넥션을 Pool에서 관리, 매번 새로 만들지 않음
-2. **node-cache**: 동일 쿼리 결과를 5분간 메모리 캐시
+1. **커넥션 재사용**: 10개 커넥션을 Pool에서 관리, 매번 새로 만들지 않음
+2. **node-cache**: 동일 쿼리 결과를 5분간 메모리 캐시 (키: `sp:{accountId}:{SQL}`)
 3. **Steampipe 서비스 모드**: `steampipe service start`로 FDW가 항상 로드된 상태
 4. **바이너리 오버헤드 없음**: Node.js 프로세스 내에서 직접 PostgreSQL 프로토콜 통신
 
@@ -565,9 +605,201 @@ const pool = new Pool({
 대시보드 홈에서 20개 이상의 쿼리를 실행할 때는 `batchQuery()`를 사용합니다:
 
 ```typescript
-// 5개씩 순차 실행 (Steampipe FDW 동시 요청 제한 고려)
-const results = await batchQuery(queries, 5);
+// 8개씩 병렬 실행 (풀 10개 중 2개는 다른 요청용으로 예비)
+const results = await batchQuery(queries);  // BATCH_SIZE = 8
 ```
+
+</details>
+
+<details>
+<summary>Steampipe가 죽으면 대시보드는 어떻게 되나요?</summary>
+
+Steampipe 프로세스가 중단되면 pg Pool 연결이 실패합니다. 각 계층별 동작은 다음과 같습니다.
+
+### 장애 전파 흐름
+
+```mermaid
+flowchart TD
+  SP["Steampipe 프로세스 중단"] -->|"port 9193 연결 불가"| POOL["pg Pool 연결 실패"]
+
+  POOL -->|"runQuery() catch"| ERR["{ rows: [], error: message }"]
+  ERR --> DASH["대시보드: 빈 데이터 표시"]
+  ERR --> AI_SQL["AI aws-data 라우트: 데이터 없음 안내"]
+
+  SP -->|"영향 없음"| AC["AgentCore Gateway"]
+  AC --> LAMBDA["Lambda (AWS API 직접 호출)"]
+```
+
+### 계층별 영향
+
+| 계층 | Steampipe 중단 시 | 설명 |
+|------|-------------------|------|
+| **대시보드 페이지** | 빈 데이터 표시 | `runQuery()`가 `{ rows: [], error }` 반환, UI는 빈 테이블 렌더링 |
+| **AI aws-data 라우트** | "데이터를 조회할 수 없습니다" 안내 | Steampipe SQL 실행 실패 → Bedrock이 에러 상황 설명 |
+| **AI Gateway 라우트** | **정상 동작** | AgentCore → Lambda는 AWS API를 직접 호출 (Steampipe 무관) |
+| **캐시된 데이터** | 5분간 정상 표시 | node-cache TTL 내 캐시 히트 시 Steampipe 접근 안 함 |
+| **Cost 데이터** | 스냅샷 폴백 | `data/cost/` 디렉토리의 최근 JSON 파일로 대체 (최대 180일 보관) |
+
+### 에러 처리 방식
+
+```typescript
+// src/lib/steampipe.ts — runQuery()
+try {
+  const result = await pool.query(sql);
+  return { rows: result.rows };
+} catch (error) {
+  // 절대 throw하지 않음 → 호출자에게 안전한 빈 결과 반환
+  return { rows: [], error: error.message };
+}
+```
+
+모든 쿼리는 try/catch로 감싸져 있어 **Steampipe 장애가 Next.js 서버 크래시로 이어지지 않습니다**.
+
+### 복구 방법
+
+```bash
+# 1. Steampipe 서비스 상태 확인
+steampipe service status
+
+# 2. 재시작
+steampipe service restart --force
+
+# 3. Next.js에서 풀 리셋 (관리자 API 또는 서버 재시작)
+# resetPool()이 호출되면 15번까지 재연결 시도 (1초 간격)
+```
+
+### 좀비 커넥션 자동 정리
+
+Steampipe FDW의 느린 API 호출이 누적되면 커넥션 풀이 고갈될 수 있습니다. 이를 방지하기 위해 2분마다 좀비 커넥션을 자동 정리합니다:
+
+```typescript
+// 5분 이상 실행 중인 SELECT 쿼리를 자동 종료
+// client_addr IS NOT NULL (FDW 내부 커넥션은 제외)
+pg_terminate_backend(pid)
+```
+
+</details>
+
+<details>
+<summary>pg Pool의 캐시 동작 원리는?</summary>
+
+AWSops는 **node-cache** 기반 인메모리 캐시를 사용하여 Steampipe 쿼리 결과를 5분간 보관합니다.
+
+### 캐시 흐름
+
+```mermaid
+flowchart TD
+  REQ["API 요청"] --> CHECK{"캐시에<br/>결과 있음?"}
+  CHECK -->|"히트"| RET["캐시 결과 반환<br/>(~0ms)"]
+  CHECK -->|"미스"| QUERY["Steampipe SQL 실행<br/>(100~500ms)"]
+  QUERY --> SAVE["캐시에 저장<br/>(TTL: 5분)"]
+  SAVE --> RET2["결과 반환"]
+
+  WARM["Cache Warmer<br/>(4분 주기)"] -->|"주요 쿼리 사전 실행"| SAVE
+```
+
+### 캐시 키 구조
+
+```
+sp:{accountId}:{SQL문}
+```
+
+- **멀티 어카운트**: 계정별로 분리 (`sp:111111111111:SELECT...`)
+- **단일 어카운트**: `sp:__all__:SELECT...`
+- **Cost 가용성**: `cost:available:{accountId}` (TTL: 1시간)
+
+### 설정값
+
+| 항목 | 값 | 설명 |
+|------|---|------|
+| 기본 TTL | 300초 (5분) | 일반 쿼리 캐시 수명 |
+| Cost 가용성 TTL | 3,600초 (1시간) | `checkCostAvailability` 결과 |
+| 체크 주기 | 60초 | 만료 키 정리 간격 |
+| Cache Warmer 주기 | 240초 (4분) | TTL(5분) 만료 전 갱신 |
+
+### 캐시 무효화
+
+| 방법 | 트리거 | 동작 |
+|------|-------|------|
+| **새로고침 버튼** | UI에서 사용자 클릭 | `bustCache: true` → 캐시 무시 후 재조회 |
+| **clearCache()** | 관리자 API | `cache.flushAll()` 전체 삭제 |
+| **resetPool()** | 풀 재생성 시 | 캐시 + 커넥션 풀 동시 초기화 |
+| **자연 만료** | TTL 경과 | 60초마다 만료 키 자동 정리 |
+
+### Cache Warmer (사전 캐시)
+
+서버 시작 5초 후부터 4분 주기로 주요 대시보드 쿼리를 백그라운드 실행하여 캐시를 미리 채웁니다:
+
+```typescript
+// src/lib/cache-warmer.ts
+// 워밍 대상: EC2, S3, RDS, Lambda, VPC, IAM, ECS, DynamoDB 등 약 22개 쿼리
+// CloudWatch 모니터링 쿼리는 제외 (FDW 느린 API로 좀비 커넥션 유발)
+```
+
+- 멀티 어카운트: 최대 3개 계정까지 순차적으로 워밍
+- `isWarming` 플래그로 중복 실행 방지
+
+</details>
+
+<details>
+<summary>batchQuery 실행 시 AWS API 비용이 발생하나요?</summary>
+
+### 핵심 답변
+
+**캐시 히트 시 비용 0원, 캐시 미스 시에만 AWS API 호출 발생**합니다.
+
+### 비용 발생 구조
+
+```mermaid
+flowchart LR
+  BQ["batchQuery()<br/>8개 병렬"] --> CACHE{"캐시<br/>히트?"}
+  CACHE -->|"히트"| FREE["비용 없음<br/>(메모리에서 반환)"]
+  CACHE -->|"미스"| SP["Steampipe FDW"]
+  SP -->|"AWS API 호출"| AWS["AWS API<br/>(대부분 무료)"]
+```
+
+### AWS API 호출 비용
+
+Steampipe FDW는 캐시 미스 시 **실제 AWS API**를 호출합니다. 대부분의 `Describe`/`List` API는 무료입니다:
+
+| API 유형 | 비용 | 예시 |
+|----------|------|------|
+| EC2 Describe* | 무료 | `DescribeInstances`, `DescribeVpcs` |
+| S3 List* | $0.005/1,000건 | `ListBuckets` |
+| IAM List/Get* | 무료 | `ListUsers`, `ListRoles` |
+| CloudWatch GetMetricData | $0.01/1,000건 | 메트릭 조회 |
+| Cost Explorer GetCostAndUsage | $0.01/건 | 비용 데이터 |
+| CloudTrail LookupEvents | 무료 (최근 90일) | 이벤트 조회 |
+
+### 실제 비용 시나리오
+
+**대시보드 홈 로드 (약 22개 쿼리)**:
+
+| 상황 | API 호출 | 예상 비용 |
+|------|----------|----------|
+| 캐시 히트 (5분 이내 재방문) | 0건 | $0 |
+| 캐시 미스 (첫 로드) | ~22건 Describe/List | ~$0 (대부분 무료 API) |
+| Cache Warmer 1시간 (15회) | ~330건 | ~$0 |
+
+**비용이 발생하는 주요 API**:
+
+| API | 단가 | 월 예상 (4분 주기 워밍) |
+|-----|------|----------------------|
+| Cost Explorer | $0.01/건 | ~$3.24 (6건/시간 × 24시간 × 30일 × $0.01) |
+| CloudWatch GetMetricData | $0.01/1,000건 | ~$0.01 미만 |
+| S3 ListBuckets | $0.005/1,000건 | ~$0.01 미만 |
+
+### 비용 최적화 설계
+
+1. **5분 캐시**: 같은 페이지 재방문 시 API 호출 제로
+2. **Cache Warmer**: 사용자 요청 전에 미리 캐시 → 대부분의 요청이 캐시 히트
+3. **Cost 가용성 1시간 캐시**: `checkCostAvailability()`는 1시간에 1번만 probe
+4. **배치 사이즈 8**: 풀의 10개 커넥션 중 8개만 사용, 2개는 실시간 요청용 예비
+5. **CloudWatch 쿼리 워밍 제외**: 느린 FDW API로 좀비 커넥션 유발 → 사용자 요청 시에만 실행
+
+:::info Cost Explorer 비용 절감
+Cost Explorer API는 가장 비용이 높은 API입니다. `checkCostAvailability()`는 전용 10초 타임아웃으로 빠르게 판별하고, MSP 환경에서는 `costEnabled: false` 설정으로 API 호출 자체를 차단합니다.
+:::
 
 </details>
 
@@ -701,7 +933,7 @@ export function getUserFromRequest(request: NextRequest): UserInfo {
 
 ### 현재 설치 상태
 
-`scripts/06f-setup-opencost.sh`로 설치된 Prometheus 구성:
+`scripts/07-setup-opencost.sh`로 설치된 Prometheus 구성:
 
 ```bash
 helm install prometheus prometheus-community/prometheus \

@@ -1,0 +1,48 @@
+release:
+  label: Release
+  description: Version release milestones
+ai:
+  label: AI
+  description: AI Assistant and Bedrock integration
+network:
+  label: Network
+  description: VPC, TGW, VPN, network analysis
+container:
+  label: Container
+  description: EKS, ECS, Istio container workloads
+security:
+  label: Security
+  description: IAM, compliance, security fixes
+monitoring:
+  label: Monitoring
+  description: CloudWatch, CloudTrail, Bedrock metrics
+cost:
+  label: Cost
+  description: Cost Explorer, container cost analysis
+database:
+  label: Database
+  description: RDS, DynamoDB, ElastiCache, MSK, OpenSearch
+iac:
+  label: IaC
+  description: CDK, CloudFormation, Terraform
+i18n:
+  label: i18n
+  description: Internationalization and localization
+multi-account:
+  label: Multi-Account
+  description: Cross-account queries and management
+streaming:
+  label: Streaming
+  description: SSE streaming and real-time updates
+deployment:
+  label: Deployment
+  description: CDK infrastructure and deployment scripts
+docs:
+  label: Docs
+  description: Documentation and user guides
+datasources:
+  label: Datasources
+  description: External datasource integrations (Prometheus, Loki, ClickHouse, etc.)
+infrastructure:
+  label: Infrastructure
+  description: VPC, CIDR, TGW, CDK infrastructure changes
