@@ -11,7 +11,7 @@ LOGO_FILE="$PROJECT_DIR/public/logos/default.png"
 echo "=== Cognito Hosted UI Customization ==="
 
 # Get User Pool ID
-USER_POOL_ID=$(aws cognito-idp list-user-pools --max-results 10 --query "UserPools[?Name=='awsops-user-pool'].Id | [0]" --output text)
+USER_POOL_ID=$(aws cognito-idp list-user-pools --max-results 10 --query "UserPools[?Name=='AWSops-UserPool'].Id | [0]" --output text)
 if [ -z "$USER_POOL_ID" ] || [ "$USER_POOL_ID" = "None" ]; then
   echo "ERROR: User Pool 'awsops-user-pool' not found"
   exit 1
@@ -19,7 +19,7 @@ fi
 echo "User Pool ID: $USER_POOL_ID"
 
 # Get App Client ID
-CLIENT_ID=$(aws cognito-idp list-user-pool-clients --user-pool-id "$USER_POOL_ID" --query "UserPoolClients[?ClientName=='awsops-app-client'].ClientId | [0]" --output text)
+CLIENT_ID=$(aws cognito-idp list-user-pool-clients --user-pool-id "$USER_POOL_ID" --query "UserPoolClients[?ClientName=='AWSops-Dashboard'].ClientId | [0]" --output text)
 if [ -z "$CLIENT_ID" ] || [ "$CLIENT_ID" = "None" ]; then
   echo "ERROR: App Client 'awsops-app-client' not found"
   exit 1

@@ -29,6 +29,7 @@ interface ReportListItem {
   accountAlias?: string;
   downloadUrlDocx?: string;
   downloadUrlMd?: string;
+  downloadUrlPdf?: string;
   status: 'generating' | 'completed' | 'failed';
   createdAt: string;
   progress?: ReportProgress;
@@ -205,6 +206,7 @@ export default function DiagnosisPage() {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [downloadUrlDocx, setDownloadUrlDocx] = useState<string | null>(null);
   const [downloadUrlMd, setDownloadUrlMd] = useState<string | null>(null);
+  const [downloadUrlPdf, setDownloadUrlPdf] = useState<string | null>(null);
   const [showToc, setShowToc] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -264,6 +266,7 @@ export default function DiagnosisPage() {
             setStatus('completed');
             setDownloadUrlDocx(data.downloadUrlDocx || null);
             setDownloadUrlMd(data.downloadUrlMd || null);
+            setDownloadUrlPdf(data.downloadUrlPdf || null);
             setSections(data.sections || []);
             setCollapsedSections(new Set());
           }
@@ -332,6 +335,7 @@ export default function DiagnosisPage() {
             setStatus('completed');
             setDownloadUrlDocx(data.downloadUrlDocx || null);
             setDownloadUrlMd(data.downloadUrlMd || null);
+            setDownloadUrlPdf(data.downloadUrlPdf || null);
             setSections(data.sections || []);
             setCollapsedSections(new Set());
             fetchReportList();
@@ -363,6 +367,7 @@ export default function DiagnosisPage() {
     setCollapsedSections(new Set());
     setDownloadUrlDocx(null);
     setDownloadUrlMd(null);
+    setDownloadUrlPdf(null);
     setProgress({ current: 0, total: 15, currentSection: '' });
 
     try {
@@ -404,6 +409,7 @@ export default function DiagnosisPage() {
         setSections(data.sections || []);
         setDownloadUrlDocx(data.downloadUrlDocx || null);
         setDownloadUrlMd(data.downloadUrlMd || null);
+        setDownloadUrlPdf(data.downloadUrlPdf || null);
         setError(null);
         setCollapsedSections(new Set());
       } else if (data.status === 'generating') {
@@ -863,6 +869,7 @@ export default function DiagnosisPage() {
                             <button onClick={() => viewReport(report.reportId)} className="text-xs text-accent-cyan hover:text-accent-cyan/80 transition-colors">{isEn ? 'View' : '보기'}</button>
                             {report.downloadUrlDocx && <button onClick={() => window.open(report.downloadUrlDocx, '_blank')} className="inline-flex items-center gap-1 text-xs text-accent-cyan hover:text-accent-cyan/80 transition-colors"><Download size={12} /> DOCX</button>}
                             {report.downloadUrlMd && <button onClick={() => window.open(report.downloadUrlMd, '_blank')} className="inline-flex items-center gap-1 text-xs text-accent-green hover:text-accent-green/80 transition-colors"><Download size={12} /> MD</button>}
+                            {report.downloadUrlPdf && <button onClick={() => window.open(report.downloadUrlPdf, '_blank')} className="inline-flex items-center gap-1 text-xs text-accent-purple hover:text-accent-purple/80 transition-colors"><Download size={12} /> PDF</button>}
                           </>
                         )}
                         {report.status === 'generating' && <button onClick={() => viewReport(report.reportId)} className="text-xs text-accent-cyan hover:text-accent-cyan/80 transition-colors">{isEn ? 'Track' : '진행 확인'}</button>}
@@ -1042,12 +1049,21 @@ export default function DiagnosisPage() {
                   <FileCode size={14} /> MD
                 </button>
               )}
-              <button
-                onClick={() => window.open(`/awsops/ai-diagnosis/report?id=${currentReportId}`, '_blank')}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-accent-purple/30 text-accent-purple hover:bg-accent-purple/10 text-xs font-medium transition-colors"
-              >
-                <Printer size={14} /> PDF
-              </button>
+              {downloadUrlPdf ? (
+                <button
+                  onClick={() => window.open(downloadUrlPdf, '_blank')}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-accent-purple/30 text-accent-purple hover:bg-accent-purple/10 text-xs font-medium transition-colors"
+                >
+                  <FileDown size={14} /> PDF
+                </button>
+              ) : (
+                <button
+                  onClick={() => window.open(`/awsops/ai-diagnosis/report?id=${currentReportId}`, '_blank')}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-accent-purple/30 text-accent-purple hover:bg-accent-purple/10 text-xs font-medium transition-colors"
+                >
+                  <Printer size={14} /> PDF
+                </button>
+              )}
             </div>
           </div>
 

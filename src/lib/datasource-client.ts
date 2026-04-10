@@ -276,6 +276,7 @@ function normalizeTempoTrace(data: any, ds: DatasourceConfig): QueryResult {
         rows.push({
           traceId: span.traceId,
           spanId: span.spanId,
+          parentSpanId: span.parentSpanId || '',
           name: span.name,
           serviceName: resource,
           durationMs: span.endTimeUnixNano && span.startTimeUnixNano
@@ -288,7 +289,7 @@ function normalizeTempoTrace(data: any, ds: DatasourceConfig): QueryResult {
     }
   }
   return {
-    columns: ['traceId', 'spanId', 'name', 'serviceName', 'durationMs', 'status', 'startTime'],
+    columns: ['traceId', 'spanId', 'parentSpanId', 'name', 'serviceName', 'durationMs', 'status', 'startTime'],
     rows,
     metadata: { datasource: ds.name, type: 'tempo', queryLanguage: 'TraceQL', executionTimeMs: 0, resultType: 'trace', totalRows: rows.length },
   };
@@ -408,6 +409,7 @@ function normalizeJaegerTrace(data: any, ds: DatasourceConfig): QueryResult {
       rows.push({
         traceId: trace.traceID,
         spanId: span.spanID,
+        parentSpanId: span.references?.find((r: any) => r.refType === 'CHILD_OF')?.spanID || '',
         operationName: span.operationName,
         serviceName: process?.serviceName || '',
         durationMs: (span.duration || 0) / 1000,
@@ -417,7 +419,7 @@ function normalizeJaegerTrace(data: any, ds: DatasourceConfig): QueryResult {
     }
   }
   return {
-    columns: ['traceId', 'spanId', 'operationName', 'serviceName', 'durationMs', 'status', 'startTime'],
+    columns: ['traceId', 'spanId', 'parentSpanId', 'operationName', 'serviceName', 'durationMs', 'status', 'startTime'],
     rows,
     metadata: { datasource: ds.name, type: 'jaeger', queryLanguage: 'Jaeger API', executionTimeMs: 0, resultType: 'trace', totalRows: rows.length },
   };

@@ -25,6 +25,8 @@ export interface ReportData {
   security: { publicS3: any[]; openSgs: any[]; unencryptedEbs: any[]; iamSummary: any; complianceScore: any | null; } | null;
   idle: CollectorResult | null;
   msk: CollectorResult | null;
+  traceAnalysis: CollectorResult | null;
+  networkFlow: CollectorResult | null;
   rdsInstances: any[];
   mskClusters: any[];
 }
@@ -133,27 +135,33 @@ export async function collectReportData(
 
   // ── Phase 3: Auto-collect collectors (parallel) ──
   send('status', { step: 'collectors', message: isEn
-    ? 'Running specialized collectors (EKS, DB, MSK, Idle)...'
-    : '전문 컬렉터 실행 중 (EKS, DB, MSK, 유휴 리소스)...' });
+    ? 'Running specialized collectors (EKS, DB, MSK, Idle, Traces, Network Flow)...'
+    : '전문 컬렉터 실행 중 (EKS, DB, MSK, 유휴 리소스, 트레이스, 네트워크 흐름)...' });
 
-  const [eksM, dbM, mskM, idleM] = await Promise.all([
+  const [eksM, dbM, mskM, idleM, traceM, netflowM] = await Promise.all([
     import('@/lib/collectors/eks-optimize'),
     import('@/lib/collectors/db-optimize'),
     import('@/lib/collectors/msk-optimize'),
     import('@/lib/collectors/idle-scan'),
+    import('@/lib/collectors/trace-analyze'),
+    import('@/lib/collectors/network-flow'),
   ]);
 
-  const [eksR, dbR, mskR, idleR] = await Promise.allSettled([
+  const [eksR, dbR, mskR, idleR, traceR, netflowR] = await Promise.allSettled([
     eksM.default.collect(send, accountId, isEn),
     dbM.default.collect(send, accountId, isEn),
     mskM.default.collect(send, accountId, isEn),
     idleM.default.collect(send, accountId, isEn),
+    traceM.default.collect(send, accountId, isEn),
+    netflowM.default.collect(send, accountId, isEn),
   ]);
 
   const eks = eksR.status === 'fulfilled' ? eksR.value : null;
   const database = dbR.status === 'fulfilled' ? dbR.value : null;
   const msk = mskR.status === 'fulfilled' ? mskR.value : null;
   const idle = idleR.status === 'fulfilled' ? idleR.value : null;
+  const traceAnalysis = traceR.status === 'fulfilled' ? traceR.value : null;
+  const networkFlow = netflowR.status === 'fulfilled' ? netflowR.value : null;
 
   // ── Phase 4: CIS benchmark (optional) ──
   send('status', { step: 'benchmark', message: isEn
@@ -192,6 +200,8 @@ export async function collectReportData(
     security,
     idle,
     msk,
+    traceAnalysis,
+    networkFlow,
     rdsInstances,
     mskClusters,
   };
@@ -378,6 +388,29 @@ export async function formatReportForBedrock(
       parts.push(jsonBlock('Route Tables', abbreviate(data.network.routeTables, 30)));
       parts.push(jsonBlock('VPC Peering Connections', data.network.vpcPeerings));
       parts.push(jsonBlock('Transit Gateways', data.network.transitGateways));
+      break;
+    }
+
+    // ── Network Flow & Service Topology ──
+    case 'network-flow': {
+      parts.push('# Network Flow & Service Topology');
+      // Trace data from trace-analyze collector
+      if (data.traceAnalysis) {
+        const traceM = await import('@/lib/collectors/trace-analyze');
+        parts.push(traceM.default.formatContext(data.traceAnalysis));
+      }
+      // VPC Flow Log data from network-flow collector
+      if (data.networkFlow) {
+        const netflowM = await import('@/lib/collectors/network-flow');
+        parts.push(netflowM.default.formatContext(data.networkFlow));
+      }
+      // Include network infra context for cross-referencing
+      if (data.network) {
+        parts.push(jsonBlock('VPCs (for cross-reference)', abbreviate(data.network.vpcs, 20)));
+        parts.push(jsonBlock('Transit Gateways', data.network.transitGateways));
+        parts.push(jsonBlock('VPC Peering Connections', data.network.vpcPeerings));
+      }
+      if (parts.length <= 1) return '\n\n--- No network flow data available (configure Tempo/Jaeger/ClickHouse datasource) ---';
       break;
     }
 

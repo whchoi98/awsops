@@ -55,9 +55,11 @@ interface ReportMeta {
   s3Key: string | null;         // legacy (PPTX) — kept for old reports
   s3KeyDocx?: string | null;
   s3KeyMd?: string | null;
+  s3KeyPdf?: string | null;
   downloadUrl: string | null;   // legacy (PPTX)
   downloadUrlDocx?: string | null;
   downloadUrlMd?: string | null;
+  downloadUrlPdf?: string | null;
   sections: SectionResult[];
   error: string | null;
   scheduledBy?: string;         // 'manual' | 'weekly' | 'monthly' etc.
@@ -71,9 +73,10 @@ interface ReportMeta {
 const SECTION_BATCHES: string[][] = [
   ['cost-overview', 'cost-compute', 'cost-network'],
   ['cost-storage', 'idle-resources', 'security-posture'],
-  ['network-architecture', 'compute-analysis', 'eks-analysis'],
-  ['database-analysis', 'msk-analysis', 'storage-analysis'],
-  ['executive-summary', 'recommendations', 'appendix'],
+  ['network-architecture', 'network-flow', 'compute-analysis'],
+  ['eks-analysis', 'database-analysis', 'msk-analysis'],
+  ['storage-analysis', 'executive-summary', 'recommendations'],
+  ['appendix'],
 ];
 
 // Desired final order: executive-summary first, appendix last
@@ -82,7 +85,7 @@ const SECTION_ORDER: string[] = [
   'executive-summary',
   'cost-overview', 'cost-compute', 'cost-network', 'cost-storage',
   'idle-resources', 'security-posture',
-  'network-architecture', 'compute-analysis', 'eks-analysis',
+  'network-architecture', 'network-flow', 'compute-analysis', 'eks-analysis',
   'database-analysis', 'msk-analysis', 'storage-analysis',
   'recommendations', 'appendix',
 ];
@@ -433,16 +436,30 @@ async function generateReportBackground(
   }
   const mdBuffer = Buffer.from(mdLines.join('\n'), 'utf-8');
 
+  // Generate PDF (server-side via Puppeteer — no sidebar, clean A4)
+  // PDF 생성 (서버사이드 Puppeteer — 사이드바 없는 깨끗한 A4)
+  let pdfBuffer: Buffer | null = null;
+  try {
+    const { generateReportPdf } = await import('@/lib/report-pdf');
+    pdfBuffer = await generateReportPdf(reportInput);
+  } catch (err) {
+    console.error(`[Report] PDF generation failed (non-fatal):`, err instanceof Error ? err.message : err);
+  }
+
   // Phase 4: Save locally (permanent) + Upload to S3
   // 4단계: 로컬 영구 저장 + S3 업로드
   const localDocxPath = path.join(REPORTS_META_DIR, `${reportId}.docx`);
   const localMdPath = path.join(REPORTS_META_DIR, `${reportId}.md`);
   fs.writeFileSync(localDocxPath, docxBuffer);
   fs.writeFileSync(localMdPath, mdBuffer);
+  if (pdfBuffer) {
+    fs.writeFileSync(path.join(REPORTS_META_DIR, `${reportId}.pdf`), pdfBuffer);
+  }
 
   const s3KeyDocx = `${REPORT_S3_PREFIX}${reportId}.docx`;
   const s3KeyMd = `${REPORT_S3_PREFIX}${reportId}.md`;
-  await Promise.all([
+  const s3KeyPdf = pdfBuffer ? `${REPORT_S3_PREFIX}${reportId}.pdf` : null;
+  const uploadPromises: Promise<any>[] = [
     s3Client.send(new PutObjectCommand({
       Bucket: REPORT_BUCKET,
       Key: s3KeyDocx,
@@ -455,13 +472,22 @@ async function generateReportBackground(
       Body: mdBuffer,
       ContentType: 'text/markdown; charset=utf-8',
     })),
-  ]);
+  ];
+  if (pdfBuffer && s3KeyPdf) {
+    uploadPromises.push(s3Client.send(new PutObjectCommand({
+      Bucket: REPORT_BUCKET,
+      Key: s3KeyPdf,
+      Body: pdfBuffer,
+      ContentType: 'application/pdf',
+    })));
+  }
+  await Promise.all(uploadPromises);
 
   // Generate presigned URLs (valid for 7 days)
   // 7일간 유효한 사전 서명 URL 생성
   const currentMeta = readReportMeta(reportId);
   const fileMeta = { createdAt: currentMeta?.createdAt || new Date().toISOString(), accountAlias };
-  const [downloadUrlDocx, downloadUrlMd] = await Promise.all([
+  const presignPromises: Promise<string>[] = [
     getSignedUrl(s3Client, new GetObjectCommand({
       Bucket: REPORT_BUCKET, Key: s3KeyDocx,
       ResponseContentDisposition: `attachment; filename="${buildReportFilename(fileMeta, 'docx')}"`,
@@ -470,7 +496,16 @@ async function generateReportBackground(
       Bucket: REPORT_BUCKET, Key: s3KeyMd,
       ResponseContentDisposition: `attachment; filename="${buildReportFilename(fileMeta, 'md')}"`,
     }), { expiresIn: 7 * 24 * 60 * 60 }),
-  ]);
+  ];
+  if (s3KeyPdf) {
+    presignPromises.push(getSignedUrl(s3Client, new GetObjectCommand({
+      Bucket: REPORT_BUCKET, Key: s3KeyPdf,
+      ResponseContentDisposition: `attachment; filename="${buildReportFilename(fileMeta, 'pdf')}"`,
+    }), { expiresIn: 7 * 24 * 60 * 60 }));
+  }
+  const presignedUrls = await Promise.all(presignPromises);
+  const [downloadUrlDocx, downloadUrlMd] = presignedUrls;
+  const downloadUrlPdf = presignedUrls[2] || null;
 
   updateReportMeta(reportId, {
     status: 'completed',
@@ -478,9 +513,11 @@ async function generateReportBackground(
     s3Key: null,
     s3KeyDocx,
     s3KeyMd,
+    s3KeyPdf,
     downloadUrl: null,
     downloadUrlDocx,
     downloadUrlMd,
+    downloadUrlPdf,
     sections: ordered,
   });
 
@@ -600,6 +637,7 @@ export async function GET(request: NextRequest) {
         completedAt: string | null;
         downloadUrlDocx?: string | null;
         downloadUrlMd?: string | null;
+        downloadUrlPdf?: string | null;
         scheduledBy?: string;
       }> = [];
 
@@ -615,6 +653,7 @@ export async function GET(request: NextRequest) {
             completedAt: meta.completedAt,
             downloadUrlDocx: meta.downloadUrlDocx,
             downloadUrlMd: meta.downloadUrlMd,
+            downloadUrlPdf: meta.downloadUrlPdf,
             scheduledBy: meta.scheduledBy,
           });
         } catch {
@@ -646,6 +685,7 @@ export async function GET(request: NextRequest) {
     // 완료 상태에서 downloadUrl이 만료되었을 수 있으면 사전 서명 URL 재생성
     let downloadUrlDocx = meta.downloadUrlDocx;
     let downloadUrlMd = meta.downloadUrlMd;
+    let downloadUrlPdf = meta.downloadUrlPdf;
     if (meta.status === 'completed') {
       const refreshPromises: Promise<void>[] = [];
       if (meta.s3KeyDocx) {
@@ -668,8 +708,18 @@ export async function GET(request: NextRequest) {
           } catch { /* keep existing */ }
         })());
       }
+      if (meta.s3KeyPdf) {
+        refreshPromises.push((async () => {
+          try {
+            downloadUrlPdf = await getSignedUrl(s3Client, new GetObjectCommand({
+              Bucket: REPORT_BUCKET, Key: meta.s3KeyPdf!,
+              ResponseContentDisposition: `attachment; filename="${buildReportFilename(meta, 'pdf')}"`,
+            }), { expiresIn: 7 * 24 * 60 * 60 });
+          } catch { /* keep existing */ }
+        })());
+      }
       await Promise.all(refreshPromises);
-      updateReportMeta(id, { downloadUrlDocx, downloadUrlMd });
+      updateReportMeta(id, { downloadUrlDocx, downloadUrlMd, downloadUrlPdf });
     }
 
     return NextResponse.json({
@@ -678,6 +728,7 @@ export async function GET(request: NextRequest) {
       progress: meta.progress,
       downloadUrlDocx: meta.status === 'completed' ? downloadUrlDocx : undefined,
       downloadUrlMd: meta.status === 'completed' ? downloadUrlMd : undefined,
+      downloadUrlPdf: meta.status === 'completed' ? downloadUrlPdf : undefined,
       sections: meta.status === 'completed' ? meta.sections : undefined,
       error: meta.error,
       createdAt: meta.createdAt,
@@ -777,6 +828,46 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ error: 'Markdown file not available' }, { status: 500 });
+  }
+
+  // ── Download PDF ──
+  if (action === 'download-pdf') {
+    const meta = readReportMeta(id);
+    if (!meta) {
+      return NextResponse.json({ error: 'Report not found' }, { status: 404 });
+    }
+    if (meta.status !== 'completed') {
+      return NextResponse.json(
+        { error: 'Report not available' },
+        { status: meta.status === 'failed' ? 410 : 202 },
+      );
+    }
+
+    // Try S3 presigned URL first
+    if (meta.s3KeyPdf) {
+      try {
+        const freshUrl = await getSignedUrl(s3Client, new GetObjectCommand({
+          Bucket: REPORT_BUCKET, Key: meta.s3KeyPdf,
+          ResponseContentDisposition: `attachment; filename="${buildReportFilename(meta, 'pdf')}"`,
+        }), { expiresIn: 60 * 60 });
+        return NextResponse.redirect(freshUrl, 302);
+      } catch { /* fallback below */ }
+    }
+
+    // Fallback: local file
+    const localPath = path.join(REPORTS_META_DIR, `${id}.pdf`);
+    if (fs.existsSync(localPath)) {
+      const buffer = fs.readFileSync(localPath);
+      return new NextResponse(buffer, {
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="${buildReportFilename(meta, 'pdf')}"`,
+          'Content-Length': String(buffer.length),
+        },
+      });
+    }
+
+    return NextResponse.json({ error: 'PDF file not available' }, { status: 500 });
   }
 
   return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
