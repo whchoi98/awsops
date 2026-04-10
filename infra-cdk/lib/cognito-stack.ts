@@ -160,6 +160,15 @@ exports.handler = async (event) => {
     }
   }
 
+  // Allow login page and auth API without authentication
+  if (uri === '/awsops/login' || uri.startsWith('/awsops/login/') || uri === '/awsops/api/auth') {
+    return request;
+  }
+  // Allow Next.js static assets for login page
+  if (uri.startsWith('/awsops/_next/')) {
+    return request;
+  }
+
   // Check for valid token
   const token = cookies[COOKIE_NAME];
   if (token) {
@@ -177,20 +186,12 @@ exports.handler = async (event) => {
     }
   }
 
-  // Redirect to Cognito Hosted UI
-  const redirectUri = 'https://' + host + CALLBACK_PATH;
-  const loginUrl = 'https://' + COGNITO_DOMAIN + '/login?' + querystring.stringify({
-    response_type: 'code',
-    client_id: CLIENT_ID,
-    redirect_uri: redirectUri,
-    scope: 'openid email profile',
-  });
-
+  // Redirect to custom login page (instead of Cognito Hosted UI)
   return {
     status: '302',
     statusDescription: 'Found',
     headers: {
-      location: [{ key: 'Location', value: loginUrl }],
+      location: [{ key: 'Location', value: '/awsops/login' }],
     },
   };
 };
