@@ -14,6 +14,9 @@ set -e
 #     AWS_PROFILE          - AWS CLI 프로파일 / AWS CLI profile                  #
 #     VSCODE_PASSWORD      - VSCode 비밀번호 / VSCode password                  #
 #     INSTANCE_TYPE        - EC2 타입 [t4g.2xlarge]                             #
+#     CUSTOM_DOMAIN        - 커스텀 도메인 (Route53) / Custom domain             #
+#     TRANSIT_GATEWAY_ID   - Transit Gateway ID (선택)                           #
+#     TGW_ROUTE_CIDR       - TGW 라우트 CIDR [10.254.0.0/16]                    #
 #                                                                              #
 ################################################################################
 
@@ -30,9 +33,9 @@ echo -e "${CYAN}================================================================
 echo ""
 
 ###############################################################################
-#  [1/8] 사전 점검 / Pre-flight checks                                        #
+#  [1/10] 사전 점검 / Pre-flight checks                                        #
 ###############################################################################
-echo -e "${CYAN}[1/8] 사전 점검 / Pre-flight checks...${NC}"
+echo -e "${CYAN}[1/10] 사전 점검 / Pre-flight checks...${NC}"
 
 for cmd in aws node npm; do
     if ! command -v "$cmd" &>/dev/null; then
@@ -73,10 +76,10 @@ echo -e "  │                                                             │"
 echo -e "  ${BOLD}└─────────────────────────────────────────────────────────────┘${NC}"
 
 ###############################################################################
-#  [2/8] 계정 선택 / Account Selection                                         #
+#  [2/10] 계정 선택 / Account Selection                                         #
 ###############################################################################
 echo ""
-echo -e "${CYAN}[2/8] AWS 계정 선택 / Account Selection...${NC}"
+echo -e "${CYAN}[2/10] AWS 계정 선택 / Account Selection...${NC}"
 echo ""
 
 # 현재 자격 증명으로 계정 확인 / Check current credentials
@@ -145,10 +148,10 @@ fi
 echo -e "  ${GREEN}계정 확인 / Account verified: $ACCOUNT_ID${NC}"
 
 ###############################################################################
-#  [3/8] 리전 선택 / Region Selection                                          #
+#  [3/10] 리전 선택 / Region Selection                                          #
 ###############################################################################
 echo ""
-echo -e "${CYAN}[3/8] 리전 선택 / Region Selection...${NC}"
+echo -e "${CYAN}[3/10] 리전 선택 / Region Selection...${NC}"
 echo ""
 echo -e "${BOLD}  배포할 리전을 선택하세요 / Select deployment region:${NC}"
 echo ""
@@ -191,14 +194,14 @@ echo -e "  ${GREEN}선택된 리전 / Selected: $REGION${NC}"
 export AWS_DEFAULT_REGION="$REGION"
 
 ###############################################################################
-#  [4/8] VPC 선택 / VPC Selection                                              #
+#  [4/10] VPC 선택 / VPC Selection                                              #
 ###############################################################################
 echo ""
-echo -e "${CYAN}[4/8] VPC 선택 / VPC Selection...${NC}"
+echo -e "${CYAN}[4/10] VPC 선택 / VPC Selection...${NC}"
 echo ""
 echo -e "${BOLD}  VPC 옵션을 선택하세요 / Select VPC option:${NC}"
 echo ""
-echo "    1) 새 VPC 생성 / Create new VPC (10.254.0.0/16, 2 Public + 2 Private subnets)"
+echo "    1) 새 VPC 생성 / Create new VPC (CIDR 입력 가능, 2 Public + 2 Private subnets)"
 echo "    2) 기존 VPC 선택 / Use existing VPC from account"
 echo ""
 read -p "  번호 입력 / Enter number [1]: " VPC_CHOICE
@@ -206,8 +209,20 @@ VPC_CHOICE="${VPC_CHOICE:-1}"
 
 USE_EXISTING_VPC="false"
 EXISTING_VPC_ID=""
+NEW_VPC_CIDR=""
 
-if [ "$VPC_CHOICE" = "2" ]; then
+if [ "$VPC_CHOICE" = "1" ]; then
+    echo ""
+    echo -e "  ${CYAN}새 VPC CIDR 입력 / Enter new VPC CIDR${NC}"
+    echo -e "  기본값 / Default: 10.10.0.0/16"
+    read -p "  CIDR [10.10.0.0/16]: " NEW_VPC_CIDR
+    NEW_VPC_CIDR="${NEW_VPC_CIDR:-10.10.0.0/16}"
+    if ! echo "$NEW_VPC_CIDR" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$'; then
+        echo -e "  ${RED}잘못된 CIDR 형식 / Invalid CIDR format${NC}"
+        exit 1
+    fi
+    echo -e "  ${GREEN}✓ VPC CIDR: $NEW_VPC_CIDR${NC}"
+elif [ "$VPC_CHOICE" = "2" ]; then
     echo ""
     echo -e "  ${CYAN}$REGION 리전의 VPC 목록 조회 중... / Listing VPCs in $REGION...${NC}"
     echo ""
@@ -340,14 +355,135 @@ if [ "$USE_EXISTING_VPC" = "true" ]; then
         fi
     fi
 else
-    echo -e "  ${GREEN}✓ 새 VPC 생성 / Creating new VPC (10.254.0.0/16)${NC}"
+    echo -e "  ${GREEN}✓ 새 VPC 생성 / Creating new VPC ($NEW_VPC_CIDR)${NC}"
 fi
 
 ###############################################################################
-#  [5/9] 인스턴스 타입 선택 / Instance Type Selection                           #
+#  [5/10] Transit Gateway 연결 / TGW Connection (optional)                     #
 ###############################################################################
 echo ""
-echo -e "${CYAN}[5/9] 인스턴스 타입 선택 / Instance Type Selection...${NC}"
+echo -e "${CYAN}[5/10] Transit Gateway 연결 (선택) / TGW Connection (optional)...${NC}"
+echo ""
+
+TRANSIT_GATEWAY_ID="${TRANSIT_GATEWAY_ID:-}"
+TGW_ROUTE_CIDRS=""
+
+if [ -n "$TRANSIT_GATEWAY_ID" ]; then
+    echo -e "  ${GREEN}환경변수에서 TGW 감지 / TGW from env: $TRANSIT_GATEWAY_ID${NC}"
+    TGW_ROUTE_CIDRS="${TGW_ROUTE_CIDR:-}"
+else
+    echo -e "  Transit Gateway로 다른 VPC와 연결하시겠습니까?"
+    echo -e "  Connect this VPC to other VPCs via Transit Gateway?"
+    echo ""
+    echo "    1) 건너뛰기 / Skip (TGW 연결 안 함)"
+    echo "    2) TGW 선택 및 VPC 연결 / Select TGW and connect VPCs"
+    echo ""
+    read -p "  번호 입력 / Enter number [1]: " TGW_CHOICE
+    TGW_CHOICE="${TGW_CHOICE:-1}"
+
+    if [ "$TGW_CHOICE" = "2" ]; then
+        echo -e "  ${CYAN}TGW 목록 조회 중... / Listing Transit Gateways...${NC}"
+        TGW_JSON=$(aws ec2 describe-transit-gateways \
+            --filters "Name=state,Values=available" \
+            --region "$REGION" --output json 2>/dev/null)
+        TGW_COUNT=$(echo "$TGW_JSON" | python3 -c "import json,sys;print(len(json.load(sys.stdin).get('TransitGateways',[])))")
+
+        if [ "$TGW_COUNT" = "0" ]; then
+            echo -e "  ${YELLOW}사용 가능한 TGW가 없습니다 / No available TGWs${NC}"
+        else
+            echo ""
+            echo "$TGW_JSON" | python3 -c "
+import json, sys
+tgws = json.load(sys.stdin).get('TransitGateways', [])
+for i, t in enumerate(tgws):
+    name = next((tag['Value'] for tag in t.get('Tags', []) if tag['Key'] == 'Name'), '(이름 없음 / no name)')
+    print('    {:2d}) {}  {}'.format(i+1, t['TransitGatewayId'], name))
+"
+            echo ""
+            TGW_IDS=($(echo "$TGW_JSON" | python3 -c "import json,sys;[print(t['TransitGatewayId']) for t in json.load(sys.stdin).get('TransitGateways',[])]"))
+            read -p "  TGW 번호 선택 / Select TGW number: " TGW_SELECT
+
+            if [[ "$TGW_SELECT" =~ ^[0-9]+$ ]] && [ "$TGW_SELECT" -ge 1 ] && [ "$TGW_SELECT" -le "${#TGW_IDS[@]}" ]; then
+                TRANSIT_GATEWAY_ID="${TGW_IDS[$((TGW_SELECT-1))]}"
+                echo -e "  ${GREEN}✓ 선택 / Selected: $TRANSIT_GATEWAY_ID${NC}"
+
+                # 연결할 VPC 멀티 선택 / Multi-select VPCs to connect
+                echo ""
+                echo -e "  ${CYAN}연결할 VPC를 선택하세요 (쉼표로 구분)${NC}"
+                echo -e "  ${CYAN}Select VPCs to connect via TGW (comma-separated):${NC}"
+                echo -e "  이 VPC들의 CIDR이 TGW 라우트로 추가됩니다"
+                echo ""
+
+                # 프로젝트 VPC 제외 / Exclude project VPC
+                ALL_VPC_JSON=$(aws ec2 describe-vpcs --region "$REGION" --output json 2>/dev/null)
+                EXCLUDE_VPC="${EXISTING_VPC_ID}"
+                echo "$ALL_VPC_JSON" | python3 -c "
+import json, sys
+vpcs = json.load(sys.stdin).get('Vpcs', [])
+exclude = '${EXCLUDE_VPC}'
+idx = 0
+for v in vpcs:
+    vid = v['VpcId']
+    if vid == exclude:
+        continue
+    idx += 1
+    name = next((t['Value'] for t in v.get('Tags', []) if t['Key'] == 'Name'), '(이름 없음 / no name)')
+    cidr = v.get('CidrBlock', '?')
+    print('    {:2d}) {:25s} {:18s} {}'.format(idx, vid, cidr, name))
+"
+                echo ""
+
+                PEER_VPC_IDS=($(echo "$ALL_VPC_JSON" | python3 -c "
+import json,sys
+vpcs = json.load(sys.stdin).get('Vpcs', [])
+exclude = '${EXCLUDE_VPC}'
+for v in vpcs:
+    if v['VpcId'] != exclude:
+        print(v['VpcId'])
+"))
+                PEER_VPC_CIDRS=($(echo "$ALL_VPC_JSON" | python3 -c "
+import json,sys
+vpcs = json.load(sys.stdin).get('Vpcs', [])
+exclude = '${EXCLUDE_VPC}'
+for v in vpcs:
+    if v['VpcId'] != exclude:
+        print(v.get('CidrBlock',''))
+"))
+
+                read -p "  VPC 번호 (쉼표 구분 / comma-separated, 예: 1,3): " VPC_SELECTIONS
+
+                if [ -n "$VPC_SELECTIONS" ]; then
+                    IFS=',' read -ra SELECTED <<< "$VPC_SELECTIONS"
+                    for sel in "${SELECTED[@]}"; do
+                        sel=$(echo "$sel" | tr -d ' ')
+                        if [[ "$sel" =~ ^[0-9]+$ ]] && [ "$sel" -ge 1 ] && [ "$sel" -le "${#PEER_VPC_CIDRS[@]}" ]; then
+                            cidr="${PEER_VPC_CIDRS[$((sel-1))]}"
+                            if [ -n "$TGW_ROUTE_CIDRS" ]; then
+                                TGW_ROUTE_CIDRS="$TGW_ROUTE_CIDRS,$cidr"
+                            else
+                                TGW_ROUTE_CIDRS="$cidr"
+                            fi
+                            echo -e "    ${GREEN}✓ ${PEER_VPC_IDS[$((sel-1))]} ($cidr)${NC}"
+                        fi
+                    done
+                fi
+            fi
+        fi
+    fi
+fi
+
+if [ -n "$TRANSIT_GATEWAY_ID" ]; then
+    echo -e "  ${GREEN}✓ TGW: $TRANSIT_GATEWAY_ID${NC}"
+    [ -n "$TGW_ROUTE_CIDRS" ] && echo -e "  ${GREEN}  Routes: $TGW_ROUTE_CIDRS${NC}"
+else
+    echo -e "  ${DIM}  TGW 연결 건너뜀 / Skipped${NC}"
+fi
+
+###############################################################################
+#  [6/10] 인스턴스 타입 선택 / Instance Type Selection                          #
+###############################################################################
+echo ""
+echo -e "${CYAN}[6/10] 인스턴스 타입 선택 / Instance Type Selection...${NC}"
 echo ""
 echo -e "  ${BOLD}EC2 인스턴스 타입을 선택하세요 / Select EC2 instance type:${NC}"
 echo ""
@@ -399,10 +535,10 @@ esac
 echo -e "  ${GREEN}✓ 선택된 인스턴스 / Selected: $INSTANCE_TYPE${NC}"
 
 ###############################################################################
-#  [6/9] CDK CLI 설치 / Install CDK CLI                                        #
+#  [7/10] CDK CLI 설치 / Install CDK CLI                                        #
 ###############################################################################
 echo ""
-echo -e "${CYAN}[6/9] CDK CLI 설치 / Install CDK CLI...${NC}"
+echo -e "${CYAN}[7/10] CDK CLI 설치 / Install CDK CLI...${NC}"
 
 if command -v cdk &>/dev/null; then
     echo "  이미 설치됨 / Already installed: $(cdk --version)"
@@ -412,10 +548,10 @@ else
 fi
 
 ###############################################################################
-#  [7/9] CDK 빌드 + 부트스트랩 / Build + Bootstrap                             #
+#  [8/10] CDK 빌드 + 부트스트랩 / Build + Bootstrap                             #
 ###############################################################################
 echo ""
-echo -e "${CYAN}[7/9] CDK 빌드 + 부트스트랩 / Build + Bootstrap...${NC}"
+echo -e "${CYAN}[8/10] CDK 빌드 + 부트스트랩 / Build + Bootstrap...${NC}"
 
 cd "$CDK_DIR"
 npm install --quiet
@@ -439,13 +575,13 @@ bootstrap_region "$REGION"
 [ "$REGION" != "us-east-1" ] && bootstrap_region "us-east-1"
 
 ###############################################################################
-#  [8/9] 설정 확인 / Confirm Configuration                                     #
+#  [9/10] 설정 확인 / Confirm Configuration                                     #
 ###############################################################################
 echo ""
-echo -e "${CYAN}[8/9] 설정 확인 / Confirm Configuration...${NC}"
+echo -e "${CYAN}[9/10] 설정 확인 / Confirm Configuration...${NC}"
 
 # 인스턴스 타입 / Instance type
-# INSTANCE_TYPE은 [5/9]에서 대화형으로 선택 / selected interactively in step 5
+# INSTANCE_TYPE은 [6/10]에서 대화형으로 선택 / selected interactively in step 6
 
 # CloudFront Prefix List
 CF_PREFIX_LIST=$(aws ec2 describe-managed-prefix-lists \
@@ -468,6 +604,16 @@ if [ ${#VSCODE_PASSWORD} -lt 8 ]; then
     exit 1
 fi
 
+# 커스텀 도메인 (선택) / Custom domain (optional)
+CUSTOM_DOMAIN="${CUSTOM_DOMAIN:-}"
+if [ -z "$CUSTOM_DOMAIN" ]; then
+    echo ""
+    echo -e "  ${CYAN}커스텀 도메인 설정 (선택) / Custom domain (optional)${NC}"
+    echo -e "  Route 53 호스팅 존이 있어야 합니다 / Requires Route 53 hosted zone"
+    echo -e "  예시 / Example: awsops.example.com"
+    read -p "  도메인 (비워두면 CloudFront 기본 도메인 사용): " CUSTOM_DOMAIN
+fi
+
 echo ""
 echo -e "  ${BOLD}┌─────────────────────────────────────────────────┐${NC}"
 echo -e "  ${BOLD}│  배포 설정 요약 / Deployment Summary             │${NC}"
@@ -478,10 +624,18 @@ echo "  │  인스턴스 / Type:   $INSTANCE_TYPE"
 echo "  │  CF Prefix List:    $CF_PREFIX_LIST"
 if [ -n "$EXISTING_VPC_ID" ]; then
     echo "  │  VPC:               $EXISTING_VPC_ID (기존 / existing)"
+    echo "  │  VPC CIDR:          $VPC_CIDR"
 else
-    echo "  │  VPC:               새로 생성 / new (10.254.0.0/16)"
+    echo "  │  VPC:               새로 생성 / new ($NEW_VPC_CIDR)"
 fi
 echo "  │  비밀번호 / PW:     $(printf '*%.0s' $(seq 1 ${#VSCODE_PASSWORD}))"
+if [ -n "$CUSTOM_DOMAIN" ]; then
+    echo "  │  도메인 / Domain:   $CUSTOM_DOMAIN"
+fi
+if [ -n "$TRANSIT_GATEWAY_ID" ]; then
+    echo "  │  TGW:               $TRANSIT_GATEWAY_ID"
+    [ -n "$TGW_ROUTE_CIDRS" ] && echo "  │  TGW Routes:         $TGW_ROUTE_CIDRS"
+fi
 echo -e "  ${BOLD}└─────────────────────────────────────────────────┘${NC}"
 echo ""
 read -p "  배포 시작? / Start deployment? (y/n) [y]: " CONFIRM
@@ -489,10 +643,10 @@ CONFIRM="${CONFIRM:-y}"
 [ "$CONFIRM" != "y" ] && [ "$CONFIRM" != "Y" ] && { echo "  취소 / Cancelled."; exit 0; }
 
 ###############################################################################
-#  [9/9] CDK 배포 / CDK Deploy                                                #
+#  [10/10] CDK 배포 / CDK Deploy                                                #
 ###############################################################################
 echo ""
-echo -e "${CYAN}[9/9] CDK 배포 중... (5-10분) / Deploying via CDK (5-10 min)...${NC}"
+echo -e "${CYAN}[10/10] CDK 배포 중... (5-10분) / Deploying via CDK (5-10 min)...${NC}"
 echo ""
 
 cd "$CDK_DIR"
@@ -502,8 +656,21 @@ CDK_CONTEXT=""
 if [ -n "$EXISTING_VPC_ID" ]; then
     CDK_CONTEXT="-c useExistingVpc=true -c vpcId=$EXISTING_VPC_ID -c vpcCidr=${VPC_CIDR:-10.0.0.0/8}"
 fi
+if [ -n "$NEW_VPC_CIDR" ] && [ "$NEW_VPC_CIDR" != "10.10.0.0/16" ]; then
+    CDK_CONTEXT="$CDK_CONTEXT -c newVpcCidr=$NEW_VPC_CIDR"
+fi
 if [ "$SKIP_VPC_ENDPOINTS" = "true" ]; then
     CDK_CONTEXT="$CDK_CONTEXT -c skipVpcEndpoints=true"
+fi
+if [ -n "$CUSTOM_DOMAIN" ]; then
+    CDK_CONTEXT="$CDK_CONTEXT -c customDomain=$CUSTOM_DOMAIN"
+    # hostedZoneName auto-derived from customDomain in CDK stack
+fi
+if [ -n "$TRANSIT_GATEWAY_ID" ]; then
+    CDK_CONTEXT="$CDK_CONTEXT -c transitGatewayId=$TRANSIT_GATEWAY_ID"
+    if [ -n "$TGW_ROUTE_CIDRS" ]; then
+        CDK_CONTEXT="$CDK_CONTEXT -c tgwRouteCidrs=$TGW_ROUTE_CIDRS"
+    fi
 fi
 
 npx cdk deploy AwsopsStack \
@@ -513,6 +680,7 @@ npx cdk deploy AwsopsStack \
     --parameters ExistingVpcId="${EXISTING_VPC_ID}" \
     $CDK_CONTEXT \
     --require-approval never \
+    --no-rollback \
     --region "$REGION" 2>&1
 
 ###############################################################################

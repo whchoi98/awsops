@@ -66,7 +66,7 @@ awsops/
 │       └── cognito-stack.ts      # Cognito, Lambda@Edge
 ├── powerpipe/                    # CIS Benchmark mod
 ├── scripts/                      # 17 install/ops scripts (00~10)
-│   ├── 06f-setup-opencost.sh     # Prometheus + OpenCost (EKS cost)
+│   ├── 07-setup-opencost.sh      # Prometheus + OpenCost (EKS cost)
 │   └── ARCHITECTURE.md           # Full architecture documentation
 └── docs/                         # Guides, ADRs, Runbooks
 ```

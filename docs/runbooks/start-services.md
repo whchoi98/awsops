@@ -2,7 +2,7 @@
 
 ## 빠른 시작 / Quick Start
 ```bash
-bash scripts/07-start-all.sh
+bash scripts/09-start-all.sh
 ```
 
 ## 수동 시작 / Manual Start
@@ -22,7 +22,7 @@ PORT=3000 npm run start &
 ### 3. 검증 / Verify
 ```bash
 curl -s http://localhost:3000/awsops  # 200 응답이 와야 함 (should return 200)
-bash scripts/09-verify.sh             # 전체 점검 (full check)
+bash scripts/11-verify.sh             # 전체 점검 (full check)
 ```
 
 ## 문제 해결 / Troubleshooting

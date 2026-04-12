@@ -203,5 +203,5 @@ curl -s -X POST http://localhost:3000/awsops/api/steampipe \
 fuser 3000/tcp 9193/tcp
 
 # 전체 검증
-bash scripts/09-verify.sh
+bash scripts/11-verify.sh
 ```
