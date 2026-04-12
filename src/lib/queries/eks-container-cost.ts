@@ -11,6 +11,7 @@ export const queries = {
       p.node_name,
       p.pod_ip,
       p.creation_timestamp,
+      p.context_name,
       c->>'name' AS container_name,
       c->'resources'->'requests'->>'cpu' AS cpu_request,
       c->'resources'->'requests'->>'memory' AS memory_request,
@@ -34,7 +35,8 @@ export const queries = {
       allocatable_cpu,
       allocatable_memory,
       node_info ->> 'instanceType' AS instance_type,
-      node_info ->> 'osImage' AS os_image
+      node_info ->> 'osImage' AS os_image,
+      context_name
     FROM
       kubernetes_node
     ORDER BY

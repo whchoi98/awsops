@@ -77,6 +77,9 @@ export interface AppConfig {
   accounts?: AccountConfig[];
   datasources?: DatasourceConfig[];  // External datasources / 외부 데이터소스
   datasourceAllowedNetworks?: string[];  // Allowed private CIDRs/hostnames for datasource SSRF allowlist
+  snsTopicArn?: string;               // SNS topic ARN for email notifications / 이메일 알림용 SNS 토픽 ARN
+  notificationEmails?: string[];      // Mailing list for report/benchmark notifications / 리포트/벤치마크 알림 메일링 리스트
+  notificationEnabled?: boolean;      // Enable auto-notification on report completion / 리포트 완료 시 자동 알림 활성화
 }
 
 const DEFAULT_CONFIG: AppConfig = {

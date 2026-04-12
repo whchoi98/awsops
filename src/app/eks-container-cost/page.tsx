@@ -3,12 +3,13 @@
 // Request-based cost estimation: Pod resource requests + EC2 node pricing
 // 리소스 요청 기반 비용 추정: Pod 리소스 요청 + EC2 노드 가격
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Header from '@/components/layout/Header';
 import StatsCard from '@/components/dashboard/StatsCard';
 import DataTable from '@/components/table/DataTable';
 import { DollarSign, Box, Server, TrendingUp } from 'lucide-react';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import SafeResponsiveContainer from '@/components/charts/SafeResponsiveContainer';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { useAccountContext } from '@/contexts/AccountContext';
 
@@ -66,6 +67,7 @@ export default function EksContainerCostPage() {
   const [error, setError] = useState<string | null>(null);
   const [showBasis, setShowBasis] = useState(false);
   const [activeTab, setActiveTab] = useState<'pods' | 'nodes'>('pods');
+  const [clusterFilter, setClusterFilter] = useState('');
 
   const fetchData = useCallback(async () => {
     try {
@@ -89,6 +91,66 @@ export default function EksContainerCostPage() {
   const formatCost = (cost: number) => `$${cost.toFixed(4)}`;
   const formatCostLg = (cost: number) => `$${cost.toFixed(2)}`;
 
+  // Extract cluster name from context_name ARN
+  const extractCluster = (ctx: string) => {
+    const m = ctx?.match(/\/([^/]+)$/);
+    return m ? m[1] : '';
+  };
+
+  // Unique cluster names from pods + nodes
+  const clusterNames = useMemo(() => {
+    if (!data) return [];
+    const names = new Set<string>();
+    data.pods.forEach(p => { const c = extractCluster((p as any).context_name || ''); if (c) names.add(c); });
+    data.nodes.forEach(n => { const c = extractCluster((n as any).context_name || ''); if (c) names.add(c); });
+    return Array.from(names).sort();
+  }, [data]);
+
+  // Filter pods and nodes by cluster
+  const filteredPods = useMemo(() => {
+    if (!data?.pods) return [];
+    if (!clusterFilter) return data.pods;
+    return data.pods.filter(p => extractCluster((p as any).context_name || '') === clusterFilter);
+  }, [data, clusterFilter]);
+
+  const filteredNodes = useMemo(() => {
+    if (!data?.nodes) return [];
+    if (!clusterFilter) return data.nodes;
+    return data.nodes.filter(n => extractCluster((n as any).context_name || '') === clusterFilter);
+  }, [data, clusterFilter]);
+
+  // Recompute stats for filtered data
+  const filteredSummary = useMemo(() => {
+    const totalPodCostDaily = filteredPods.reduce((sum, p) => sum + p.totalCostDaily, 0);
+    const totalNodeCostDaily = filteredNodes.reduce((sum, n) => sum + n.dailyCost, 0);
+    const nsCosts: Record<string, number> = {};
+    filteredPods.forEach(p => {
+      nsCosts[p.namespace] = (nsCosts[p.namespace] || 0) + p.totalCostDaily;
+    });
+    const sorted = Object.entries(nsCosts).sort((a, b) => b[1] - a[1]);
+    return {
+      totalPodCostDaily: Math.round(totalPodCostDaily * 1000) / 1000,
+      totalPodCostMonthly: Math.round(totalPodCostDaily * 30 * 100) / 100,
+      totalNodeCostDaily: Math.round(totalNodeCostDaily * 100) / 100,
+      totalNodeCostMonthly: Math.round(totalNodeCostDaily * 30 * 100) / 100,
+      podCount: filteredPods.length,
+      nodeCount: filteredNodes.length,
+      namespaceCount: Object.keys(nsCosts).length,
+      topNamespace: sorted[0] ? { name: sorted[0][0], cost: sorted[0][1] } : null,
+    };
+  }, [filteredPods, filteredNodes]);
+
+  // Namespace costs for charts
+  const filteredNsCosts = useMemo(() => {
+    const nsCosts: Record<string, number> = {};
+    filteredPods.forEach(p => {
+      nsCosts[p.namespace] = (nsCosts[p.namespace] || 0) + p.totalCostDaily;
+    });
+    return Object.entries(nsCosts)
+      .map(([name, cost]) => ({ name, cost: Math.round(cost * 1000) / 1000 }))
+      .sort((a, b) => b.cost - a.cost);
+  }, [filteredPods]);
+
   return (
     <div className="space-y-6">
       <Header
@@ -110,29 +172,49 @@ export default function EksContainerCostPage() {
         </div>
       )}
 
+      {/* Cluster Filter / 클러스터 필터 */}
+      {clusterNames.length > 1 && (
+        <div className="flex items-center gap-3">
+          <span className="text-gray-400 text-sm">EKS Cluster:</span>
+          <select
+            value={clusterFilter}
+            onChange={e => setClusterFilter(e.target.value)}
+            className="bg-navy-800 border border-navy-600 rounded-lg px-3 py-1.5 text-sm text-gray-300 focus:border-cyan-500/50 focus:outline-none"
+          >
+            <option value="">All Clusters ({clusterNames.length})</option>
+            {clusterNames.map(name => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+          {clusterFilter && (
+            <button onClick={() => setClusterFilter('')} className="text-xs text-gray-500 hover:text-white">Clear</button>
+          )}
+        </div>
+      )}
+
       {/* StatsCards / 통계 카드 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatsCard
           label={t('eksContainerCost.totalCost')}
-          value={data ? formatCostLg(data.summary.totalPodCostDaily) : '-'}
+          value={data ? formatCostLg(filteredSummary.totalPodCostDaily) : '-'}
           icon={DollarSign}
           color="cyan"
         />
         <StatsCard
           label="Pod Cost (Monthly)"
-          value={data ? formatCostLg(data.summary.totalPodCostMonthly) : '-'}
+          value={data ? formatCostLg(filteredSummary.totalPodCostMonthly) : '-'}
           icon={TrendingUp}
           color="green"
         />
         <StatsCard
           label="Running Pods"
-          value={data ? `${data.summary.podCount} pods / ${data.summary.nodeCount} nodes` : '-'}
+          value={data ? `${filteredSummary.podCount} pods / ${filteredSummary.nodeCount} nodes` : '-'}
           icon={Box}
           color="purple"
         />
         <StatsCard
           label="Top Namespace"
-          value={data?.summary.topNamespace ? `${data.summary.topNamespace.name} (${formatCost(data.summary.topNamespace.cost)}/day)` : '-'}
+          value={filteredSummary.topNamespace ? `${filteredSummary.topNamespace.name} (${formatCost(filteredSummary.topNamespace.cost)}/day)` : '-'}
           icon={Server}
           color="orange"
         />
@@ -143,22 +225,22 @@ export default function EksContainerCostPage() {
         {/* Namespace Cost Distribution / 네임스페이스별 비용 분포 */}
         <div className="bg-navy-800 rounded-lg p-4 border border-navy-600">
           <h3 className="text-white font-medium mb-4">Namespace Cost Distribution (Daily)</h3>
-          {data && data.namespaceCosts.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
+          {filteredNsCosts.length > 0 ? (
+            <SafeResponsiveContainer height={300}>
               <PieChart>
                 <Pie
-                  data={data.namespaceCosts.map(s => ({ name: s.name, value: s.cost }))}
+                  data={filteredNsCosts.map(s => ({ name: s.name, value: s.cost }))}
                   cx="50%" cy="50%" outerRadius={100}
                   dataKey="value" nameKey="name"
                   label={({ name, value }) => `${name}: $${value.toFixed(3)}`}
                 >
-                  {data.namespaceCosts.map((_, i) => (
+                  {filteredNsCosts.map((_, i) => (
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip contentStyle={{ backgroundColor: '#0f1629', border: '1px solid #1a2540', borderRadius: '8px' }} />
               </PieChart>
-            </ResponsiveContainer>
+            </SafeResponsiveContainer>
           ) : (
             <div className="h-[300px] flex items-center justify-center text-gray-500">{t('eksContainerCost.noData')}</div>
           )}
@@ -167,9 +249,9 @@ export default function EksContainerCostPage() {
         {/* Node Cost Bar Chart / 노드별 비용 바 차트 */}
         <div className="bg-navy-800 rounded-lg p-4 border border-navy-600">
           <h3 className="text-white font-medium mb-4">Node Daily Cost + Pod Count</h3>
-          {data && data.nodes.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={data.nodes.map(n => ({
+          {filteredNodes.length > 0 ? (
+            <SafeResponsiveContainer height={300}>
+              <BarChart data={filteredNodes.map(n => ({
                 name: n.node_name.split('.')[0],
                 'Daily Cost': n.dailyCost,
                 'Pod Count': n.pod_count,
@@ -183,7 +265,7 @@ export default function EksContainerCostPage() {
                 <Bar yAxisId="left" dataKey="Daily Cost" fill="#00d4ff" />
                 <Bar yAxisId="right" dataKey="Pod Count" fill="#a855f7" />
               </BarChart>
-            </ResponsiveContainer>
+            </SafeResponsiveContainer>
           ) : (
             <div className="h-[300px] flex items-center justify-center text-gray-500">No node data</div>
           )}
@@ -197,13 +279,13 @@ export default function EksContainerCostPage() {
             onClick={() => setActiveTab('pods')}
             className={`px-3 py-1.5 rounded text-sm font-medium ${activeTab === 'pods' ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-400 hover:text-white'}`}
           >
-            Pods ({data?.summary.podCount || 0})
+            Pods ({filteredSummary.podCount})
           </button>
           <button
             onClick={() => setActiveTab('nodes')}
             className={`px-3 py-1.5 rounded text-sm font-medium ${activeTab === 'nodes' ? 'bg-purple-500/20 text-purple-400' : 'text-gray-400 hover:text-white'}`}
           >
-            Nodes ({data?.summary.nodeCount || 0})
+            Nodes ({filteredSummary.nodeCount})
           </button>
           <span className="ml-auto text-xs text-gray-400">
             {data?.dataSource === 'opencost'
@@ -230,7 +312,7 @@ export default function EksContainerCostPage() {
                 render: (v: number) => <span className="text-green-400 font-medium">{formatCost(v)}</span>,
               },
             ]}
-            data={data?.pods}
+            data={filteredPods}
           />
         ) : (
           <DataTable
@@ -241,7 +323,7 @@ export default function EksContainerCostPage() {
               { key: 'dailyCost', label: 'Daily Cost', render: (v: number) => <span className="text-green-400 font-medium">${v?.toFixed(2)}</span> },
               { key: 'pod_count', label: 'Pods' },
             ]}
-            data={data?.nodes}
+            data={filteredNodes}
           />
         )}
       </div>

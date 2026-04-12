@@ -6,8 +6,8 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  ResponsiveContainer,
 } from 'recharts';
+import SafeResponsiveContainer from './SafeResponsiveContainer';
 
 interface BarChartCardProps {
   title: string;
@@ -31,7 +31,7 @@ export default function BarChartCard({ title, data, color = '#00d4ff' }: BarChar
       <h3 className="text-sm font-semibold text-white mb-4">{title}</h3>
 
       <div className="h-52">
-        <ResponsiveContainer width="100%" height="100%">
+        <SafeResponsiveContainer>
           <BarChart data={data}>
             <XAxis
               dataKey="name"
@@ -48,7 +48,7 @@ export default function BarChartCard({ title, data, color = '#00d4ff' }: BarChar
             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0,212,255,0.05)' }} />
             <Bar dataKey="value" fill={color} radius={[4, 4, 0, 0]} maxBarSize={40} />
           </BarChart>
-        </ResponsiveContainer>
+        </SafeResponsiveContainer>
       </div>
     </div>
   );

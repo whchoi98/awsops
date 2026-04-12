@@ -173,7 +173,7 @@ export interface K8sService {
   namespace: string;
   type: string;
   cluster_ip: string;
-  external_ip?: string;
+  external_ips?: string;
   port?: string;
   protocol?: string;
 }

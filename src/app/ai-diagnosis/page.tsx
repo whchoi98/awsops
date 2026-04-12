@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Header from '@/components/layout/Header';
-import { Play, Loader2, Download, FileText, CheckCircle, AlertTriangle, XCircle, Clock, ChevronDown, ChevronRight, FileDown, Printer, List, FileCode, CalendarClock } from 'lucide-react';
+import { Play, Loader2, Download, FileText, CheckCircle, AlertTriangle, XCircle, Clock, ChevronDown, ChevronRight, FileDown, Printer, List, FileCode, CalendarClock, Mail, Bell, BellOff, Send, Plus, X } from 'lucide-react';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { useAccountContext } from '@/contexts/AccountContext';
 import ReportMarkdown from '@/components/ReportMarkdown';
@@ -211,6 +211,12 @@ export default function DiagnosisPage() {
   const [showSchedule, setShowSchedule] = useState(false);
   const [schedule, setSchedule] = useState<ReportSchedule | null>(null);
   const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [showNotification, setShowNotification] = useState(false);
+  const [notifEnabled, setNotifEnabled] = useState(false);
+  const [notifEmails, setNotifEmails] = useState<string[]>([]);
+  const [notifNewEmail, setNotifNewEmail] = useState('');
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [notifMessage, setNotifMessage] = useState<string | null>(null);
 
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -461,6 +467,82 @@ export default function DiagnosisPage() {
     setScheduleLoading(false);
   }, []);
 
+  // --- Notification Settings ---
+  const fetchNotification = useCallback(async () => {
+    try {
+      const res = await fetch('/awsops/api/notification');
+      if (res.ok) {
+        const data = await res.json();
+        setNotifEnabled(data.enabled || false);
+        setNotifEmails(data.emails || []);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { fetchNotification(); }, [fetchNotification]);
+
+  const toggleNotification = useCallback(async (enabled: boolean) => {
+    setNotifLoading(true);
+    try {
+      await fetch('/awsops/api/notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'toggle', enabled }),
+      });
+      setNotifEnabled(enabled);
+    } catch { /* ignore */ }
+    setNotifLoading(false);
+  }, []);
+
+  const syncEmails = useCallback(async (emails: string[]) => {
+    setNotifLoading(true);
+    setNotifMessage(null);
+    try {
+      const res = await fetch('/awsops/api/notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'sync-emails', emails }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNotifEmails(emails);
+        const msgs: string[] = [];
+        if (data.added?.length) msgs.push(`${data.added.length} added (confirmation email sent)`);
+        if (data.removed?.length) msgs.push(`${data.removed.length} removed`);
+        setNotifMessage(msgs.join(', ') || 'No changes');
+      }
+    } catch { /* ignore */ }
+    setNotifLoading(false);
+  }, []);
+
+  const sendTestNotification = useCallback(async () => {
+    setNotifLoading(true);
+    try {
+      const res = await fetch('/awsops/api/notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test' }),
+      });
+      const data = await res.json();
+      setNotifMessage(data.sent ? 'Test notification sent!' : 'Failed to send');
+    } catch { setNotifMessage('Error sending test'); }
+    setNotifLoading(false);
+  }, []);
+
+  const addEmail = useCallback(() => {
+    const email = notifNewEmail.trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+    if (notifEmails.includes(email)) return;
+    const updated = [...notifEmails, email];
+    setNotifNewEmail('');
+    syncEmails(updated);
+  }, [notifNewEmail, notifEmails, syncEmails]);
+
+  const removeEmail = useCallback((email: string) => {
+    const updated = notifEmails.filter(e => e !== email);
+    syncEmails(updated);
+  }, [notifEmails, syncEmails]);
+
   // --- Progress bar percentage ---
 
   const progressPercent = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0;
@@ -528,6 +610,20 @@ export default function DiagnosisPage() {
           <CalendarClock size={18} />
           {isEn ? 'Schedule' : '자동 스케줄'}
           {schedule?.enabled && <span className="w-2 h-2 rounded-full bg-accent-green animate-pulse" />}
+        </button>
+        <button
+          onClick={() => setShowNotification(s => !s)}
+          className={`flex items-center gap-2 px-4 py-3 rounded-lg border transition-colors ${
+            notifEnabled
+              ? 'bg-accent-cyan/10 border-accent-cyan/30 text-accent-cyan'
+              : 'bg-navy-800 border-navy-600 text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          {notifEnabled ? <Bell size={18} /> : <BellOff size={18} />}
+          {isEn ? 'Notification' : '알림'}
+          {notifEnabled && notifEmails.length > 0 && (
+            <span className="bg-accent-cyan/20 text-accent-cyan text-xs px-1.5 py-0.5 rounded-full">{notifEmails.length}</span>
+          )}
         </button>
       </div>
 
@@ -642,6 +738,90 @@ export default function DiagnosisPage() {
             )}
             {scheduleLoading && <Loader2 size={12} className="animate-spin text-accent-cyan" />}
           </div>
+        </div>
+      )}
+
+      {/* Notification Settings Panel */}
+      {showNotification && (
+        <div className="bg-navy-800 border border-navy-600 rounded-lg p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Mail size={18} className="text-accent-cyan" />
+              <span className="text-white font-medium text-sm">{isEn ? 'Email Notification' : '이메일 알림'}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={sendTestNotification}
+                disabled={notifLoading || !notifEnabled || notifEmails.length === 0}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-navy-700 text-gray-300 hover:text-white border border-navy-600 disabled:opacity-40"
+              >
+                <Send size={12} /> {isEn ? 'Test' : '테스트'}
+              </button>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <span className="text-xs text-gray-400">{notifEnabled ? 'ON' : 'OFF'}</span>
+                <button
+                  onClick={() => toggleNotification(!notifEnabled)}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${notifEnabled ? 'bg-accent-green' : 'bg-navy-600'}`}
+                >
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${notifEnabled ? 'left-5.5 translate-x-0.5' : 'left-0.5'}`} />
+                </button>
+              </label>
+            </div>
+          </div>
+
+          <p className="text-xs text-gray-500 mb-3">
+            {isEn
+              ? 'Receive email when diagnosis reports or CIS benchmarks complete. Each email must confirm the subscription.'
+              : '종합진단 리포트 또는 CIS 벤치마크 완료 시 이메일을 수신합니다. 각 이메일은 SNS 구독 확인이 필요합니다.'}
+          </p>
+
+          {/* Add email */}
+          <div className="flex gap-2 mb-3">
+            <input
+              type="email"
+              value={notifNewEmail}
+              onChange={e => setNotifNewEmail(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addEmail()}
+              placeholder={isEn ? 'email@example.com' : 'email@example.com'}
+              className="flex-1 bg-navy-900 border border-navy-600 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-accent-cyan/50 focus:outline-none"
+            />
+            <button
+              onClick={addEmail}
+              disabled={notifLoading}
+              className="flex items-center gap-1.5 px-4 py-2 bg-accent-cyan/20 text-accent-cyan rounded-lg text-sm font-medium hover:bg-accent-cyan/30 disabled:opacity-40"
+            >
+              <Plus size={14} /> {isEn ? 'Add' : '추가'}
+            </button>
+          </div>
+
+          {/* Email list */}
+          {notifEmails.length > 0 && (
+            <div className="space-y-1.5 mb-3">
+              {notifEmails.map(email => (
+                <div key={email} className="flex items-center justify-between bg-navy-900 rounded-lg px-3 py-2">
+                  <span className="text-sm text-gray-300">{email}</span>
+                  <button
+                    onClick={() => removeEmail(email)}
+                    className="text-gray-500 hover:text-red-400 transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {notifEmails.length === 0 && (
+            <div className="text-center text-xs text-gray-600 py-4">
+              {isEn ? 'No email addresses configured' : '등록된 이메일이 없습니다'}
+            </div>
+          )}
+
+          {/* Status message */}
+          {notifMessage && (
+            <div className="text-xs text-accent-green mt-2">{notifMessage}</div>
+          )}
+          {notifLoading && <Loader2 size={14} className="animate-spin text-accent-cyan mt-2" />}
         </div>
       )}
 

@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
     ]);
 
     // Build node info map / 노드 정보 맵 구성
-    const nodeMap: Record<string, { instanceType: string; allocCpu: number; allocMemMB: number; hourlyRate: number }> = {};
+    const nodeMap: Record<string, { instanceType: string; allocCpu: number; allocMemMB: number; hourlyRate: number; contextName: string }> = {};
     (nodesResult.rows || []).forEach((n: any) => {
       const allocCpu = parseCpu(n.allocatable_cpu);
       const allocMemMB = parseMemoryMB(n.allocatable_memory);
@@ -171,6 +171,7 @@ export async function GET(request: NextRequest) {
         allocCpu,
         allocMemMB,
         hourlyRate: getNodeHourlyRate(instanceType),
+        contextName: n.context_name || '',
       };
     });
 
@@ -207,7 +208,7 @@ export async function GET(request: NextRequest) {
       if (!podCostMap[key]) {
         podCostMap[key] = {
           pod_name: p.pod_name, namespace: p.namespace, node_name: p.node_name,
-          instance_type: p.instance_type, phase: p.phase,
+          instance_type: p.instance_type, phase: p.phase, context_name: p.context_name || '',
           cpu_request_vcpu: 0, memory_request_mb: 0,
           cpuCostDaily: 0, memCostDaily: 0, totalCostDaily: 0,
           containers: [],
@@ -255,6 +256,7 @@ export async function GET(request: NextRequest) {
         allocatable_memory_mb: info?.allocMemMB || 0,
         pod_count: parseInt(String(agg?.pod_count)) || 0,
         container_count: parseInt(String(agg?.container_count)) || 0,
+        context_name: n.context_name || '',
       };
     });
 

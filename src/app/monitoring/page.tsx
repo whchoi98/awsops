@@ -7,7 +7,8 @@ import LineChartCard from '@/components/charts/LineChartCard';
 import BarChartCard from '@/components/charts/BarChartCard';
 import DataTable from '@/components/table/DataTable';
 import { Activity, Cpu, HardDrive, Database, X, MemoryStick, Wifi, ArrowLeft, Calendar, RefreshCw } from 'lucide-react';
-import { LineChart, Line, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis } from 'recharts';
+import { LineChart, Line, Tooltip as RTooltip, XAxis, YAxis } from 'recharts';
+import SafeResponsiveContainer from '@/components/charts/SafeResponsiveContainer';
 import { queries as metQ } from '@/lib/queries/metrics';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { useAccountContext } from '@/contexts/AccountContext';
@@ -366,14 +367,14 @@ export default function MonitoringPage() {
                     </div>
                   </div>
                   <div className="h-36">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <SafeResponsiveContainer>
                       <LineChart data={chartData}>
                         <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 10 }} interval="preserveStartEnd" />
                         <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 10 }} width={45} />
                         <RTooltip contentStyle={{ background: '#0f1629', border: '1px solid #1a2540', borderRadius: 8, fontSize: 11 }} labelStyle={{ color: '#6b7280' }} />
                         <Line type="monotone" dataKey="value" stroke={metricColor[name] || '#00d4ff'} strokeWidth={2} dot={false} />
                       </LineChart>
-                    </ResponsiveContainer>
+                    </SafeResponsiveContainer>
                   </div>
                 </div>
               );

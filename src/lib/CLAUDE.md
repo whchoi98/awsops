@@ -15,12 +15,7 @@
 - `eks-optimize-queries.ts` — EKS 리소스 최적화 (Prometheus 메트릭 디스커버리 + K8s 리소스 수집 + 비용 분석 프롬프트)
 - `report-pptx.ts` — PPTX 리포트 생성 (WADD 스타일: 타이틀바, 요약바, 2컬럼/카드 레이아웃, 인라인 테이블, 마크다운 파싱)
 - `report-docx.ts` — DOCX 리포트 생성 (docx 패키지, A4/라이트 테마, TOC, 마크다운→문단/테이블/블릿 변환, 헤더/푸터/페이지 번호)
-- `report-generator.ts` — 종합 진단 데이터 수집 오케스트레이터 (Steampipe 쿼리 + 전문 컬렉터)
-- `report-prompts.ts` — 15섹션 진단 프롬프트 정의 (섹션명, 시스템 프롬프트, 한/영 제목)
 - `report-scheduler.ts` — 리포트 스케줄러 (주기적 자동 진단, weekly/biweekly/monthly, KST 기준, data/report-schedule.json)
-- `datasource-client.ts` — 외부 데이터소스 HTTP 클라이언트 (7종: Prometheus, Loki, Tempo, ClickHouse, Jaeger, Dynatrace, Datadog, SSRF 방지 내장)
-- `datasource-registry.ts` — 데이터소스 타입 레지스트리 (헬스체크 엔드포인트, 쿼리 언어, 라벨)
-- `datasource-prompts.ts` — 데이터소스 AI 쿼리 생성 프롬프트 (타입별 PromQL/LogQL/SQL 등)
 - `queries/*.ts` — 25개 SQL 쿼리 파일 (ebs, msk, opensearch, container-cost, eks-container-cost, bedrock 포함)
 
 ## 규칙
@@ -51,12 +46,7 @@ Core libraries: Steampipe database connection, SQL query definitions, inventory,
 - `eks-optimize-queries.ts` — EKS resource optimization (Prometheus metric discovery + K8s resource collection + cost analysis prompt)
 - `report-pptx.ts` — PPTX report generation (WADD-style: title bars, summary bars, 2-column/card layouts, inline tables, markdown parsing)
 - `report-docx.ts` — DOCX report generation (docx package, A4/light theme, TOC, markdown→paragraph/table/bullet conversion, header/footer/page numbers)
-- `report-generator.ts` — Diagnosis report data collection orchestrator (Steampipe queries + specialized collectors)
-- `report-prompts.ts` — 15-section diagnosis prompt definitions (section names, system prompts, KO/EN titles)
 - `report-scheduler.ts` — Report scheduler (periodic auto-diagnosis, weekly/biweekly/monthly, KST-based, data/report-schedule.json)
-- `datasource-client.ts` — External datasource HTTP client (7 platforms: Prometheus, Loki, Tempo, ClickHouse, Jaeger, Dynatrace, Datadog, built-in SSRF protection)
-- `datasource-registry.ts` — Datasource type registry (health endpoints, query languages, labels)
-- `datasource-prompts.ts` — Datasource AI query generation prompts (per-type PromQL/LogQL/SQL etc.)
 - `queries/*.ts` — 25 SQL query files (incl. ebs, msk, opensearch, container-cost, eks-container-cost, bedrock)
 
 ## Rules

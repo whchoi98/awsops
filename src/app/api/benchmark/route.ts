@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
   const fileSuffix = account ? `_${account.accountId}` : '';
   const resultFile = join(RESULTS_DIR, `${benchmark}${fileSuffix}.json`);
   const statusFile = join(RESULTS_DIR, `${benchmark}${fileSuffix}.status`);
+  const errorFile = join(RESULTS_DIR, `${benchmark}${fileSuffix}.err`);
 
   if (action === 'run') {
     // Start benchmark in background
@@ -56,14 +57,35 @@ export async function GET(request: NextRequest) {
 
     const dbUrl = getDbUrl();
     const tmpFile = `${resultFile}.tmp`;
-    const errorFile = `${resultFile}.error`;
     // Powerpipe exits with code 2 when controls have alarms — this is expected.
     // Check output file validity instead of relying on exit code.
-    // Note: exec() is used here intentionally — the command requires shell features
-    // (pipes, redirects, conditionals). All parameters (benchmark, dbUrl, MOD_DIR) are
-    // server-controlled values from allowlisted constants, not user input.
     const cmd = `powerpipe mod install --mod-location "${MOD_DIR}" > /dev/null 2>&1; powerpipe benchmark run aws_compliance.benchmark.${benchmark} --mod-location "${MOD_DIR}" ${searchPathArgs} --output json --progress=false > "${tmpFile}" 2>"${errorFile}"; if [ -s "${tmpFile}" ]; then mv "${tmpFile}" "${resultFile}" && echo "done" > "${statusFile}"; else rm -f "${tmpFile}" && echo "error" > "${statusFile}"; fi`;
-    exec(cmd, { env: { ...process.env, POWERPIPE_DATABASE: dbUrl } });
+    // Note: exec() is used here intentionally — the command requires shell features
+    // (pipes, redirects, &&/||). All parameters (benchmark, dbUrl, MOD_DIR) are
+    // server-controlled values, not user input. No user input is interpolated.
+    exec(cmd, { env: { ...process.env, POWERPIPE_DATABASE: dbUrl } }, () => {
+      // Send SNS notification on benchmark completion (best-effort)
+      try {
+        const st = existsSync(statusFile) ? readFileSync(statusFile, 'utf-8').trim() : 'error';
+        if (st === 'done') {
+          let totalControls = 0, alarmCount = 0, okCount = 0;
+          try {
+            const raw = readFileSync(resultFile, 'utf-8');
+            const result = JSON.parse(raw);
+            const groups = result?.groups || [];
+            for (const g of groups) {
+              totalControls += g?.summary?.control?.total || 0;
+              alarmCount += g?.summary?.control?.alarm || 0;
+              okCount += g?.summary?.control?.ok || 0;
+            }
+          } catch { /* parse error — send without counts */ }
+
+          import('@/lib/sns-notification').then(({ notifyBenchmarkCompleted }) => {
+            notifyBenchmarkCompleted({ benchmark, accountAlias: account?.alias, totalControls, alarmCount, okCount });
+          }).catch(() => {});
+        }
+      } catch { /* notification is best-effort */ }
+    });
 
     return NextResponse.json({ status: 'started', message: 'Benchmark started' });
   }
@@ -75,11 +97,26 @@ export async function GET(request: NextRequest) {
   }
 
   if (action === 'result') {
+    // Check status first — if errored or still running, don't attempt to parse
+    const currentStatus = existsSync(statusFile) ? readFileSync(statusFile, 'utf-8').trim() : 'none';
+    if (currentStatus === 'error') {
+      const errorDetail = existsSync(errorFile) ? readFileSync(errorFile, 'utf-8').trim() : '';
+      return NextResponse.json({
+        error: 'Benchmark failed. Check that powerpipe is installed and Steampipe is running.',
+        detail: errorDetail
+      }, { status: 502 });
+    }
+    if (currentStatus === 'running') {
+      return NextResponse.json({ error: 'Benchmark still running.' }, { status: 202 });
+    }
     if (!existsSync(resultFile)) {
       return NextResponse.json({ error: 'No results available. Run the benchmark first.' }, { status: 404 });
     }
     try {
       const raw = readFileSync(resultFile, 'utf-8');
+      if (!raw.trim()) {
+        return NextResponse.json({ error: 'Benchmark produced empty results. Check powerpipe installation.' }, { status: 502 });
+      }
       const data = JSON.parse(raw);
       return NextResponse.json(data);
     } catch {

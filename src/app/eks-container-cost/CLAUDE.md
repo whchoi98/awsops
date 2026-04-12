@@ -10,7 +10,7 @@ OpenCost(기본) + Request 기반 추정(폴백) 이중 데이터 소스의 EKS 
 ## Data Sources / 데이터 소스
 - **OpenCost (primary)**: `data/config.json` `opencostEndpoint` → OpenCost REST API
   - 5 cost items: CPU, Memory, Network, Storage (PV), GPU
-  - Requires: Prometheus + Metrics Server + OpenCost (scripts/06f-setup-opencost.sh)
+  - Requires: Prometheus + Metrics Server + OpenCost (scripts/07-setup-opencost.sh)
   - Access: kubectl port-forward localhost:9003 → OpenCost svc
 - **Request-based (fallback)**: Steampipe `kubernetes_pod` + `kubernetes_node`
   - 2 cost items: CPU, Memory (from resource requests)
@@ -25,4 +25,4 @@ OpenCost(기본) + Request 기반 추정(폴백) 이중 데이터 소스의 EKS 
 - ECS Container Cost: `src/app/container-cost/` (Fargate pricing)
 - API: `src/app/api/eks-container-cost/route.ts`
 - Queries: `src/lib/queries/eks-container-cost.ts`
-- Install: `scripts/06f-setup-opencost.sh` (Prometheus + OpenCost)
+- Install: `scripts/07-setup-opencost.sh` (Prometheus + OpenCost)
