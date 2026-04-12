@@ -164,8 +164,8 @@ exports.handler = async (event) => {
   if (uri === '/awsops/login' || uri.startsWith('/awsops/login/') || uri === '/awsops/api/auth') {
     return request;
   }
-  // Allow Next.js static assets for login page
-  if (uri.startsWith('/awsops/_next/')) {
+  // Allow Next.js static assets and logos for login page
+  if (uri.startsWith('/awsops/_next/') || uri.startsWith('/awsops/logos/')) {
     return request;
   }
 
