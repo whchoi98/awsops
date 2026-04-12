@@ -3,7 +3,137 @@
 import { useState, useEffect, useCallback } from 'react';
 import Header from '@/components/layout/Header';
 import { useAccountContext } from '@/contexts/AccountContext';
-import { Plus, Trash2, RefreshCw, CheckCircle, XCircle, Shield, Copy } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, CheckCircle, XCircle, Shield, Copy, Users, Save } from 'lucide-react';
+
+interface DepartmentEntry {
+  name: string;
+  cognitoGroup: string;
+  accounts: string[];
+  pages?: string[];
+  eksClusterNames?: string[];
+  datasourceIds?: string[];
+}
+
+const EMPTY_DEPT: DepartmentEntry = {
+  name: '',
+  cognitoGroup: '',
+  accounts: ['*'],
+  pages: ['*'],
+  eksClusterNames: ['*'],
+  datasourceIds: ['*'],
+};
+
+// All available page paths from sidebar navigation
+const ALL_PAGES = [
+  { value: '/ec2', label: 'EC2' },
+  { value: '/lambda', label: 'Lambda' },
+  { value: '/ecs', label: 'ECS' },
+  { value: '/ecr', label: 'ECR' },
+  { value: '/k8s', label: 'EKS' },
+  { value: '/k8s/explorer', label: 'EKS Explorer' },
+  { value: '/container-cost', label: 'ECS Container Cost' },
+  { value: '/eks-container-cost', label: 'EKS Container Cost' },
+  { value: '/vpc', label: 'VPC / Network' },
+  { value: '/cloudfront-cdn', label: 'CloudFront' },
+  { value: '/waf', label: 'WAF' },
+  { value: '/topology', label: 'Topology' },
+  { value: '/ebs', label: 'EBS' },
+  { value: '/s3', label: 'S3' },
+  { value: '/rds', label: 'RDS' },
+  { value: '/dynamodb', label: 'DynamoDB' },
+  { value: '/elasticache', label: 'ElastiCache' },
+  { value: '/opensearch', label: 'OpenSearch' },
+  { value: '/msk', label: 'MSK' },
+  { value: '/monitoring', label: 'Monitoring' },
+  { value: '/bedrock', label: 'Bedrock' },
+  { value: '/cloudwatch', label: 'CloudWatch' },
+  { value: '/cloudtrail', label: 'CloudTrail' },
+  { value: '/cost', label: 'Cost' },
+  { value: '/inventory', label: 'Resource Inventory' },
+  { value: '/datasources', label: 'Datasources' },
+  { value: '/iam', label: 'IAM' },
+  { value: '/security', label: 'Security' },
+  { value: '/compliance', label: 'CIS Compliance' },
+  { value: '/ai', label: 'AI Assistant' },
+  { value: '/ai-diagnosis', label: 'AI Diagnosis' },
+  { value: '/agentcore', label: 'AgentCore' },
+];
+
+// Reusable multi-select dropdown with "All" toggle
+function MultiSelect({ options, selected, onChange, allLabel = 'All' }: {
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (values: string[]) => void;
+  allLabel?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const isAll = selected.includes('*');
+
+  const toggleAll = () => {
+    onChange(isAll ? [] : ['*']);
+  };
+
+  const toggle = (value: string) => {
+    if (isAll) {
+      // Switching from "All" to specific selections: select all except clicked
+      onChange(options.map(o => o.value).filter(v => v !== value));
+      return;
+    }
+    const next = selected.includes(value)
+      ? selected.filter(v => v !== value)
+      : [...selected, value];
+    // If all individually selected, switch to "*"
+    if (next.length === options.length) {
+      onChange(['*']);
+    } else {
+      onChange(next);
+    }
+  };
+
+  const displayText = isAll
+    ? `✓ ${allLabel}`
+    : selected.length === 0
+    ? 'None selected'
+    : selected.length <= 3
+    ? selected.map(v => options.find(o => o.value === v)?.label || v).join(', ')
+    : `${selected.length} selected`;
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full bg-navy-700 border border-navy-600 rounded-lg px-3 py-2 text-left text-sm text-gray-200 focus:border-cyan-500 focus:outline-none flex items-center justify-between"
+      >
+        <span className={isAll ? 'text-accent-cyan' : selected.length === 0 ? 'text-gray-500' : ''}>{displayText}</span>
+        <svg className={`w-4 h-4 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute z-20 mt-1 w-full bg-navy-800 border border-navy-600 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+            <label className="flex items-center gap-2 px-3 py-2 hover:bg-navy-700 cursor-pointer border-b border-navy-600">
+              <input type="checkbox" checked={isAll} onChange={toggleAll} className="rounded border-navy-500 bg-navy-700 text-accent-cyan focus:ring-cyan-500" />
+              <span className="text-sm text-accent-cyan font-medium">{allLabel} (*)</span>
+            </label>
+            {options.map(opt => (
+              <label key={opt.value} className="flex items-center gap-2 px-3 py-1.5 hover:bg-navy-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isAll || selected.includes(opt.value)}
+                  onChange={() => toggle(opt.value)}
+                  className="rounded border-navy-500 bg-navy-700 text-accent-cyan focus:ring-cyan-500"
+                />
+                <span className="text-sm text-gray-300">{opt.label}</span>
+                <span className="text-[10px] text-gray-600 font-mono ml-auto">{opt.value}</span>
+              </label>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 interface AccountEntry {
   accountId: string;
@@ -54,6 +184,14 @@ export default function AccountsPage() {
   const [initingHost, setInitingHost] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
 
+  // Department states
+  const [departments, setDepartments] = useState<DepartmentEntry[]>([]);
+  const [deptLoading, setDeptLoading] = useState(true);
+  const [deptSaving, setDeptSaving] = useState(false);
+  const [deptMessage, setDeptMessage] = useState<{ success: boolean; text: string } | null>(null);
+  const [eksClusters, setEksClusters] = useState<{ value: string; label: string }[]>([]);
+  const [datasourceOptions, setDatasourceOptions] = useState<{ value: string; label: string }[]>([]);
+
   const fetchAccounts = useCallback(async () => {
     setLoading(true);
     setPageError(null);
@@ -68,6 +206,80 @@ export default function AccountsPage() {
     }
   }, []);
 
+  const fetchDepartments = useCallback(async () => {
+    setDeptLoading(true);
+    try {
+      const configRes = await fetch('/awsops/api/steampipe?action=config');
+      const config = await configRes.json();
+      setDepartments(config.departments || []);
+      // Build datasource options from config
+      setDatasourceOptions(
+        (config.datasources || []).map((ds: { id: string; name: string; type: string }) => ({
+          value: ds.id,
+          label: `${ds.name} (${ds.type})`,
+        }))
+      );
+      // Fetch EKS clusters from Steampipe
+      try {
+        const eksRes = await fetch('/awsops/api/steampipe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ queries: { eks: 'SELECT DISTINCT name FROM aws_eks_cluster ORDER BY name' } }),
+        });
+        const eksData = await eksRes.json();
+        setEksClusters(
+          (eksData.eks?.rows || []).map((r: { name: string }) => ({
+            value: r.name,
+            label: r.name,
+          }))
+        );
+      } catch {
+        // EKS query may fail if no clusters
+      }
+    } catch {
+      // ignore
+    } finally {
+      setDeptLoading(false);
+    }
+  }, []);
+
+  const saveDepartments = async () => {
+    setDeptSaving(true);
+    setDeptMessage(null);
+    try {
+      const res = await fetch('/awsops/api/steampipe?action=save-departments', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ departments }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setDeptMessage({ success: false, text: data.error });
+      } else {
+        setDepartments(data.departments);
+        setDeptMessage({ success: true, text: 'Departments saved successfully.' });
+      }
+    } catch {
+      setDeptMessage({ success: false, text: 'Failed to save departments.' });
+    } finally {
+      setDeptSaving(false);
+    }
+  };
+
+  const addDepartment = () => {
+    setDepartments([...departments, { ...EMPTY_DEPT }]);
+  };
+
+  const removeDepartment = (index: number) => {
+    setDepartments(departments.filter((_, i) => i !== index));
+  };
+
+  const updateDepartment = (index: number, field: keyof DepartmentEntry, value: string | string[]) => {
+    const updated = [...departments];
+    updated[index] = { ...updated[index], [field]: value };
+    setDepartments(updated);
+  };
+
   // Admin access check / 관리자 접근 확인
   useEffect(() => {
     fetch('/awsops/api/steampipe?action=admin-check')
@@ -79,8 +291,11 @@ export default function AccountsPage() {
   }, []);
 
   useEffect(() => {
-    if (!accessDenied) fetchAccounts();
-  }, [fetchAccounts, accessDenied]);
+    if (!accessDenied) {
+      fetchAccounts();
+      fetchDepartments();
+    }
+  }, [fetchAccounts, fetchDepartments, accessDenied]);
 
   // Access denied screen / 접근 거부 화면
   if (accessDenied) {
@@ -554,6 +769,154 @@ export default function AccountsPage() {
                 <li>Configure Steampipe connection for the new account</li>
               </ol>
             </div>
+          </div>
+        </div>
+        {/* Department Access Control */}
+        <div className="bg-navy-800 rounded-xl border border-navy-600 overflow-hidden">
+          <div className="px-6 py-4 border-b border-navy-600">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Users size={18} className="text-purple-400" />
+              Department Access Control
+            </h2>
+            <p className="text-sm text-gray-400 mt-0.5">
+              Map Cognito groups to accounts, pages, EKS clusters, and datasources.
+              Leave empty to disable department filtering (all users see everything).
+            </p>
+          </div>
+
+          <div className="px-6 py-5 space-y-4">
+            {deptLoading ? (
+              <div className="text-center text-gray-500 py-8">Loading departments...</div>
+            ) : (
+              <>
+                {departments.map((dept, idx) => (
+                  <div key={idx} className="bg-navy-900 border border-navy-600 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-300">Department #{idx + 1}</span>
+                      <button
+                        onClick={() => removeDepartment(idx)}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-colors"
+                      >
+                        <Trash2 size={12} />
+                        Remove
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Department Name</label>
+                        <input
+                          type="text"
+                          value={dept.name}
+                          onChange={e => updateDepartment(idx, 'name', e.target.value)}
+                          placeholder="e.g., DevOps, FinOps, Security"
+                          className="w-full bg-navy-700 border border-navy-600 rounded-lg px-3 py-2 text-gray-200 focus:border-cyan-500 focus:outline-none text-sm placeholder-gray-600"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Cognito Group</label>
+                        <input
+                          type="text"
+                          value={dept.cognitoGroup}
+                          onChange={e => updateDepartment(idx, 'cognitoGroup', e.target.value)}
+                          placeholder="e.g., devops-team"
+                          className="w-full bg-navy-700 border border-navy-600 rounded-lg px-3 py-2 text-gray-200 focus:border-cyan-500 focus:outline-none text-sm font-mono placeholder-gray-600"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Allowed Accounts</label>
+                        <MultiSelect
+                          options={accounts.map(a => ({ value: a.accountId, label: `${a.alias} (${a.accountId})` }))}
+                          selected={dept.accounts}
+                          onChange={v => updateDepartment(idx, 'accounts', v)}
+                          allLabel="All Accounts"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Allowed Pages</label>
+                        <MultiSelect
+                          options={ALL_PAGES}
+                          selected={dept.pages || ['*']}
+                          onChange={v => updateDepartment(idx, 'pages', v)}
+                          allLabel="All Pages"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Allowed EKS Clusters</label>
+                        {eksClusters.length > 0 ? (
+                          <MultiSelect
+                            options={eksClusters}
+                            selected={dept.eksClusterNames || ['*']}
+                            onChange={v => updateDepartment(idx, 'eksClusterNames', v)}
+                            allLabel="All Clusters"
+                          />
+                        ) : (
+                          <div className="w-full bg-navy-700 border border-navy-600 rounded-lg px-3 py-2 text-sm text-gray-500">No EKS clusters found</div>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Allowed Datasources</label>
+                        {datasourceOptions.length > 0 ? (
+                          <MultiSelect
+                            options={datasourceOptions}
+                            selected={dept.datasourceIds || ['*']}
+                            onChange={v => updateDepartment(idx, 'datasourceIds', v)}
+                            allLabel="All Datasources"
+                          />
+                        ) : (
+                          <div className="w-full bg-navy-700 border border-navy-600 rounded-lg px-3 py-2 text-sm text-gray-500">No datasources configured</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={addDepartment}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition-colors"
+                  >
+                    <Plus size={14} />
+                    Add Department
+                  </button>
+
+                  <button
+                    onClick={saveDepartments}
+                    disabled={deptSaving}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30 transition-colors disabled:opacity-50"
+                  >
+                    {deptSaving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+                    Save Departments
+                  </button>
+                </div>
+
+                {deptMessage && (
+                  <div className={`px-4 py-3 rounded-lg flex items-center gap-2 text-sm ${
+                    deptMessage.success
+                      ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                      : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                  }`}>
+                    {deptMessage.success ? <CheckCircle size={16} /> : <XCircle size={16} />}
+                    {deptMessage.text}
+                  </div>
+                )}
+
+                {departments.length === 0 && (
+                  <div className="bg-navy-900/50 border border-navy-600 rounded-lg px-4 py-3">
+                    <p className="text-sm text-gray-400">
+                      No departments configured. All users can access all accounts and pages.
+                      Add a department to enable Cognito group-based access control.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>

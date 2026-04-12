@@ -39,4 +39,4 @@
 - EKS 컨테이너 비용: OpenCost API (CPU/Mem/Net/Storage/GPU) 우선
 - OpenCost 미설치 시 request-based fallback (Fargate pricing 기반 추정)
 - ECS 컨테이너 비용: Fargate pricing + Container Insights metrics
-- Prometheus + OpenCost 설치: `scripts/06f-setup-opencost.sh`
+- Prometheus + OpenCost 설치: `scripts/07-setup-opencost.sh`

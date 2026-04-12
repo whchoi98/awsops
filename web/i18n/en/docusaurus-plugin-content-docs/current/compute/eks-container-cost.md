@@ -84,7 +84,7 @@ Pod Total Cost = CPU + Memory + Network + Storage + GPU
 ## OpenCost Installation
 
 ```bash
-bash scripts/06f-setup-opencost.sh
+bash scripts/07-setup-opencost.sh
 ```
 
 After installation, setting `opencostEndpoint` in `data/config.json` automatically switches to OpenCost mode.

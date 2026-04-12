@@ -1,0 +1,78 @@
+/* AWSops Cognito Hosted UI — Dark Theme */
+/* Matching dashboard navy theme (#0f1629 base) */
+
+.background-customizable {
+  background-color: #0f1629;
+}
+
+.banner-customizable {
+  background-color: #0a0e1a;
+  padding: 24px 0 16px;
+}
+
+.logo-customizable {
+  max-width: 180px;
+  max-height: 72px;
+}
+
+.redirect-customizable {
+  color: #c0c8d4;
+}
+
+.label-customizable {
+  color: #8b95a5;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.inputField-customizable {
+  background-color: #151d30;
+  border: 1px solid #1e2d4a;
+  border-radius: 8px;
+  color: #e0e6ed;
+  padding: 11px 14px;
+  font-size: 14px;
+}
+
+.inputField-customizable:focus {
+  border-color: #00d4ff;
+}
+
+.submitButton-customizable {
+  background-color: #00d4ff;
+  border: none;
+  border-radius: 8px;
+  color: #0a0e1a;
+  font-weight: 700;
+  font-size: 15px;
+  padding: 11px 24px;
+}
+
+.textDescription-customizable {
+  color: #6b7a8d;
+}
+
+.idpButton-customizable {
+  background-color: #151d30;
+  border: 1px solid #1e2d4a;
+  border-radius: 8px;
+  color: #c0c8d4;
+}
+
+.legalText-customizable {
+  color: #3d4d63;
+}
+
+.errorMessage-customizable {
+  background-color: #1c1015;
+  border: 1px solid #7f1d1d;
+  border-radius: 8px;
+  color: #fca5a5;
+}
+
+.socialButton-customizable {
+  background-color: #151d30;
+  border: 1px solid #1e2d4a;
+  border-radius: 8px;
+  color: #c0c8d4;
+}

@@ -3,7 +3,7 @@ set -e
 set -o pipefail
 ################################################################################
 #                                                                              #
-#   Step 11: Multi-Account Setup                                               #
+#   Step 12: Multi-Account Setup                                               #
 #                                                                              #
 #   Actions:                                                                   #
 #     1. Validate prerequisites (Steampipe, host account)                      #
@@ -41,7 +41,7 @@ cd "$WORK_DIR"
 
 echo ""
 echo -e "${CYAN}=================================================================${NC}"
-echo -e "${CYAN}   Step 11: Multi-Account Setup${NC}"
+echo -e "${CYAN}   Step 12: Multi-Account Setup${NC}"
 echo -e "${CYAN}=================================================================${NC}"
 echo ""
 

@@ -139,9 +139,6 @@ export const queries = {
       reason,
       message,
       last_timestamp,
-      count,
-      involved_object_kind,
-      involved_object_name,
       context_name
     FROM
       kubernetes_event

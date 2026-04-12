@@ -11,6 +11,11 @@ export interface CognitoStackProps extends cdk.StackProps {
    * Lambda@Edge will be attached to viewer-request events.
    */
   distribution: cloudfront.Distribution;
+  /**
+   * Optional custom domain for the dashboard (e.g., 'awsops.example.com').
+   * When set, Cognito callback URLs will use this domain instead of the CloudFront domain.
+   */
+  customDomain?: string;
 }
 
 export class CognitoStack extends cdk.Stack {
@@ -24,6 +29,9 @@ export class CognitoStack extends cdk.Stack {
     // -------------------------------------------------------
     // Cognito User Pool
     // -------------------------------------------------------
+    // Callback domain: use custom domain if provided, otherwise CloudFront distribution domain
+    const callbackDomain = props.customDomain || props.distribution.distributionDomainName;
+
     this.userPool = new cognito.UserPool(this, 'AWSopsUserPool', {
       userPoolName: 'awsops-user-pool',
       selfSignUpEnabled: false,
@@ -58,9 +66,8 @@ export class CognitoStack extends cdk.Stack {
       oAuth: {
         flows: { authorizationCodeGrant: true },
         scopes: [cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL, cognito.OAuthScope.PROFILE],
-        // CallbackURLs will be set after CloudFront domain is known
-        callbackUrls: ['https://placeholder.cloudfront.net/awsops/_callback'],
-        logoutUrls: ['https://placeholder.cloudfront.net/awsops/'],
+        callbackUrls: [`https://${callbackDomain}/awsops/_callback`],
+        logoutUrls: [`https://${callbackDomain}/awsops/`],
       },
       authFlows: {
         userPassword: true,
@@ -70,6 +77,14 @@ export class CognitoStack extends cdk.Stack {
       idTokenValidity: cdk.Duration.hours(1),
       refreshTokenValidity: cdk.Duration.days(30),
     });
+
+    // -------------------------------------------------------
+    // Cognito Hosted UI Customization (Dark Theme)
+    // CSS + Logo applied via set-ui-customization.
+    // Run `scripts/setup-cognito-ui.sh` after deployment to apply.
+    // CDK CfnUserPoolUICustomizationAttachment requires the domain
+    // to be fully created first, so we use a script for reliability.
+    // -------------------------------------------------------
 
     // -------------------------------------------------------
     // Lambda@Edge for CloudFront Authentication
@@ -145,6 +160,15 @@ exports.handler = async (event) => {
     }
   }
 
+  // Allow login page and auth API without authentication
+  if (uri === '/awsops/login' || uri.startsWith('/awsops/login/') || uri === '/awsops/api/auth') {
+    return request;
+  }
+  // Allow Next.js static assets and logos for login page
+  if (uri.startsWith('/awsops/_next/') || uri.startsWith('/awsops/logos/')) {
+    return request;
+  }
+
   // Check for valid token
   const token = cookies[COOKIE_NAME];
   if (token) {
@@ -162,20 +186,12 @@ exports.handler = async (event) => {
     }
   }
 
-  // Redirect to Cognito Hosted UI
-  const redirectUri = 'https://' + host + CALLBACK_PATH;
-  const loginUrl = 'https://' + COGNITO_DOMAIN + '/login?' + querystring.stringify({
-    response_type: 'code',
-    client_id: CLIENT_ID,
-    redirect_uri: redirectUri,
-    scope: 'openid email profile',
-  });
-
+  // Redirect to custom login page (instead of Cognito Hosted UI)
   return {
     status: '302',
     statusDescription: 'Found',
     headers: {
-      location: [{ key: 'Location', value: loginUrl }],
+      location: [{ key: 'Location', value: '/awsops/login' }],
     },
   };
 };

@@ -5,7 +5,7 @@ import { homedir } from 'os';
 import { batchQuery, clearCache, checkCostAvailability, runCostQueriesPerAccount, resetPool } from '@/lib/steampipe';
 import { saveSnapshot, getHistory } from '@/lib/resource-inventory';
 import { saveCostSnapshot, getLatestCostSnapshot } from '@/lib/cost-snapshot';
-import { getConfig, saveConfig, validateAccountId, getAccounts, isMultiAccount } from '@/lib/app-config';
+import { getConfig, saveConfig, validateAccountId, getAccounts, isMultiAccount, getAllowedAccountIds, isAccountAllowed, getAllowedPages, getAllowedEksClusters, getAllowedDatasources } from '@/lib/app-config';
 import type { AccountConfig } from '@/lib/app-config';
 import { getCacheWarmerStatus, ensureCacheWarmerStarted } from '@/lib/cache-warmer';
 import { getUserFromRequest } from '@/lib/auth-utils';
@@ -71,6 +71,20 @@ export async function GET(request: NextRequest) {
       const message = err instanceof Error ? err.message : 'Inventory fetch failed';
       return NextResponse.json({ error: message }, { status: 500 });
     }
+  }
+
+  // Department-based account filtering — returns allowed account IDs for current user
+  // 부서 기반 계정 필터링 — 현재 사용자에게 허용된 계정 ID 반환
+  if (action === 'allowed-accounts') {
+    const user = getUserFromRequest(request);
+    const groups = user.groups;
+    return NextResponse.json({
+      allowedAccountIds: getAllowedAccountIds(groups),
+      allowedPages: getAllowedPages(groups),
+      allowedEksClusters: getAllowedEksClusters(groups),
+      allowedDatasources: getAllowedDatasources(groups),
+      groups,
+    });
   }
 
   if (action === 'config') {
@@ -432,6 +446,34 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ accounts: updated });
     }
 
+    // --- Department CRUD / 부서 CRUD ---
+
+    if (action === 'departments') {
+      return NextResponse.json({ departments: getConfig().departments || [] });
+    }
+
+    if (action === 'save-departments') {
+      const body = await request.json();
+      const departments = body.departments;
+      if (!Array.isArray(departments)) {
+        return NextResponse.json({ error: 'departments must be an array' }, { status: 400 });
+      }
+      // Validate each department entry
+      for (const dept of departments) {
+        if (!dept.name || typeof dept.name !== 'string' || !dept.name.trim()) {
+          return NextResponse.json({ error: 'Each department must have a name' }, { status: 400 });
+        }
+        if (!dept.cognitoGroup || typeof dept.cognitoGroup !== 'string' || !dept.cognitoGroup.trim()) {
+          return NextResponse.json({ error: `Department "${dept.name}" must have a cognitoGroup` }, { status: 400 });
+        }
+        if (!Array.isArray(dept.accounts) || dept.accounts.length === 0) {
+          return NextResponse.json({ error: `Department "${dept.name}" must have at least one account (or "*")` }, { status: 400 });
+        }
+      }
+      saveConfig({ departments });
+      return NextResponse.json({ departments });
+    }
+
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';
@@ -513,6 +555,16 @@ export async function POST(request: NextRequest) {
     }
 
     const safeAccountId = accountId && validateAccountId(accountId) ? accountId : undefined;
+
+    // Department-based authorization: verify user can access the requested account
+    // 부서 기반 권한 검증: 요청된 계정 접근 허용 여부 확인
+    const user = getUserFromRequest(request);
+    if (!isAccountAllowed(safeAccountId, user.groups)) {
+      return NextResponse.json(
+        { error: 'Access denied. Your department does not have access to this account.' },
+        { status: 403 }
+      );
+    }
 
     let results: Record<string, { rows: unknown[]; error?: string }>;
 

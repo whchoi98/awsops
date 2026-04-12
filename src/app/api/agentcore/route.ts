@@ -6,7 +6,7 @@ import { execFileSync } from 'child_process';
 import NodeCache from 'node-cache';
 import { getConfig } from '@/lib/app-config';
 import { getStats } from '@/lib/agentcore-stats';
-import { getConversations, searchConversations, getMemoryStats } from '@/lib/agentcore-memory';
+import { getConversations, searchConversations, getMemoryStats, listSessions, getSession } from '@/lib/agentcore-memory';
 import { getUserFromRequest } from '@/lib/auth-utils';
 
 const REGION = 'ap-northeast-2';
@@ -112,6 +112,23 @@ export async function GET(request: NextRequest) {
     const user = getUserFromRequest(request);
     const conversations = await searchConversations(query, 10, user.email);
     return NextResponse.json({ conversations, user: user.email });
+  }
+
+  // 세션 목록 (사용자별) / Session list (per user)
+  if (action === 'sessions') {
+    const limit = parseInt(searchParams.get('limit') || '30');
+    const user = getUserFromRequest(request);
+    const sessions = await listSessions(user.email, limit);
+    return NextResponse.json({ sessions, user: user.email });
+  }
+
+  // 세션 상세 조회 / Get full session
+  if (action === 'session') {
+    const id = searchParams.get('id') || '';
+    if (!id) return NextResponse.json({ error: 'Missing session id' }, { status: 400 });
+    const session = await getSession(id);
+    if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    return NextResponse.json({ session });
   }
 
   // 메모리 통계 / Memory stats

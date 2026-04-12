@@ -6,8 +6,8 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  ResponsiveContainer,
 } from 'recharts';
+import SafeResponsiveContainer from './SafeResponsiveContainer';
 
 interface LineChartCardProps {
   title: string;
@@ -31,7 +31,7 @@ export default function LineChartCard({ title, data, color = '#00d4ff' }: LineCh
       <h3 className="text-sm font-semibold text-white mb-4">{title}</h3>
 
       <div className="h-52">
-        <ResponsiveContainer width="100%" height="100%">
+        <SafeResponsiveContainer>
           <LineChart data={data}>
             <XAxis
               dataKey="name"
@@ -55,7 +55,7 @@ export default function LineChartCard({ title, data, color = '#00d4ff' }: LineCh
               activeDot={{ r: 5, fill: color, strokeWidth: 2, stroke: '#0f1629' }}
             />
           </LineChart>
-        </ResponsiveContainer>
+        </SafeResponsiveContainer>
       </div>
     </div>
   );

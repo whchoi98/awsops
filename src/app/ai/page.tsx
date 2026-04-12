@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
-import { Send, Bot, User, Loader2, Sparkles, Database, Copy, Check, Activity, History, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { Send, Bot, User, Loader2, Sparkles, Database, Copy, Check, Activity, History, ChevronDown, ChevronUp, Plus, MessageSquare } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
@@ -47,6 +47,9 @@ export default function AIPage() {
   const [historyData, setHistoryData] = useState<any[]>([]);
   const [statusMessage, setStatusMessage] = useState('');
   const [streamingContent, setStreamingContent] = useState(''); // Accumulates streaming chunks / 스트리밍 청크 누적
+  const [sessionId, setSessionId] = useState(() => `s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null); // 선택된 세션 / Selected session for highlighting
+  const [loadingSession, setLoadingSession] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -54,13 +57,50 @@ export default function AIPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingContent]);
 
-  // 대화 이력 로드 / Load conversation history
+  // 새 채팅 시작 / Start new chat
+  const startNewChat = useCallback(() => {
+    setMessages([]);
+    setSessionId(`s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
+    setActiveSessionId(null);
+    setInput('');
+    inputRef.current?.focus();
+  }, []);
+
+  // 세션 목록 로드 / Load session list
   const loadHistory = () => {
-    fetch('/awsops/api/agentcore?action=conversations&limit=30')
+    fetch('/awsops/api/agentcore?action=sessions&limit=30')
       .then(r => r.json())
-      .then(d => setHistoryData(d.conversations || []))
+      .then(d => setHistoryData(d.sessions || []))
       .catch(() => {});
   };
+
+  // 세션 전체 대화 복원 / Restore full session
+  const loadSession = useCallback((sid: string) => {
+    setLoadingSession(true);
+    fetch(`/awsops/api/agentcore?action=session&id=${encodeURIComponent(sid)}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.session?.messages) {
+          const restored: Message[] = d.session.messages.map((m: any) => ({
+            role: m.role,
+            content: m.content,
+            model: m.model,
+            usedTools: m.usedTools,
+            via: m.via,
+            route: m.route,
+            responseTime: m.responseTimeMs ? Math.round(m.responseTimeMs / 100) / 10 : undefined,
+            inputTokens: m.inputTokens,
+            outputTokens: m.outputTokens,
+          }));
+          setMessages(restored);
+          setSessionId(sid);
+          setActiveSessionId(sid);
+          setShowHistory(false);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingSession(false));
+  }, []);
 
   // 히스토리는 토글 시에만 로드 (마운트 시 불필요) / Only load on toggle, not mount
 
@@ -108,6 +148,7 @@ export default function AIPage() {
           stream: true,
           lang,
           accountId: currentAccountId,
+          sessionId,
         }),
       });
 
@@ -235,7 +276,15 @@ export default function AIPage() {
           <h1 className="text-2xl font-bold text-white">{t('ai.title')}</h1>
           <p className="text-sm text-gray-400 mt-0.5">{t('ai.subtitle')}</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {messages.length > 0 && (
+            <button onClick={startNewChat}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-navy-700 border border-navy-600 text-gray-300 hover:border-accent-cyan/50 hover:text-accent-cyan transition-colors"
+              title={lang === 'ko' ? '새 대화' : 'New Chat'}>
+              <Plus size={14} />
+              {lang === 'ko' ? '새 대화' : 'New Chat'}
+            </button>
+          )}
           <select value={model} onChange={(e) => setModel(e.target.value as any)}
             className="bg-navy-900 border border-navy-600 rounded-lg px-3 py-2 text-xs text-gray-300 focus:ring-accent-cyan focus:border-accent-cyan">
             <option value="sonnet-4.6">Claude Sonnet 4.6</option>
@@ -508,22 +557,38 @@ export default function AIPage() {
 
         {showHistory && (
           <div className="px-5 py-4 bg-navy-900/30 max-h-80 overflow-y-auto space-y-2">
+            {loadingSession && (
+              <div className="flex items-center justify-center py-4 gap-2 text-sm text-gray-400">
+                <Loader2 size={14} className="animate-spin" />
+                {lang === 'ko' ? '대화 복원 중...' : 'Restoring conversation...'}
+              </div>
+            )}
             {historyData.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-6">{t('ai.noHistory')}</p>
             ) : (
-              historyData.map((conv: any, i: number) => (
-                <div key={conv.id || i}
-                  onClick={() => { setInput(conv.question); setShowHistory(false); inputRef.current?.focus(); }}
-                  className="flex items-center gap-4 px-4 py-3 rounded-lg bg-navy-800/60 hover:bg-navy-700/60 border border-navy-700/50 hover:border-accent-cyan/30 cursor-pointer transition-all group"
+              historyData.map((session: any, i: number) => (
+                <div key={session.id || i}
+                  onClick={() => loadSession(session.id)}
+                  className={`flex items-center gap-4 px-4 py-3 rounded-lg border cursor-pointer transition-all group ${
+                    activeSessionId === session.id
+                      ? 'bg-accent-cyan/10 border-accent-cyan/40'
+                      : 'bg-navy-800/60 hover:bg-navy-700/60 border-navy-700/50 hover:border-accent-cyan/30'
+                  }`}
                 >
+                  <div className="shrink-0">
+                    <MessageSquare size={16} className={activeSessionId === session.id ? 'text-accent-cyan' : 'text-gray-500 group-hover:text-gray-400'} />
+                  </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-200 truncate group-hover:text-white font-medium">{conv.question}</p>
-                    <p className="text-xs text-gray-500 truncate mt-1">{conv.summary?.slice(0, 100)}</p>
+                    <p className="text-sm text-gray-200 truncate group-hover:text-white font-medium">{session.title}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {session.messageCount} {lang === 'ko' ? '개 메시지' : 'messages'}
+                    </p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
-                    <span className="px-2 py-0.5 rounded-full bg-accent-cyan/10 text-accent-cyan text-xs font-mono border border-accent-cyan/20">{conv.route}</span>
-                    <span className="text-xs font-mono text-gray-400">{(conv.responseTimeMs / 1000).toFixed(1)}s</span>
-                    <span className="text-xs text-gray-500">{conv.timestamp ? new Date(conv.timestamp).toLocaleDateString() : ''}</span>
+                    {session.lastRoute && (
+                      <span className="px-2 py-0.5 rounded-full bg-accent-cyan/10 text-accent-cyan text-xs font-mono border border-accent-cyan/20">{session.lastRoute}</span>
+                    )}
+                    <span className="text-xs text-gray-500">{session.updatedAt ? new Date(session.updatedAt).toLocaleDateString() : ''}</span>
                   </div>
                 </div>
               ))

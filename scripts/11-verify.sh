@@ -2,7 +2,7 @@
 set -e
 ################################################################################
 #                                                                              #
-#   Step 9: Verification & Health Check                                        #
+#   Step 11: Verification & Health Check                                       #
 #                                                                              #
 #   Checks:                                                                    #
 #     [1/5] Services   - Steampipe, Next.js                                    #
@@ -23,7 +23,7 @@ ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/nu
 
 echo ""
 echo -e "${CYAN}=================================================================${NC}"
-echo -e "${CYAN}   Step 9: Verification & Health Check${NC}"
+echo -e "${CYAN}   Step 11: Verification & Health Check${NC}"
 echo -e "${CYAN}=================================================================${NC}"
 echo ""
 
@@ -134,19 +134,24 @@ while IFS= read -r api_route; do
     API_NAME=$(echo "$api_route" | sed "s|$WORK_DIR/src/app/api/||;s|/route.ts||")
     API_PATH="/awsops/api/$API_NAME"
 
-    RESP=$(curl -s --max-time 10 -X POST "http://localhost:3000${API_PATH}" \
-        -H "Content-Type: application/json" -d '{}' 2>/dev/null)
+    # Try GET first (most routes are GET-only), fallback to POST
+    RESP=$(curl -s --max-time 15 "http://localhost:3000${API_PATH}" 2>/dev/null)
+    METHOD="GET"
+    if [ -z "$RESP" ] || echo "$RESP" | grep -q "Method Not Allowed"; then
+        RESP=$(curl -s --max-time 15 -X POST "http://localhost:3000${API_PATH}" \
+            -H "Content-Type: application/json" -d '{}' 2>/dev/null)
+        METHOD="POST"
+    fi
 
     if [ -n "$RESP" ]; then
-        # Any JSON response (even error) means endpoint exists
         echo "$RESP" | python3 -c "import json,sys;json.load(sys.stdin)" 2>/dev/null
         if [ $? -eq 0 ]; then
-            check "POST $API_PATH" "OK"
+            check "$METHOD $API_PATH" "OK"
         else
-            check "POST $API_PATH (non-JSON)" "WARN"
+            check "$METHOD $API_PATH (non-JSON)" "WARN"
         fi
     else
-        check "POST $API_PATH" "TIMEOUT"
+        check "$METHOD $API_PATH" "TIMEOUT"
     fi
 done < <(find "$WORK_DIR/src/app/api" -name "route.ts" 2>/dev/null | sort)
 

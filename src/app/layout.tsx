@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Sidebar from "@/components/layout/Sidebar";
+import SidebarWrapper from "@/components/layout/SidebarWrapper";
 import ClientProviders from "@/components/providers/ClientProviders";
 
 export const metadata: Metadata = {
@@ -18,7 +18,7 @@ export default function RootLayout({
       <body className="bg-navy-900 text-gray-100 antialiased">
         <ClientProviders>
           <div className="flex h-screen overflow-hidden">
-            <Sidebar />
+            <SidebarWrapper />
             <main className="flex-1 overflow-y-auto">
               {children}
             </main>

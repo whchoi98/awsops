@@ -82,14 +82,16 @@ export class AgentCoreStack extends cdk.Stack {
       description: 'AgentCore stack status',
     });
 
+    // These are placeholder outputs. Actual values are populated by 06-setup-agentcore.sh.
+    // Runtime ARN pattern: arn:aws:bedrock-agentcore:{region}:{account}:runtime/{name}
     new cdk.CfnOutput(this, 'AgentRuntimeArn', {
-      value: 'arn:aws:bedrock-agentcore:ap-northeast-2:730335239360:runtime/awsops_agent-0gr2NL8TG8',
-      description: 'AgentCore Runtime ARN (deployed via script)',
+      value: `arn:aws:bedrock-agentcore:${this.region}:${this.account}:runtime/awsops_agent`,
+      description: 'AgentCore Runtime ARN pattern (actual ID set by deploy script)',
     });
 
     new cdk.CfnOutput(this, 'CodeInterpreterIdentifier', {
-      value: 'awsops_code_interpreter-z8d1fmh5Nf',
-      description: 'Code Interpreter ID (ap-northeast-2)',
+      value: 'awsops_code_interpreter',
+      description: 'Code Interpreter name prefix (actual ID set by deploy script)',
     });
   }
 }

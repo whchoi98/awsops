@@ -20,10 +20,10 @@ AgentCore 런타임용 Strands 에이전트. MCP 프로토콜을 통해 8개 역
 | **IaC** | 12 | CloudFormation, CDK, Terraform |
 | **Data** | 24 | DynamoDB, RDS, ElastiCache, MSK |
 | **Security** | 14 | IAM users/roles/policies, simulation |
-| **Monitoring** | 16 | CloudWatch metrics/alarms/logs, CloudTrail |
+| **Monitoring** | 24 | CloudWatch metrics/alarms/logs, CloudTrail, Datasource diagnostics |
 | **Cost** | 9 | Cost Explorer, Pricing, Budgets |
 | **Ops** | 9 | AWS docs, CLI, Steampipe SQL |
-| **Total** | **125** | |
+| **Total** | **133** | |
 
 ## 10 Routes (route.ts) / 10개 라우트
 

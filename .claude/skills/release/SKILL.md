@@ -18,10 +18,10 @@ AWSops 대시보드의 새 릴리스를 준비합니다.
 npm run build
 
 # 전체 검증 — 46개 이상 점검 (Full verification — 46+ checks)
-bash scripts/09-verify.sh
+bash scripts/11-verify.sh
 
 # 전체 서비스 실행 확인 (All services running)
-bash scripts/07-start-all.sh
+bash scripts/09-start-all.sh
 ```
 
 ### 2. 버전 업데이트 / Version Update
@@ -52,5 +52,5 @@ aws cloudfront create-invalidation --distribution-id <ID> --paths "/awsops*"
 curl -s -o /dev/null -w "%{http_code}" https://<cf-domain>/awsops
 
 # 전체 검증 실행 (Run full verify)
-bash scripts/09-verify.sh
+bash scripts/11-verify.sh
 ```

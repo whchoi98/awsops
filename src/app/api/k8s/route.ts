@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { execFileSync } from 'child_process';
 import { readFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
+import { getUserFromRequest } from '@/lib/auth-utils';
+import { getAllowedEksClusters } from '@/lib/app-config';
 
 const HOME = process.env.HOME || '/home/ec2-user';
 const K8S_SPC_PATH = resolve(HOME, '.steampipe/config/kubernetes.spc');
@@ -17,17 +19,18 @@ function addConnectionIfMissing(clusterName: string, contextArn: string) {
     // Insert new connection block before the aggregator (or at end)
     const newBlock = `\nconnection "${connName}" {\n  plugin = "kubernetes"\n  config_context = "${contextArn}"\n  custom_resource_tables = ["*"]\n}\n`;
 
-    const aggregatorIdx = content.indexOf('type      = "aggregator"');
-    if (aggregatorIdx === -1) {
+    const aggregatorMatch = /connection\s+"kubernetes"\s*\{[\s\S]*?type\s*=\s*"aggregator"[\s\S]*?\}/.exec(content);
+    if (!aggregatorMatch) {
       // No aggregator — append connection + create aggregator
-      const withAggregator = content + newBlock + `\nconnection "kubernetes" {\n  plugin    = "kubernetes"\n  type      = "aggregator"\n  connections = ["kubernetes_*"]\n}\n`;
+      const withAggregator = content + newBlock + `\nconnection "kubernetes" {\n  plugin      = "kubernetes"\n  type        = "aggregator"\n  connections = ["kubernetes_*"]\n}\n`;
       writeFileSync(K8S_SPC_PATH, withAggregator, 'utf-8');
     } else {
-      // Insert before aggregator block
-      const aggStart = content.lastIndexOf('connection "kubernetes"', aggregatorIdx);
+      // Insert before aggregator block, remove any duplicates first
+      const aggStart = aggregatorMatch.index;
       const before = content.slice(0, aggStart);
-      const after = content.slice(aggStart);
-      writeFileSync(K8S_SPC_PATH, before + newBlock + '\n' + after, 'utf-8');
+      const aggBlock = aggregatorMatch[0];
+      // Strip any extra aggregator blocks that might follow
+      writeFileSync(K8S_SPC_PATH, before + newBlock + '\n' + aggBlock + '\n', 'utf-8');
     }
     return true; // added
   } catch {
@@ -37,13 +40,19 @@ function addConnectionIfMissing(clusterName: string, contextArn: string) {
   }
 }
 
-// POST: Register kubeconfig + add Steampipe connection (no restart)
+// POST: Register kubeconfig + add Steampipe connection + restart Steampipe
 export async function POST(req: NextRequest) {
   try {
     const { clusterName, region } = await req.json();
 
     if (!clusterName || !/^[a-zA-Z0-9_-]+$/.test(clusterName)) {
       return NextResponse.json({ error: 'Invalid cluster name' }, { status: 400 });
+    }
+    // Department EKS access check / 부서별 EKS 접근 검증
+    const user = getUserFromRequest(req);
+    const allowedClusters = getAllowedEksClusters(user.groups);
+    if (allowedClusters !== null && !allowedClusters.includes(clusterName)) {
+      return NextResponse.json({ error: 'Access denied: cluster not allowed for your department' }, { status: 403 });
     }
     if (!region || !/^[a-z]{2}-[a-z]+-\d$/.test(region)) {
       return NextResponse.json({ error: 'Invalid region' }, { status: 400 });
@@ -57,17 +66,29 @@ export async function POST(req: NextRequest) {
     ], { encoding: 'utf-8', timeout: 15000 });
 
     // Extract context ARN from output (e.g. "Updated context arn:aws:eks:...")
-    const arnMatch = output.match(/(arn:aws:eks:[^\\s]+)/);
-    const contextArn = arnMatch ? arnMatch[1] : `arn:aws:eks:${region}:*:cluster/${clusterName}`;
+    const arnMatch = output.match(/(arn:aws:eks:\S+)/);
+    const contextArn = arnMatch ? arnMatch[1].replace(/[.,;]+$/, '') : `arn:aws:eks:${region}:*:cluster/${clusterName}`;
 
     // 2. Add connection to kubernetes.spc if missing
     const added = addConnectionIfMissing(clusterName, contextArn);
 
-    const msg = added
-      ? `kubeconfig + Steampipe connection added for ${clusterName}. Restart Steampipe to apply.`
-      : `kubeconfig updated for ${clusterName} (connection already exists).`;
+    // 3. Restart Steampipe so the kubernetes plugin reloads kubeconfig
+    // The plugin caches ~/.kube/config at startup, so a restart is required
+    try {
+      execFileSync('steampipe', ['service', 'restart'], {
+        encoding: 'utf-8',
+        timeout: 30000,
+        env: { ...process.env, HOME },
+      });
+    } catch {
+      // Steampipe restart failed — data will appear after manual restart
+    }
 
-    return NextResponse.json({ success: true, message: msg, needsRestart: added });
+    const msg = added
+      ? `kubeconfig + Steampipe connection registered for ${clusterName}.`
+      : `kubeconfig updated for ${clusterName}.`;
+
+    return NextResponse.json({ success: true, message: msg, needsRestart: false });
   } catch (e: any) {
     return NextResponse.json({
       success: false,

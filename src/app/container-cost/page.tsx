@@ -3,12 +3,13 @@
 // Phase 1: ECS Task cost analysis via Container Insights + Fargate pricing
 // 1단계: Container Insights + Fargate 가격 기반 ECS Task 비용 분석
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Header from '@/components/layout/Header';
 import StatsCard from '@/components/dashboard/StatsCard';
 import DataTable from '@/components/table/DataTable';
 import { DollarSign, Container, Cpu, TrendingUp } from 'lucide-react';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import SafeResponsiveContainer from '@/components/charts/SafeResponsiveContainer';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { useAccountContext } from '@/contexts/AccountContext';
 
@@ -53,6 +54,7 @@ export default function ContainerCostPage() {
   const [_loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showBasis, setShowBasis] = useState(false);
+  const [clusterFilter, setClusterFilter] = useState('');
 
   const fetchData = useCallback(async () => {
     try {
@@ -76,6 +78,52 @@ export default function ContainerCostPage() {
   const formatCost = (cost: number) => `$${cost.toFixed(3)}`;
   const formatCostLg = (cost: number) => `$${cost.toFixed(2)}`;
 
+  // Cluster list from data
+  const clusterNames = useMemo(() => {
+    if (!data?.clusters) return [];
+    return data.clusters.map((c: any) => c.cluster_name).filter(Boolean).sort();
+  }, [data]);
+
+  // Filter tasks by cluster
+  const filteredTasks = useMemo(() => {
+    if (!data?.tasks) return [];
+    if (!clusterFilter) return data.tasks;
+    return data.tasks.filter(t => t.cluster_name === clusterFilter);
+  }, [data, clusterFilter]);
+
+  // Recompute stats for filtered tasks
+  const filteredSummary = useMemo(() => {
+    const totalDailyCost = filteredTasks.reduce((sum, t) => sum + t.dailyCost.totalCost, 0);
+    const fargateCount = filteredTasks.filter(t => t.launch_type === 'FARGATE').length;
+    const ec2Count = filteredTasks.filter(t => t.launch_type === 'EC2').length;
+    const serviceCosts: Record<string, number> = {};
+    filteredTasks.forEach(t => {
+      const svc = t.service_name || 'unknown';
+      serviceCosts[svc] = (serviceCosts[svc] || 0) + t.dailyCost.totalCost;
+    });
+    const sorted = Object.entries(serviceCosts).sort((a, b) => b[1] - a[1]);
+    return {
+      totalDailyCost: Math.round(totalDailyCost * 1000) / 1000,
+      totalMonthly: Math.round(totalDailyCost * 30 * 100) / 100,
+      taskCount: filteredTasks.length,
+      fargateCount,
+      ec2Count,
+      topService: sorted[0] ? { name: sorted[0][0], cost: sorted[0][1] } : null,
+    };
+  }, [filteredTasks]);
+
+  // Service cost breakdown for charts
+  const filteredServiceCosts = useMemo(() => {
+    const serviceCosts: Record<string, number> = {};
+    filteredTasks.forEach(t => {
+      const svc = t.service_name || 'unknown';
+      serviceCosts[svc] = (serviceCosts[svc] || 0) + t.dailyCost.totalCost;
+    });
+    return Object.entries(serviceCosts)
+      .map(([name, cost]) => ({ name, cost: Math.round(cost * 1000) / 1000 }))
+      .sort((a, b) => b.cost - a.cost);
+  }, [filteredTasks]);
+
   return (
     <div className="space-y-6">
       <Header
@@ -89,29 +137,49 @@ export default function ContainerCostPage() {
         </div>
       )}
 
+      {/* Cluster Filter / 클러스터 필터 */}
+      {clusterNames.length > 1 && (
+        <div className="flex items-center gap-3">
+          <span className="text-gray-400 text-sm">ECS Cluster:</span>
+          <select
+            value={clusterFilter}
+            onChange={e => setClusterFilter(e.target.value)}
+            className="bg-navy-800 border border-navy-600 rounded-lg px-3 py-1.5 text-sm text-gray-300 focus:border-cyan-500/50 focus:outline-none"
+          >
+            <option value="">All Clusters ({clusterNames.length})</option>
+            {clusterNames.map((name: string) => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+          {clusterFilter && (
+            <button onClick={() => setClusterFilter('')} className="text-xs text-gray-500 hover:text-white">Clear</button>
+          )}
+        </div>
+      )}
+
       {/* StatsCards / 통계 카드 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatsCard
           label={t('containerCost.dailyCost')}
-          value={data ? formatCostLg(data.summary.totalDailyCost) : '-'}
+          value={data ? formatCostLg(filteredSummary.totalDailyCost) : '-'}
           icon={DollarSign}
           color="cyan"
         />
         <StatsCard
           label={t('containerCost.totalCost')}
-          value={data ? formatCostLg(data.summary.totalMonthly) : '-'}
+          value={data ? formatCostLg(filteredSummary.totalMonthly) : '-'}
           icon={TrendingUp}
           color="green"
         />
         <StatsCard
           label={t('containerCost.taskCount')}
-          value={data ? `${data.summary.taskCount} (F:${data.summary.fargateCount} / EC2:${data.summary.ec2Count})` : '-'}
+          value={data ? `${filteredSummary.taskCount} (F:${filteredSummary.fargateCount} / EC2:${filteredSummary.ec2Count})` : '-'}
           icon={Container}
           color="purple"
         />
         <StatsCard
           label="Top Cost Service"
-          value={data?.summary.topService ? `${data.summary.topService.name.replace(/^service:/, '')} (${formatCost(data.summary.topService.cost)}/day)` : '-'}
+          value={filteredSummary.topService ? `${filteredSummary.topService.name.replace(/^service:/, '')} (${formatCost(filteredSummary.topService.cost)}/day)` : '-'}
           icon={Cpu}
           color="orange"
         />
@@ -122,11 +190,11 @@ export default function ContainerCostPage() {
         {/* Service Cost Distribution / 서비스별 비용 분포 */}
         <div className="bg-navy-800 rounded-lg p-4 border border-navy-600">
           <h3 className="text-white font-medium mb-4">Service Cost Distribution (Daily)</h3>
-          {data && data.namespaceCosts.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
+          {filteredServiceCosts.length > 0 ? (
+            <SafeResponsiveContainer height={300}>
               <PieChart>
                 <Pie
-                  data={data.namespaceCosts.map(s => ({
+                  data={filteredServiceCosts.map(s => ({
                     name: s.name.replace(/^service:/, ''),
                     value: s.cost,
                   }))}
@@ -134,13 +202,13 @@ export default function ContainerCostPage() {
                   dataKey="value" nameKey="name"
                   label={({ name, value }) => `${name}: $${value.toFixed(3)}`}
                 >
-                  {data.namespaceCosts.map((_, i) => (
+                  {filteredServiceCosts.map((_, i) => (
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip contentStyle={{ backgroundColor: '#0f1629', border: '1px solid #1a2540', borderRadius: '8px' }} />
               </PieChart>
-            </ResponsiveContainer>
+            </SafeResponsiveContainer>
           ) : (
             <div className="h-[300px] flex items-center justify-center text-gray-500">
               {t('containerCost.noData')}
@@ -151,14 +219,14 @@ export default function ContainerCostPage() {
         {/* Service Cost Bar Chart / 서비스별 비용 바 차트 */}
         <div className="bg-navy-800 rounded-lg p-4 border border-navy-600">
           <h3 className="text-white font-medium mb-4">Cost by Service (CPU vs Memory)</h3>
-          {data && data.services.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={data.services.map((s: any) => {
-                const svcTasks = data.tasks.filter(t => t.service_name === s.service_name);
+          {filteredServiceCosts.length > 0 ? (
+            <SafeResponsiveContainer height={300}>
+              <BarChart data={filteredServiceCosts.map(s => {
+                const svcTasks = filteredTasks.filter(t => t.service_name === s.name);
                 const cpuCost = svcTasks.reduce((sum, t) => sum + t.dailyCost.cpuCost, 0);
                 const memCost = svcTasks.reduce((sum, t) => sum + t.dailyCost.memoryCost, 0);
                 return {
-                  name: (s.service_name || '').replace(/^service:/, ''),
+                  name: (s.name || '').replace(/^service:/, ''),
                   CPU: Math.round(cpuCost * 1000) / 1000,
                   Memory: Math.round(memCost * 1000) / 1000,
                 };
@@ -171,7 +239,7 @@ export default function ContainerCostPage() {
                 <Bar dataKey="CPU" fill="#00d4ff" />
                 <Bar dataKey="Memory" fill="#00ff88" />
               </BarChart>
-            </ResponsiveContainer>
+            </SafeResponsiveContainer>
           ) : (
             <div className="h-[300px] flex items-center justify-center text-gray-500">
               No service data available
@@ -209,7 +277,7 @@ export default function ContainerCostPage() {
             },
             { key: 'availability_zone', label: 'AZ' },
           ]}
-          data={data?.tasks}
+          data={filteredTasks}
         />
       </div>
 

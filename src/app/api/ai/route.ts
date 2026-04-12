@@ -15,7 +15,8 @@ import {
 import { runQuery } from '@/lib/steampipe';
 import { getConfig, validateAccountId, getAccountById } from '@/lib/app-config';
 import { recordCall } from '@/lib/agentcore-stats';
-import { saveConversation } from '@/lib/agentcore-memory';
+import { saveConversation, saveSession, cleanupOldSessions } from '@/lib/agentcore-memory';
+import type { SessionMessage } from '@/lib/agentcore-memory';
 import { getUserFromRequest } from '@/lib/auth-utils';
 import { getDefaultDatasource } from '@/lib/app-config';
 import type { DatasourceType } from '@/lib/app-config';
@@ -62,7 +63,7 @@ interface RouteConfig {
   description: string;         // What this route handles / 이 라우트가 처리하는 것
   tools: string[];             // Available tool capabilities / 사용 가능한 도구 기능
   examples?: string[];         // Classification examples / 분류 예시
-  handler?: 'code' | 'sql' | 'datasource';   // Special handler type / 특수 핸들러 타입 (code: Code Interpreter, sql: pg Pool 직접, datasource: 외부 데이터소스)
+  handler?: 'code' | 'sql' | 'datasource' | 'auto-collect';   // Special handler type / 특수 핸들러 타입 (code: Code Interpreter, sql: pg Pool 직접, datasource: 외부 데이터소스, auto-collect: 자동 데이터 수집 분석)
 }
 
 const ROUTE_REGISTRY: Record<string, RouteConfig> = {
@@ -159,15 +160,14 @@ const ROUTE_REGISTRY: Record<string, RouteConfig> = {
   cost: {
     gateway: 'cost',
     display: 'Cost Gateway (9 tools)',
-    description: 'AWS billing, cost optimization, and FinOps',
+    description: 'AWS billing, cost forecasting, budgets, and FinOps. NOT for EKS resource rightsizing (use eks-optimize instead)',
     tools: [
       'Cost Explorer (비용/사용량 분석, 기간 비교, 비용 동인 분석)',
       'Cost Forecast (비용 예측)',
       'Pricing (AWS 서비스 가격 조회)',
       'Budgets (예산 상태 확인)',
-      'Container Cost (ECS/EKS 워크로드별 비용 분석)',
     ],
-    examples: ['"이번 달 비용" → cost', '"EC2 비용 분석" → cost', '"비용 예측" → cost', '"컨테이너 비용" → cost', '"ECS Task 비용" → cost', '"Pod 비용 분석" → cost', '"네임스페이스별 비용" → cost'],
+    examples: ['"이번 달 비용" → cost', '"EC2 비용 분석" → cost', '"비용 예측" → cost', '"서비스별 비용 추이" → cost', '"AWS 전체 비용" → cost'],
   },
   'aws-data': {
     gateway: 'ops',
@@ -227,6 +227,87 @@ const ROUTE_REGISTRY: Record<string, RouteConfig> = {
     ],
     handler: 'datasource',
   },
+  'eks-optimize': {
+    gateway: '',
+    display: 'EKS Cost Optimizer',
+    description: 'EKS resource optimization: collects Prometheus metrics, K8s resource configs, and cost data to find rightsizing opportunities and cost savings',
+    tools: [
+      'Prometheus CPU/Memory 사용량 vs 요청량 비교',
+      'CPU Throttling 분석',
+      'HTTP 에러율 분석 (5xx)',
+      'Pod 재시작 분석',
+      'K8s 리소스 request/limit 분석 (Steampipe)',
+      'EKS 컨테이너 비용 분석',
+      'Node 활용률 분석',
+    ],
+    examples: [
+      '"EKS 비용 개선점 찾아줘" → eks-optimize', '"EKS 리소스 최적화" → eks-optimize',
+      '"컨테이너 리소스 낭비 분석" → eks-optimize', '"EKS rightsizing" → eks-optimize',
+      '"Pod CPU/메모리 과다 할당 분석" → eks-optimize', '"EKS cost optimization" → eks-optimize',
+      '"EKS 비용 최적화" → eks-optimize', '"EKS 비용 절감" → eks-optimize',
+      '"컨테이너 비용 분석" → eks-optimize', '"K8s 리소스 최적화" → eks-optimize',
+    ],
+    handler: 'auto-collect',
+  },
+  'db-optimize': {
+    gateway: '',
+    display: 'DB Cost Optimizer',
+    description: 'RDS, ElastiCache, OpenSearch instance rightsizing: collects CloudWatch metrics and Steampipe configs to find over-provisioned databases. NOT for EKS (use eks-optimize) or general billing (use cost)',
+    tools: ['RDS CPU/Memory/IOPS/Connections 분석', 'ElastiCache CPU/Memory/Connections 분석', 'OpenSearch JVM/Storage/Latency 분석', '인스턴스 타입 rightsizing 권장'],
+    examples: [
+      '"RDS 비용 최적화" → db-optimize', '"ElastiCache rightsizing" → db-optimize',
+      '"OpenSearch 비용 분석" → db-optimize', '"DB 리소스 낭비 확인" → db-optimize',
+      '"데이터베이스 비용 절감" → db-optimize', '"RDS 인스턴스 다운사이징" → db-optimize',
+    ],
+    handler: 'auto-collect',
+  },
+  'msk-optimize': {
+    gateway: '',
+    display: 'MSK Optimizer',
+    description: 'MSK Kafka broker rightsizing: collects broker CloudWatch metrics, Steampipe configs, and optional Prometheus Kafka metrics for throughput and consumer lag analysis',
+    tools: ['MSK 브로커 CPU/Memory/처리량 분석', 'Kafka consumer lag 분석', '브로커 인스턴스 rightsizing', 'Provisioned vs Serverless 비교'],
+    examples: [
+      '"MSK 비용 최적화" → msk-optimize', '"Kafka 브로커 rightsizing" → msk-optimize',
+      '"MSK 처리량 분석" → msk-optimize', '"MSK 브로커 다운사이징" → msk-optimize',
+    ],
+    handler: 'auto-collect',
+  },
+  'idle-scan': {
+    gateway: '',
+    display: 'Idle Resource Scanner',
+    description: 'Scans for unused/idle AWS resources wasting money: unattached EBS, unassociated EIPs, stopped EC2s, old snapshots, gp2 volumes, unused security groups',
+    tools: ['미연결 EBS 스캔', '미연결 EIP 스캔', '중지 EC2 스캔', '오래된 스냅샷 스캔', 'gp2→gp3 전환 대상 스캔', '미사용 SG 스캔'],
+    examples: [
+      '"미사용 리소스 찾아줘" → idle-scan', '"유휴 리소스 스캔" → idle-scan',
+      '"비용 낭비 리소스" → idle-scan', '"사용 안하는 EBS 확인" → idle-scan',
+      '"idle resources" → idle-scan', '"낭비되는 리소스 정리" → idle-scan',
+    ],
+    handler: 'auto-collect',
+  },
+  'trace-analyze': {
+    gateway: '',
+    display: 'Service Trace Analyzer',
+    description: 'Distributed tracing analysis: auto-discovers Tempo/Jaeger datasource, maps service dependencies, identifies latency bottlenecks and error propagation paths',
+    tools: ['서비스 의존성 매핑', '지연시간 핫스팟 분석', '에러 전파 경로 분석', '서비스별 트레이스 샘플링'],
+    examples: [
+      '"서비스 의존성 분석" → trace-analyze', '"지연시간 병목 찾아줘" → trace-analyze',
+      '"트레이스 분석" → trace-analyze', '"서비스 호출 관계" → trace-analyze',
+      '"latency bottleneck" → trace-analyze', '"서비스간 의존성 확인" → trace-analyze',
+    ],
+    handler: 'auto-collect',
+  },
+  incident: {
+    gateway: '',
+    display: 'Incident Analyzer',
+    description: 'Multi-source incident analysis: cross-correlates Prometheus anomalies, Loki error logs, Tempo error traces, CloudWatch alarms, and K8s warning events to reconstruct incident timelines',
+    tools: ['CloudWatch 알람 분석', 'K8s 이벤트 분석', 'Prometheus 이상 감지', 'Loki 에러 로그 분석', 'Tempo 에러 트레이스 분석'],
+    examples: [
+      '"장애 원인 분석" → incident', '"서비스 에러 원인 찾아줘" → incident',
+      '"사고 분석" → incident', '"최근 이상 현상 분석" → incident',
+      '"incident analysis" → incident', '"지금 무슨 문제가 있어?" → incident',
+    ],
+    handler: 'auto-collect',
+  },
   general: {
     gateway: 'ops',
     display: 'Ops Gateway (9 tools)',
@@ -278,6 +359,13 @@ Classification rules:
 - "datasource" CAN be combined with AWS routes (monitoring, container, network) for cross-source correlation. Multi-datasource (e.g. Prometheus+Loki) is handled within a single "datasource" route.
 - Keywords like "목록", "리스트", "현황", "몇개", "list", "count", "show" → prefer "aws-data"
 - Keywords like "분석", "진단", "문제", "확인해줘", "troubleshoot", "analyze" → prefer specialized route
+- "eks-optimize" is for EKS/K8s container resource optimization (rightsizing, over-provisioning, CPU/memory). Use instead of "cost" for EKS questions.
+- "db-optimize" is for RDS/ElastiCache/OpenSearch instance rightsizing. Use instead of "cost" for database optimization questions.
+- "msk-optimize" is for MSK Kafka broker rightsizing and throughput optimization. Use instead of "cost" for MSK questions.
+- "idle-scan" is for finding unused/idle AWS resources (EBS, EIP, stopped EC2, old snapshots). Use instead of "cost" for waste/idle resource questions.
+- "trace-analyze" is for distributed tracing analysis (Tempo/Jaeger). Service dependencies, latency bottlenecks, error propagation. Use instead of "datasource" for tracing questions.
+- "incident" is for multi-source incident/outage analysis. Cross-correlates Prometheus + Loki + Tempo + CloudWatch. Use instead of "monitoring" for incident/outage analysis.
+- "cost" is for GENERAL AWS billing, forecast, budgets only. NOT for service-specific optimization (use eks-optimize, db-optimize, msk-optimize, idle-scan instead).
 
 Examples:
 ${examples}
@@ -820,9 +908,23 @@ function recordAndSave(p: {
   route: string; gateway: string; responseTimeMs: number; usedTools: string[];
   success: boolean; via: string; question: string; summary: string; userId: string;
   inputTokens?: number; outputTokens?: number; model?: string;
+  sessionId?: string;
 }): void {
   recordCall({ timestamp: new Date().toISOString(), route: p.route, gateway: p.gateway, responseTimeMs: p.responseTimeMs, usedTools: p.usedTools, success: p.success, via: p.via, inputTokens: p.inputTokens, outputTokens: p.outputTokens, model: p.model });
   saveConversation({ id: `${Date.now()}`, userId: p.userId, timestamp: new Date().toISOString(), route: p.route, gateway: p.gateway, question: p.question.slice(0, 100), summary: p.summary.slice(0, 200), usedTools: p.usedTools, responseTimeMs: p.responseTimeMs, via: p.via }).catch(() => {});
+
+  // 세션에 전체 대화 저장 / Save full messages to session
+  if (p.sessionId) {
+    const now = new Date().toISOString();
+    const userMsg: SessionMessage = { role: 'user', content: p.question, timestamp: now };
+    const assistantMsg: SessionMessage = {
+      role: 'assistant', content: p.summary, route: p.route, via: p.via,
+      usedTools: p.usedTools, model: p.model, responseTimeMs: p.responseTimeMs,
+      inputTokens: p.inputTokens, outputTokens: p.outputTokens, timestamp: now,
+    };
+    saveSession(p.sessionId, p.userId, userMsg, assistantMsg).catch(() => {});
+    cleanupOldSessions();
+  }
 }
 
 // POST handler — SSE streaming with step-by-step progress events
@@ -835,7 +937,7 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
-  const { messages, model: modelKey, stream: useStream, lang: clientLang, accountId: rawAccountId } = reqBody;
+  const { messages, model: modelKey, stream: useStream, lang: clientLang, accountId: rawAccountId, sessionId } = reqBody;
 
   // Account context / 계정 컨텍스트
   const accountId = rawAccountId && validateAccountId(rawAccountId) ? rawAccountId : undefined;
@@ -1018,7 +1120,7 @@ export async function POST(request: NextRequest) {
               const dsTools = successResults.map(s => `${s.dsType}: ${s.dsQuery}`);
               const viaStr = successResults.map(s => `${DATASOURCE_TYPES[s.dsType].label} (${s.result.rows.length} rows)`).join(' + ');
               const dsTimeMs = Date.now() - callStartTime;
-              recordAndSave({ route, gateway: `datasource:${successResults.map(s => s.dsType).join('+')}`, responseTimeMs: dsTimeMs, usedTools: dsTools, success: true, via: viaStr, question: lastMessage, summary: dsContent, userId: currentUser.email, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, model: modelKey || 'sonnet-4.6' });
+              recordAndSave({ route, gateway: `datasource:${successResults.map(s => s.dsType).join('+')}`, responseTimeMs: dsTimeMs, usedTools: dsTools, success: true, via: viaStr, question: lastMessage, summary: dsContent, userId: currentUser.email, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, model: modelKey || 'sonnet-4.6', sessionId });
               send('done', {
                 content: dsContent, model: modelKey || 'sonnet-4.6',
                 via: `Datasource Analytics: ${viaStr}`,
@@ -1030,6 +1132,47 @@ export async function POST(request: NextRequest) {
               return;
             }
             send('status', { step: 'datasource-fallback', message: '데이터소스 쿼리 실패. Bedrock으로 폴백합니다.' });
+          }
+        }
+
+        // Handler: Auto-collect (eks-optimize, db-optimize, msk-optimize, idle-scan, trace-analyze, incident)
+        // 자동 데이터 수집 분석 핸들러 — collector 파일을 route key로 동적 import
+        if (config.handler === 'auto-collect') {
+          try {
+            const collectorModule = await import(`@/lib/collectors/${route}`);
+            const collector = collectorModule.default as import('@/lib/collectors/types').Collector;
+
+            const data = await collector.collect(send, accountId, isEn);
+            const context = collector.formatContext(data);
+
+            send('status', { step: `${route}-analyzing`, message: isEn
+              ? `🤖 Analyzing with ${collector.displayName}...`
+              : `🤖 ${collector.displayName} 분석 중...` });
+
+            const modelId = MODELS[modelKey || 'sonnet-4.6'] || MODELS['sonnet-4.6'];
+            const bedrockMessages = messages.slice(-10).map((m: any) => ({ role: m.role, content: m.content }));
+            bedrockMessages[bedrockMessages.length - 1].content += context;
+
+            const streamResult = await streamBedrockToSSE(
+              { modelId, system: collector.analysisPrompt, messages: bedrockMessages, maxTokens: 8192 },
+              send,
+            );
+            totalInputTokens += streamResult.inputTokens;
+            totalOutputTokens += streamResult.outputTokens;
+
+            const timeMs = Date.now() - callStartTime;
+            recordAndSave({ route, gateway: route, responseTimeMs: timeMs, usedTools: data.usedTools, success: true, via: data.viaSummary, question: lastMessage, summary: streamResult.content || '', userId: currentUser.email, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, model: modelKey || 'sonnet-4.6', sessionId });
+            send('done', {
+              content: streamResult.content || 'No response', model: modelKey || 'sonnet-4.6',
+              via: data.viaSummary, queriedResources: data.queriedResources, route,
+              usedTools: data.usedTools,
+              inputTokens: totalInputTokens, outputTokens: totalOutputTokens,
+            });
+            controller.close();
+            return;
+          } catch (err: any) {
+            send('status', { step: `${route}-error`, message: `⚠️ ${route} collector error: ${err.message}` });
+            // Fall through to general handler
           }
         }
 
@@ -1071,7 +1214,7 @@ export async function POST(request: NextRequest) {
             const sqlTools = extractUsedTools(sqlContent);
             if (sql) sqlTools.push(`steampipe: ${sql.match(/FROM\s+(\w+)/i)?.[1] || 'query'}`);
             const sqlTimeMs = Date.now() - callStartTime;
-            recordAndSave({ route, gateway: 'steampipe', responseTimeMs: sqlTimeMs, usedTools: sqlTools, success: true, via: `${config.display} (${queryResult.rowCount} rows)`, question: lastMessage, summary: sqlContent, userId: currentUser.email, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, model: modelKey || 'sonnet-4.6' });
+            recordAndSave({ route, gateway: 'steampipe', responseTimeMs: sqlTimeMs, usedTools: sqlTools, success: true, via: `${config.display} (${queryResult.rowCount} rows)`, question: lastMessage, summary: sqlContent, userId: currentUser.email, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, model: modelKey || 'sonnet-4.6', sessionId });
             send('done', {
               content: sqlContent, model: modelKey || 'sonnet-4.6',
               via: `${config.display} (${queryResult.rowCount} rows)`, queriedResources: ['steampipe'], route,
@@ -1123,7 +1266,7 @@ export async function POST(request: NextRequest) {
             const finalTools = Array.from(new Set([...dedupedTools, ...synthesizedTools]));
             const viaList = successful.map(s => s.via).join(' + ');
             const multiTimeMs = Date.now() - callStartTime;
-            recordAndSave({ route, gateway: `multi:${routes.join('+')}`, responseTimeMs: multiTimeMs, usedTools: finalTools, success: true, via: `Multi-Route: ${viaList}`, question: lastMsg, summary: synthesized, userId: currentUser.email, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, model: modelKey || 'sonnet-4.6' });
+            recordAndSave({ route, gateway: `multi:${routes.join('+')}`, responseTimeMs: multiTimeMs, usedTools: finalTools, success: true, via: `Multi-Route: ${viaList}`, question: lastMsg, summary: synthesized, userId: currentUser.email, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, model: modelKey || 'sonnet-4.6', sessionId });
             send('done', {
               content: synthesized, model: modelKey || 'sonnet-4.6',
               via: `Multi-Route: ${viaList}`, queriedResources: allResources, route, routes,
@@ -1190,7 +1333,7 @@ export async function POST(request: NextRequest) {
           const finalContent = cleanedResponse || agentResponse;
           // Simulate streaming for AgentCore responses / AgentCore 응답 타이핑 시뮬레이션
           await simulateStreaming(finalContent, send);
-          recordAndSave({ route, gateway, responseTimeMs, usedTools, success: true, via: `AgentCore → ${config.display}`, question: lastMessage, summary: finalContent, userId: currentUser.email, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, model: modelKey || 'sonnet-4.6' });
+          recordAndSave({ route, gateway, responseTimeMs, usedTools, success: true, via: `AgentCore → ${config.display}`, question: lastMessage, summary: finalContent, userId: currentUser.email, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, model: modelKey || 'sonnet-4.6', sessionId });
           send('done', {
             content: finalContent, model: 'sonnet-4.6',
             via: `AgentCore → ${config.display}`, queriedResources: [`${gateway}-gateway`], route, routes,
@@ -1213,7 +1356,7 @@ export async function POST(request: NextRequest) {
         const fallbackContent = fbStreamResult.content || 'No response';
         const fallbackTools = extractUsedTools(fallbackContent);
         const fbTimeMs = Date.now() - callStartTime;
-        recordAndSave({ route, gateway: 'bedrock-fallback', responseTimeMs: fbTimeMs, usedTools: fallbackTools, success: false, via: `Bedrock Direct (fallback)`, question: lastMessage, summary: fallbackContent, userId: currentUser.email, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, model: modelKey || 'sonnet-4.6' });
+        recordAndSave({ route, gateway: 'bedrock-fallback', responseTimeMs: fbTimeMs, usedTools: fallbackTools, success: false, via: `Bedrock Direct (fallback)`, question: lastMessage, summary: fallbackContent, userId: currentUser.email, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, model: modelKey || 'sonnet-4.6', sessionId });
         send('done', {
           content: fallbackContent, model: modelKey || 'sonnet-4.6',
           via: `Bedrock Direct (fallback from ${config.display})`, queriedResources: [], route,
@@ -1353,6 +1496,32 @@ async function handleSingleRoute(
     const viaStr = successful.map(s => `${DATASOURCE_TYPES[s.dsType].label} (${s.result.rows.length} rows)`).join(' + ');
     const tools = successful.map(s => `${s.dsType}: ${s.dsQuery}`);
     return { content: analysisText, via: `Datasource Analytics: ${viaStr}`, queriedResources: successful.map(s => s.dsType), usedTools: tools };
+  }
+
+  // Auto-collect handler (non-streaming, for multi-route participation)
+  // 자동 수집 핸들러 (비스트리밍, 멀티 라우트 참여용)
+  if (config.handler === 'auto-collect') {
+    try {
+      const collectorModule = await import(`@/lib/collectors/${route}`);
+      const collector = collectorModule.default as import('@/lib/collectors/types').Collector;
+      const noopSend = () => {};
+      const data = await collector.collect(noopSend, accountId, true);
+      const context = collector.formatContext(data);
+
+      const bedrockMessages = messages.slice(-10).map((m: any) => ({ role: m.role, content: m.content }));
+      bedrockMessages[bedrockMessages.length - 1].content += context;
+      const body = JSON.stringify({
+        anthropic_version: 'bedrock-2023-05-31', max_tokens: 8192, system: collector.analysisPrompt, messages: bedrockMessages,
+      });
+      const response = await bedrockClient.send(new InvokeModelCommand({
+        modelId: MODELS[modelKey || 'sonnet-4.6'], contentType: 'application/json', accept: 'application/json',
+        body: new TextEncoder().encode(body),
+      }));
+      const analysisText = JSON.parse(new TextDecoder().decode(response.body)).content?.[0]?.text || '';
+      return { content: analysisText, via: data.viaSummary, queriedResources: data.queriedResources, usedTools: data.usedTools };
+    } catch {
+      return null;
+    }
   }
 
   // AgentCore Gateway / AgentCore 게이트웨이

@@ -1,7 +1,7 @@
 // AWSops AI Diagnosis Report API — Async background generation + S3 storage + Scheduling
 // AWSops AI 종합진단 리포트 API — 비동기 백그라운드 생성 + S3 저장 + 스케줄링
 import { NextRequest, NextResponse } from 'next/server';
-import { BedrockRuntimeClient, InvokeModelWithResponseStreamCommand } from '@aws-sdk/client-bedrock-runtime';
+import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { collectReportData, formatReportForBedrock } from '@/lib/report-generator';
@@ -21,11 +21,7 @@ import { randomUUID } from 'crypto';
 const bedrockClient = new BedrockRuntimeClient({ region: 'ap-northeast-2' });
 const s3Client = new S3Client({ region: 'ap-northeast-2' });
 const MODEL_ID = 'global.anthropic.claude-opus-4-6-v1';
-// Read bucket from config — no hardcoded account IDs
-import { getConfig } from '@/lib/app-config';
-function getReportBucket(): string {
-  return getConfig().reportBucket || process.env.REPORT_BUCKET || '';
-}
+const REPORT_BUCKET = 'awsops-deploy-180294183052';
 const REPORT_S3_PREFIX = 'reports/';
 const REPORTS_META_DIR = path.join(process.cwd(), 'data', 'reports');
 
@@ -35,6 +31,7 @@ const REPORTS_META_DIR = path.join(process.cwd(), 'data', 'reports');
 
 interface SectionResult {
   section: string;
+  key: string;
   title: string;
   content: string;
 }
@@ -58,9 +55,11 @@ interface ReportMeta {
   s3Key: string | null;         // legacy (PPTX) — kept for old reports
   s3KeyDocx?: string | null;
   s3KeyMd?: string | null;
+  s3KeyPdf?: string | null;
   downloadUrl: string | null;   // legacy (PPTX)
   downloadUrlDocx?: string | null;
   downloadUrlMd?: string | null;
+  downloadUrlPdf?: string | null;
   sections: SectionResult[];
   error: string | null;
   scheduledBy?: string;         // 'manual' | 'weekly' | 'monthly' etc.
@@ -74,9 +73,10 @@ interface ReportMeta {
 const SECTION_BATCHES: string[][] = [
   ['cost-overview', 'cost-compute', 'cost-network'],
   ['cost-storage', 'idle-resources', 'security-posture'],
-  ['network-architecture', 'compute-analysis', 'eks-analysis'],
-  ['database-analysis', 'msk-analysis', 'storage-analysis'],
-  ['executive-summary', 'recommendations', 'appendix'],
+  ['network-architecture', 'network-flow', 'compute-analysis'],
+  ['eks-analysis', 'database-analysis', 'msk-analysis'],
+  ['storage-analysis', 'executive-summary', 'recommendations'],
+  ['appendix'],
 ];
 
 // Desired final order: executive-summary first, appendix last
@@ -85,10 +85,32 @@ const SECTION_ORDER: string[] = [
   'executive-summary',
   'cost-overview', 'cost-compute', 'cost-network', 'cost-storage',
   'idle-resources', 'security-posture',
-  'network-architecture', 'compute-analysis', 'eks-analysis',
+  'network-architecture', 'network-flow', 'compute-analysis', 'eks-analysis',
   'database-analysis', 'msk-analysis', 'storage-analysis',
   'recommendations', 'appendix',
 ];
+
+// ============================================================================
+// Filename helper — user-facing download name (internal storage stays UUID)
+// 파일명 헬퍼 — 사용자에게 보이는 다운로드 파일명 (내부 저장은 UUID 유지)
+// ============================================================================
+
+function buildReportFilename(
+  meta: { createdAt: string; accountAlias?: string | null },
+  extension: string,
+): string {
+  const dt = new Date(meta.createdAt);
+  const kst = new Date(dt.getTime() + 9 * 60 * 60 * 1000);
+  const yyyy = kst.getUTCFullYear();
+  const MM = String(kst.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(kst.getUTCDate()).padStart(2, '0');
+  const HH = String(kst.getUTCHours()).padStart(2, '0');
+  const mm = String(kst.getUTCMinutes()).padStart(2, '0');
+  const alias = meta.accountAlias
+    ? `_${meta.accountAlias.replace(/[^a-zA-Z0-9_-]/g, '')}`
+    : '';
+  return `AI_WADD_REPORT_${yyyy}${MM}${dd}_${HH}${mm}${alias}.${extension}`;
+}
 
 // ============================================================================
 // Meta file helpers
@@ -132,9 +154,8 @@ function markStaleReportsAsFailed(): void {
         const meta: ReportMeta = JSON.parse(fs.readFileSync(path.join(REPORTS_META_DIR, file), 'utf-8'));
         if (meta.status === 'generating') {
           const created = new Date(meta.createdAt).getTime();
-          // If generating for more than 30 minutes, it's stale (worker died)
-          // Opus 모델 15섹션 기준 최대 25분 소요 가능 → 30분으로 설정
-          if (now - created > 30 * 60 * 1000) {
+          // If generating for more than 15 minutes, it's stale (worker died)
+          if (now - created > 15 * 60 * 1000) {
             updateReportMeta(meta.reportId, {
               status: 'failed',
               error: 'Report generation was interrupted (server restart). Please start a new diagnosis.',
@@ -220,7 +241,7 @@ async function analyzeSection(
   // 부록: Bedrock 호출 없이 인벤토리 데이터를 직접 포맷
   if (section === 'appendix') {
     const context = await formatReportForBedrock(data, 'appendix');
-    return { section, title, content: context || (isEn ? 'No inventory data.' : '인벤토리 데이터가 없습니다.') };
+    return { section, key: section, title, content: context || (isEn ? 'No inventory data.' : '인벤토리 데이터가 없습니다.') };
   }
 
   // Build context from formatReportForBedrock
@@ -239,6 +260,7 @@ async function analyzeSection(
   if (!context || context.includes('No data') || context.trim() === '') {
     return {
       section,
+      key: section,
       title,
       content: isEn ? 'No data available for this section.' : '이 섹션에 대한 데이터가 없습니다.',
     };
@@ -263,46 +285,18 @@ async function analyzeSection(
     ],
   });
 
-  // Streaming with idle timeout — abort if no token received for 60 seconds
-  // 스트리밍 + 유휴 타임아웃 — 60초간 토큰이 없으면 중단
-  const IDLE_TIMEOUT_MS = 60 * 1000;
-  const abortController = new AbortController();
-  let idleTimer: ReturnType<typeof setTimeout> | null = null;
+  const resp = await bedrockClient.send(
+    new InvokeModelCommand({
+      modelId: MODEL_ID,
+      contentType: 'application/json',
+      accept: 'application/json',
+      body: new TextEncoder().encode(body),
+    }),
+  );
 
-  const resetIdleTimer = () => {
-    if (idleTimer) clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => abortController.abort(), IDLE_TIMEOUT_MS);
-  };
-
-  try {
-    resetIdleTimer();
-    const resp = await bedrockClient.send(
-      new InvokeModelWithResponseStreamCommand({
-        modelId: MODEL_ID,
-        contentType: 'application/json',
-        accept: 'application/json',
-        body: new TextEncoder().encode(body),
-      }),
-      { abortSignal: abortController.signal },
-    );
-
-    let fullContent = '';
-    if (resp.body) {
-      for await (const event of resp.body) {
-        resetIdleTimer(); // token received — reset idle timer / 토큰 수신 — 유휴 타이머 리셋
-        if (event.chunk?.bytes) {
-          const parsed = JSON.parse(new TextDecoder().decode(event.chunk.bytes));
-          if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-            fullContent += parsed.delta.text;
-          }
-        }
-      }
-    }
-
-    return { section, title, content: fullContent };
-  } finally {
-    if (idleTimer) clearTimeout(idleTimer);
-  }
+  const decoded = JSON.parse(new TextDecoder().decode(resp.body));
+  const text: string = decoded.content?.[0]?.text || '';
+  return { section, key: section, title, content: text };
 }
 
 // ============================================================================
@@ -371,45 +365,38 @@ async function generateReportBackground(
   let completed = 0;
 
   for (const batch of SECTION_BATCHES) {
+    // Update status with sub-topics for each section in the batch
+    const batchTopics = batch.flatMap(s => (SECTION_SUBTOPICS[s] || [s]).slice(0, 2)).join(', ');
     console.log(`[Report] ${reportId} — Batch: ${batch.join(', ')}`);
-
-    // Wrap each section call to update progress immediately on completion
-    // 각 섹션 호출을 래핑하여 완료 즉시 progress 업데이트
-    const wrappedCalls = batch.map(section => {
-      // Update progress when this section starts analyzing
-      const topics = (SECTION_SUBTOPICS[section] || [section]).slice(0, 3).join(', ');
-      updateReportMeta(reportId, {
-        progress: { current: completed, total: 15, currentSection: section, statusMessage: topics, completedSections },
-      });
-
-      return analyzeSection(section, reportData, !!isEn, sectionResults)
-        .then(result => {
-          sectionResults.push(result);
-          completed++;
-          completedSections.push(section);
-          updateReportMeta(reportId, {
-            progress: { current: completed, total: 15, currentSection: section, statusMessage: '', completedSections },
-          });
-          console.log(`[Report] ${reportId} — ✓ ${section} (${completed}/15)`);
-          return result;
-        })
-        .catch(err => {
-          const msg = err?.name === 'AbortError'
-            ? (isEn ? 'Analysis timed out (no response for 60s)' : '분석 시간 초과 (60초간 응답 없음)')
-            : (isEn ? `Analysis failed: ${err?.message || 'Unknown error'}` : `분석 실패: ${err?.message || '알 수 없는 오류'}`);
-          const fallback: SectionResult = { section, title: section, content: msg };
-          sectionResults.push(fallback);
-          completed++;
-          completedSections.push(section);
-          updateReportMeta(reportId, {
-            progress: { current: completed, total: 15, currentSection: section, statusMessage: '', completedSections },
-          });
-          console.warn(`[Report] ${reportId} — ✗ ${section}: ${msg}`);
-          return fallback;
-        });
+    updateReportMeta(reportId, {
+      progress: { current: completed, total: 15, currentSection: batch[0], statusMessage: batchTopics, completedSections },
     });
 
-    await Promise.all(wrappedCalls);
+    const results = await Promise.allSettled(
+      batch.map(section => analyzeSection(section, reportData, !!isEn, sectionResults)),
+    );
+
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      if (r.status === 'fulfilled') {
+        sectionResults.push(r.value);
+      } else {
+        sectionResults.push({
+          section: batch[i],
+          key: batch[i],
+          title: batch[i],
+          content: isEn
+            ? `Analysis failed: ${r.reason?.message || 'Unknown error'}`
+            : `분석 실패: ${r.reason?.message || '알 수 없는 오류'}`,
+        });
+      }
+      completed++;
+      completedSections.push(batch[i]);
+    }
+
+    updateReportMeta(reportId, {
+      progress: { current: completed, total: 15, currentSection: batch[batch.length - 1], statusMessage: '', completedSections },
+    });
   }
 
   // Reorder: executive-summary first, appendix last
@@ -449,51 +436,76 @@ async function generateReportBackground(
   }
   const mdBuffer = Buffer.from(mdLines.join('\n'), 'utf-8');
 
-  // Phase 4: Save locally (permanent) + Upload to S3 (optional)
-  // 4단계: 로컬 영구 저장 + S3 업로드 (선택)
+  // Generate PDF (server-side via Puppeteer — no sidebar, clean A4)
+  // PDF 생성 (서버사이드 Puppeteer — 사이드바 없는 깨끗한 A4)
+  let pdfBuffer: Buffer | null = null;
+  try {
+    const { generateReportPdf } = await import('@/lib/report-pdf');
+    pdfBuffer = await generateReportPdf(reportInput);
+  } catch (err) {
+    console.error(`[Report] PDF generation failed (non-fatal):`, err instanceof Error ? err.message : err);
+  }
+
+  // Phase 4: Save locally (permanent) + Upload to S3
+  // 4단계: 로컬 영구 저장 + S3 업로드
   const localDocxPath = path.join(REPORTS_META_DIR, `${reportId}.docx`);
   const localMdPath = path.join(REPORTS_META_DIR, `${reportId}.md`);
   fs.writeFileSync(localDocxPath, docxBuffer);
   fs.writeFileSync(localMdPath, mdBuffer);
-
-  let s3KeyDocx: string | null = null;
-  let s3KeyMd: string | null = null;
-  let downloadUrlDocx: string | null = null;
-  let downloadUrlMd: string | null = null;
-
-  const bucket = getReportBucket();
-  if (bucket) {
-    // S3 upload + presigned URLs
-    s3KeyDocx = `${REPORT_S3_PREFIX}${reportId}.docx`;
-    s3KeyMd = `${REPORT_S3_PREFIX}${reportId}.md`;
-    try {
-      await Promise.all([
-        s3Client.send(new PutObjectCommand({
-          Bucket: bucket, Key: s3KeyDocx, Body: docxBuffer,
-          ContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        })),
-        s3Client.send(new PutObjectCommand({
-          Bucket: bucket, Key: s3KeyMd, Body: mdBuffer,
-          ContentType: 'text/markdown; charset=utf-8',
-        })),
-      ]);
-      [downloadUrlDocx, downloadUrlMd] = await Promise.all([
-        getSignedUrl(s3Client, new GetObjectCommand({ Bucket: bucket, Key: s3KeyDocx }), { expiresIn: 7 * 24 * 60 * 60 }),
-        getSignedUrl(s3Client, new GetObjectCommand({ Bucket: bucket, Key: s3KeyMd }), { expiresIn: 7 * 24 * 60 * 60 }),
-      ]);
-    } catch (s3Err) {
-      console.warn(`[Report] S3 upload failed (using local files): ${s3Err instanceof Error ? s3Err.message : s3Err}`);
-      s3KeyDocx = null;
-      s3KeyMd = null;
-    }
-  } else {
-    console.log(`[Report] No reportBucket configured — serving files locally`);
+  if (pdfBuffer) {
+    fs.writeFileSync(path.join(REPORTS_META_DIR, `${reportId}.pdf`), pdfBuffer);
   }
 
-  // Local download URLs as fallback (served via GET download-docx/download-md actions)
-  // 로컬 다운로드 URL 폴백 (GET download-docx/download-md 액션으로 서빙)
-  if (!downloadUrlDocx) downloadUrlDocx = `/awsops/api/report?action=download-docx&id=${reportId}`;
-  if (!downloadUrlMd) downloadUrlMd = `/awsops/api/report?action=download-md&id=${reportId}`;
+  const s3KeyDocx = `${REPORT_S3_PREFIX}${reportId}.docx`;
+  const s3KeyMd = `${REPORT_S3_PREFIX}${reportId}.md`;
+  const s3KeyPdf = pdfBuffer ? `${REPORT_S3_PREFIX}${reportId}.pdf` : null;
+  const uploadPromises: Promise<any>[] = [
+    s3Client.send(new PutObjectCommand({
+      Bucket: REPORT_BUCKET,
+      Key: s3KeyDocx,
+      Body: docxBuffer,
+      ContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    })),
+    s3Client.send(new PutObjectCommand({
+      Bucket: REPORT_BUCKET,
+      Key: s3KeyMd,
+      Body: mdBuffer,
+      ContentType: 'text/markdown; charset=utf-8',
+    })),
+  ];
+  if (pdfBuffer && s3KeyPdf) {
+    uploadPromises.push(s3Client.send(new PutObjectCommand({
+      Bucket: REPORT_BUCKET,
+      Key: s3KeyPdf,
+      Body: pdfBuffer,
+      ContentType: 'application/pdf',
+    })));
+  }
+  await Promise.all(uploadPromises);
+
+  // Generate presigned URLs (valid for 7 days)
+  // 7일간 유효한 사전 서명 URL 생성
+  const currentMeta = readReportMeta(reportId);
+  const fileMeta = { createdAt: currentMeta?.createdAt || new Date().toISOString(), accountAlias };
+  const presignPromises: Promise<string>[] = [
+    getSignedUrl(s3Client, new GetObjectCommand({
+      Bucket: REPORT_BUCKET, Key: s3KeyDocx,
+      ResponseContentDisposition: `attachment; filename="${buildReportFilename(fileMeta, 'docx')}"`,
+    }), { expiresIn: 7 * 24 * 60 * 60 }),
+    getSignedUrl(s3Client, new GetObjectCommand({
+      Bucket: REPORT_BUCKET, Key: s3KeyMd,
+      ResponseContentDisposition: `attachment; filename="${buildReportFilename(fileMeta, 'md')}"`,
+    }), { expiresIn: 7 * 24 * 60 * 60 }),
+  ];
+  if (s3KeyPdf) {
+    presignPromises.push(getSignedUrl(s3Client, new GetObjectCommand({
+      Bucket: REPORT_BUCKET, Key: s3KeyPdf,
+      ResponseContentDisposition: `attachment; filename="${buildReportFilename(fileMeta, 'pdf')}"`,
+    }), { expiresIn: 7 * 24 * 60 * 60 }));
+  }
+  const presignedUrls = await Promise.all(presignPromises);
+  const [downloadUrlDocx, downloadUrlMd] = presignedUrls;
+  const downloadUrlPdf = presignedUrls[2] || null;
 
   updateReportMeta(reportId, {
     status: 'completed',
@@ -501,11 +513,30 @@ async function generateReportBackground(
     s3Key: null,
     s3KeyDocx,
     s3KeyMd,
+    s3KeyPdf,
     downloadUrl: null,
     downloadUrlDocx,
     downloadUrlMd,
+    downloadUrlPdf,
     sections: ordered,
   });
+
+  // Send SNS notification on completion
+  // 완료 시 SNS 알림 발송
+  try {
+    const { notifyReportCompleted } = await import('@/lib/sns-notification');
+    const execSummary = ordered.find((s: SectionResult) => s.key === 'executive-summary');
+    const summaryText = execSummary?.content?.slice(0, 500) || '';
+    await notifyReportCompleted({
+      reportId,
+      accountAlias: accountAlias || undefined,
+      executiveSummary: summaryText,
+      downloadUrlDocx,
+      downloadUrlMd,
+    });
+  } catch {
+    // SNS notification is best-effort; don't fail the report
+  }
 }
 
 // ============================================================================
@@ -606,6 +637,7 @@ export async function GET(request: NextRequest) {
         completedAt: string | null;
         downloadUrlDocx?: string | null;
         downloadUrlMd?: string | null;
+        downloadUrlPdf?: string | null;
         scheduledBy?: string;
       }> = [];
 
@@ -621,6 +653,7 @@ export async function GET(request: NextRequest) {
             completedAt: meta.completedAt,
             downloadUrlDocx: meta.downloadUrlDocx,
             downloadUrlMd: meta.downloadUrlMd,
+            downloadUrlPdf: meta.downloadUrlPdf,
             scheduledBy: meta.scheduledBy,
           });
         } catch {
@@ -652,13 +685,15 @@ export async function GET(request: NextRequest) {
     // 완료 상태에서 downloadUrl이 만료되었을 수 있으면 사전 서명 URL 재생성
     let downloadUrlDocx = meta.downloadUrlDocx;
     let downloadUrlMd = meta.downloadUrlMd;
+    let downloadUrlPdf = meta.downloadUrlPdf;
     if (meta.status === 'completed') {
       const refreshPromises: Promise<void>[] = [];
       if (meta.s3KeyDocx) {
         refreshPromises.push((async () => {
           try {
             downloadUrlDocx = await getSignedUrl(s3Client, new GetObjectCommand({
-              Bucket: getReportBucket(), Key: meta.s3KeyDocx!,
+              Bucket: REPORT_BUCKET, Key: meta.s3KeyDocx!,
+              ResponseContentDisposition: `attachment; filename="${buildReportFilename(meta, 'docx')}"`,
             }), { expiresIn: 7 * 24 * 60 * 60 });
           } catch { /* keep existing */ }
         })());
@@ -667,13 +702,24 @@ export async function GET(request: NextRequest) {
         refreshPromises.push((async () => {
           try {
             downloadUrlMd = await getSignedUrl(s3Client, new GetObjectCommand({
-              Bucket: getReportBucket(), Key: meta.s3KeyMd!,
+              Bucket: REPORT_BUCKET, Key: meta.s3KeyMd!,
+              ResponseContentDisposition: `attachment; filename="${buildReportFilename(meta, 'md')}"`,
+            }), { expiresIn: 7 * 24 * 60 * 60 });
+          } catch { /* keep existing */ }
+        })());
+      }
+      if (meta.s3KeyPdf) {
+        refreshPromises.push((async () => {
+          try {
+            downloadUrlPdf = await getSignedUrl(s3Client, new GetObjectCommand({
+              Bucket: REPORT_BUCKET, Key: meta.s3KeyPdf!,
+              ResponseContentDisposition: `attachment; filename="${buildReportFilename(meta, 'pdf')}"`,
             }), { expiresIn: 7 * 24 * 60 * 60 });
           } catch { /* keep existing */ }
         })());
       }
       await Promise.all(refreshPromises);
-      updateReportMeta(id, { downloadUrlDocx, downloadUrlMd });
+      updateReportMeta(id, { downloadUrlDocx, downloadUrlMd, downloadUrlPdf });
     }
 
     return NextResponse.json({
@@ -682,6 +728,7 @@ export async function GET(request: NextRequest) {
       progress: meta.progress,
       downloadUrlDocx: meta.status === 'completed' ? downloadUrlDocx : undefined,
       downloadUrlMd: meta.status === 'completed' ? downloadUrlMd : undefined,
+      downloadUrlPdf: meta.status === 'completed' ? downloadUrlPdf : undefined,
       sections: meta.status === 'completed' ? meta.sections : undefined,
       error: meta.error,
       createdAt: meta.createdAt,
@@ -704,8 +751,9 @@ export async function GET(request: NextRequest) {
 
     try {
       const freshUrl = await getSignedUrl(s3Client, new GetObjectCommand({
-        Bucket: getReportBucket(),
+        Bucket: REPORT_BUCKET,
         Key: meta.s3KeyDocx,
+        ResponseContentDisposition: `attachment; filename="${buildReportFilename(meta, 'docx')}"`,
       }), { expiresIn: 60 * 60 });
 
       return NextResponse.redirect(freshUrl, 302);
@@ -714,11 +762,10 @@ export async function GET(request: NextRequest) {
       const localPath = path.join(REPORTS_META_DIR, `${id}.docx`);
       if (fs.existsSync(localPath)) {
         const buffer = fs.readFileSync(localPath);
-        const date = new Date().toISOString().split('T')[0];
         return new NextResponse(buffer, {
           headers: {
             'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'Content-Disposition': `attachment; filename="AWSops_Report_${date}.docx"`,
+            'Content-Disposition': `attachment; filename="${buildReportFilename(meta, 'docx')}"`,
             'Content-Length': String(buffer.length),
           },
         });
@@ -744,7 +791,8 @@ export async function GET(request: NextRequest) {
     if (meta.s3KeyMd) {
       try {
         const freshUrl = await getSignedUrl(s3Client, new GetObjectCommand({
-          Bucket: getReportBucket(), Key: meta.s3KeyMd,
+          Bucket: REPORT_BUCKET, Key: meta.s3KeyMd,
+          ResponseContentDisposition: `attachment; filename="${buildReportFilename(meta, 'md')}"`,
         }), { expiresIn: 60 * 60 });
         return NextResponse.redirect(freshUrl, 302);
       } catch { /* fallback below */ }
@@ -754,11 +802,10 @@ export async function GET(request: NextRequest) {
     const localPath = path.join(REPORTS_META_DIR, `${id}.md`);
     if (fs.existsSync(localPath)) {
       const buffer = fs.readFileSync(localPath);
-      const date = new Date().toISOString().split('T')[0];
       return new NextResponse(buffer, {
         headers: {
           'Content-Type': 'text/markdown; charset=utf-8',
-          'Content-Disposition': `attachment; filename="AWSops_Report_${date}.md"`,
+          'Content-Disposition': `attachment; filename="${buildReportFilename(meta, 'md')}"`,
           'Content-Length': String(buffer.length),
         },
       });
@@ -771,17 +818,56 @@ export async function GET(request: NextRequest) {
         lines.push(`## ${s.title}`, '', s.content, '', '---', '');
       }
       const md = Buffer.from(lines.join('\n'), 'utf-8');
-      const date = new Date().toISOString().split('T')[0];
       return new NextResponse(md, {
         headers: {
           'Content-Type': 'text/markdown; charset=utf-8',
-          'Content-Disposition': `attachment; filename="AWSops_Report_${date}.md"`,
+          'Content-Disposition': `attachment; filename="${buildReportFilename(meta, 'md')}"`,
           'Content-Length': String(md.length),
         },
       });
     }
 
     return NextResponse.json({ error: 'Markdown file not available' }, { status: 500 });
+  }
+
+  // ── Download PDF ──
+  if (action === 'download-pdf') {
+    const meta = readReportMeta(id);
+    if (!meta) {
+      return NextResponse.json({ error: 'Report not found' }, { status: 404 });
+    }
+    if (meta.status !== 'completed') {
+      return NextResponse.json(
+        { error: 'Report not available' },
+        { status: meta.status === 'failed' ? 410 : 202 },
+      );
+    }
+
+    // Try S3 presigned URL first
+    if (meta.s3KeyPdf) {
+      try {
+        const freshUrl = await getSignedUrl(s3Client, new GetObjectCommand({
+          Bucket: REPORT_BUCKET, Key: meta.s3KeyPdf,
+          ResponseContentDisposition: `attachment; filename="${buildReportFilename(meta, 'pdf')}"`,
+        }), { expiresIn: 60 * 60 });
+        return NextResponse.redirect(freshUrl, 302);
+      } catch { /* fallback below */ }
+    }
+
+    // Fallback: local file
+    const localPath = path.join(REPORTS_META_DIR, `${id}.pdf`);
+    if (fs.existsSync(localPath)) {
+      const buffer = fs.readFileSync(localPath);
+      return new NextResponse(buffer, {
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="${buildReportFilename(meta, 'pdf')}"`,
+          'Content-Length': String(buffer.length),
+        },
+      });
+    }
+
+    return NextResponse.json({ error: 'PDF file not available' }, { status: 500 });
   }
 
   return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });

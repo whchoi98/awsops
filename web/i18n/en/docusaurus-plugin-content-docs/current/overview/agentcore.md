@@ -254,7 +254,7 @@ When deploying to a new account, just update this config file. No code changes r
 | **Code Interpreter name** | No hyphens, underscores only |
 | **Memory name** | No hyphens, underscores only |
 | **Conversation history retention** | Maximum 365 days |
-| **AgentCore response** | Returns final text only (tool inference) |
+| **AgentCore response** | Returns final text only (tool inference, streamed with typing effect) |
 
 ## Next Steps
 

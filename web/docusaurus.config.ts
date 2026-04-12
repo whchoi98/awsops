@@ -45,7 +45,15 @@ const config: Config = {
           sidebarPath: './sidebars.ts',
           routeBasePath: '/',
         },
-        blog: false,
+        blog: {
+          path: 'whatsnew',
+          routeBasePath: 'whatsnew',
+          blogTitle: "What's New",
+          blogDescription: 'AWSops 개발 현황 및 릴리스 노트',
+          blogSidebarTitle: '릴리스 노트',
+          blogSidebarCount: 'ALL',
+          showReadingTime: true,
+        },
         theme: {
           customCss: './src/css/custom.css',
         },
@@ -75,8 +83,18 @@ const config: Config = {
           position: 'left',
         },
         {
+          to: '/whatsnew',
+          label: "What's New",
+          position: 'left',
+        },
+        {
           type: 'localeDropdown',
           position: 'right',
+        },
+        {
+          href: 'pathname:///presentation/awsops-intro/index.html',
+          label: 'Presentation',
+          position: 'left',
         },
         {
           href: 'https://awsops.whchoi.net/awsops/',
@@ -93,6 +111,7 @@ const config: Config = {
           items: [
             { label: '시작하기', to: '/getting-started/login' },
             { label: 'AI 어시스턴트', to: '/getting-started/ai-assistant' },
+            { label: "What's New", to: '/whatsnew' },
           ],
         },
         {

@@ -1,0 +1,343 @@
+<mxfile host="65bd71144e">
+    <diagram id="arch" name="Architecture">
+        <mxGraphModel dx="598" dy="340" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="720" background="none" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="cf" value="CloudFront" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudfront;fillColor=#8C4FFF;strokeColor=none;fontColor=#E0E0E0;fontSize=14;verticalLabelPosition=bottom;verticalAlign=top;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="66" y="100" width="48" height="48" as="geometry"/>
+                </mxCell>
+                <mxCell id="vpc" value="" style="rounded=8;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#8C4FFF;strokeWidth=3;" parent="1" vertex="1">
+                    <mxGeometry x="150" y="50" width="270" height="180" as="geometry"/>
+                </mxCell>
+                <mxCell id="vpc_icon" value="" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.vpc;fillColor=#8C4FFF;strokeColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="156" y="56" width="20" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="vpc_lbl" value="VPC" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontColor=#8C4FFF;fontSize=14;fontStyle=1;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="180" y="54" width="40" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="ec2_lbl" value="EC2 (Next.js API route.ts)" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontColor=#E0E0E0;fontSize=13;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="280" y="58" width="130" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="alb" value="ALB" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.application_load_balancer;fillColor=#8C4FFF;strokeColor=none;fontColor=#E0E0E0;fontSize=13;verticalLabelPosition=bottom;verticalAlign=top;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="190" y="102" width="44" height="44" as="geometry"/>
+                </mxCell>
+                <mxCell id="ec2" value="" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.ec2;fillColor=#ED7100;strokeColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="102" width="44" height="44" as="geometry"/>
+                </mxCell>
+                <mxCell id="classify" value="classifyIntent()&#10;generateSQL()&#10;InvokeModelCommand" style="rounded=4;whiteSpace=wrap;html=1;fillColor=#006666;strokeColor=#4A5568;strokeWidth=1;fontColor=#E6E6E6;fontSize=14;fontFamily=Amazon Ember;align=left;spacingLeft=4;" parent="1" vertex="1">
+                    <mxGeometry x="280" y="168" width="130" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="ledge" value="Lambda@Edge" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;fillColor=#ED7100;strokeColor=none;fontColor=#E0E0E0;fontSize=13;verticalLabelPosition=bottom;verticalAlign=top;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="66" y="280" width="44" height="44" as="geometry"/>
+                </mxCell>
+                <mxCell id="cognito" value="Cognito" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cognito;fillColor=#DD344C;strokeColor=none;fontColor=#E0E0E0;fontSize=13;verticalLabelPosition=bottom;verticalAlign=top;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="195" y="280" width="44" height="44" as="geometry"/>
+                </mxCell>
+                <mxCell id="bedrock" value="Bedrock&#10;Sonnet 4.6&#10;Opus 4.6" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock;fillColor=#01A88D;strokeColor=none;fontColor=#E0E0E0;fontSize=12;verticalLabelPosition=bottom;verticalAlign=top;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="275" width="48" height="48" as="geometry"/>
+                </mxCell>
+                <mxCell id="memory" value="memory" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock;fillColor=#01A88D;strokeColor=none;fontColor=#E0E0E0;fontSize=13;verticalLabelPosition=bottom;verticalAlign=top;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="505" y="15" width="44" height="44" as="geometry"/>
+                </mxCell>
+                <mxCell id="runtime" value="runtime" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock;fillColor=#01A88D;strokeColor=none;fontColor=#E0E0E0;fontSize=13;verticalLabelPosition=bottom;verticalAlign=top;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="505" y="100" width="44" height="44" as="geometry"/>
+                </mxCell>
+                <mxCell id="codeint" value="Code&#10;Interpreter" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock;fillColor=#01A88D;strokeColor=none;fontColor=#E0E0E0;fontSize=12;verticalLabelPosition=bottom;verticalAlign=top;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="505" y="202" width="44" height="44" as="geometry"/>
+                </mxCell>
+                <mxCell id="gw1" value="Network Gateway" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.vpc;fillColor=#8C4FFF;strokeColor=none;fontColor=#E0E0E0;fontSize=12;verticalLabelPosition=bottom;verticalAlign=top;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="730" y="13" width="40" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="lam1" value="Lambda x5" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;fillColor=#ED7100;strokeColor=none;fontColor=#E0E0E0;fontSize=14;verticalLabelPosition=bottom;verticalAlign=top;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="849" y="15" width="36" height="36" as="geometry"/>
+                </mxCell>
+                <mxCell id="t1" value="17 Tools&#10;vpc, tgw, firewall,&#10;reachability, flowlogs" style="rounded=4;whiteSpace=wrap;html=1;fontSize=13;fontFamily=Amazon Ember;align=left;spacingLeft=42;fontColor=#E040FB;strokeColor=#E040FB;" parent="1" vertex="1">
+                    <mxGeometry x="964" y="7" width="160" height="52" as="geometry"/>
+                </mxCell>
+                <mxCell id="gw2" value="Container Gateway" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.ecs;fillColor=#ED7100;strokeColor=none;fontColor=#E0E0E0;fontSize=12;verticalLabelPosition=bottom;verticalAlign=top;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="730" y="103" width="40" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="lam2" value="Lambda x3" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;fillColor=#ED7100;strokeColor=none;fontColor=#E0E0E0;fontSize=14;verticalLabelPosition=bottom;verticalAlign=top;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="849" y="105" width="36" height="36" as="geometry"/>
+                </mxCell>
+                <mxCell id="t2" value="28 Tools&#10;eks, ecs, istio" style="rounded=4;whiteSpace=wrap;html=1;fontSize=13;fontFamily=Amazon Ember;align=left;spacingLeft=42;fontColor=#E040FB;strokeColor=#E040FB;" parent="1" vertex="1">
+                    <mxGeometry x="964" y="103" width="160" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="gw3" value="IaC Gateway" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudformation;fillColor=#E7157B;strokeColor=none;fontColor=#E0E0E0;fontSize=12;verticalLabelPosition=bottom;verticalAlign=top;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="730" y="197" width="40" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="lam3" value="Lambda x2" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;fillColor=#ED7100;strokeColor=none;fontColor=#E0E0E0;fontSize=14;verticalLabelPosition=bottom;verticalAlign=top;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="849" y="199" width="36" height="36" as="geometry"/>
+                </mxCell>
+                <mxCell id="t3" value="11 Tools&#10;CFn, CDK, Terraform" style="rounded=4;whiteSpace=wrap;html=1;fontSize=13;fontFamily=Amazon Ember;align=left;spacingLeft=42;fontColor=#E040FB;strokeColor=#E040FB;" parent="1" vertex="1">
+                    <mxGeometry x="964" y="199" width="160" height="36" as="geometry"/>
+                </mxCell>
+                <mxCell id="gw4" value="Data Gateway" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.dynamodb;fillColor=#3B48CC;strokeColor=none;fontColor=#E0E0E0;fontSize=12;verticalLabelPosition=bottom;verticalAlign=top;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="730" y="291" width="40" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="lam4" value="Lambda x4" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;fillColor=#ED7100;strokeColor=none;fontColor=#E0E0E0;fontSize=14;verticalLabelPosition=bottom;verticalAlign=top;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="849" y="293" width="36" height="36" as="geometry"/>
+                </mxCell>
+                <mxCell id="t4" value="25 Tools&#10;DDB, RDS, ElastiCache, MSK" style="rounded=4;whiteSpace=wrap;html=1;fontSize=13;fontFamily=Amazon Ember;align=left;spacingLeft=42;fontColor=#E040FB;strokeColor=#E040FB;" parent="1" vertex="1">
+                    <mxGeometry x="964" y="291" width="160" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="gw5" value="Security Gateway" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.identity_and_access_management;fillColor=#DD344C;strokeColor=none;fontColor=#E0E0E0;fontSize=12;verticalLabelPosition=bottom;verticalAlign=top;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="730" y="385" width="40" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="lam5" value="Lambda x1" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;fillColor=#ED7100;strokeColor=none;fontColor=#E0E0E0;fontSize=14;verticalLabelPosition=bottom;verticalAlign=top;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="849" y="387" width="36" height="36" as="geometry"/>
+                </mxCell>
+                <mxCell id="t5" value="14 Tools&#10;IAM" style="rounded=4;whiteSpace=wrap;html=1;fontSize=13;fontFamily=Amazon Ember;align=left;spacingLeft=42;fontColor=#E040FB;strokeColor=#E040FB;" parent="1" vertex="1">
+                    <mxGeometry x="964" y="387" width="160" height="36" as="geometry"/>
+                </mxCell>
+                <mxCell id="gw6" value="Monitoring Gateway" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudwatch;fillColor=#E7157B;strokeColor=none;fontColor=#E0E0E0;fontSize=14;verticalLabelPosition=bottom;verticalAlign=top;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="730" y="478" width="40" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="lam6" value="Lambda x3" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;fillColor=#ED7100;strokeColor=none;fontColor=#E0E0E0;fontSize=14;verticalLabelPosition=bottom;verticalAlign=top;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="849" y="480" width="36" height="36" as="geometry"/>
+                </mxCell>
+                <mxCell id="t6" value="24 Tools&#10;CW, CT, DS Diagnostics" style="rounded=4;whiteSpace=wrap;html=1;fontSize=13;fontFamily=Amazon Ember;align=left;spacingLeft=42;fontColor=#E040FB;strokeColor=#E040FB;" parent="1" vertex="1">
+                    <mxGeometry x="964" y="476" width="160" height="44" as="geometry"/>
+                </mxCell>
+                <mxCell id="gw7" value="Cost Gateway" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cost_explorer;fillColor=#277116;strokeColor=none;fontColor=#E0E0E0;fontSize=12;verticalLabelPosition=bottom;verticalAlign=top;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="730" y="572" width="40" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="lam7" value="Lambda x2" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;fillColor=#ED7100;strokeColor=none;fontColor=#E0E0E0;fontSize=14;verticalLabelPosition=bottom;verticalAlign=top;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="849" y="574" width="36" height="36" as="geometry"/>
+                </mxCell>
+                <mxCell id="t7" value="14 Tools&#10;Cost + FinOps" style="rounded=4;whiteSpace=wrap;html=1;fontSize=13;fontFamily=Amazon Ember;align=left;spacingLeft=42;fontColor=#E040FB;strokeColor=#E040FB;" parent="1" vertex="1">
+                    <mxGeometry x="964" y="574" width="160" height="36" as="geometry"/>
+                </mxCell>
+                <mxCell id="gw8" value="Ops Gateway" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.management_console;fillColor=#232F3E;strokeColor=#FF9900;strokeWidth=2;fontColor=#E0E0E0;fontSize=12;verticalLabelPosition=bottom;verticalAlign=top;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="730" y="666" width="40" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="lam8" value="Lambda x3" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;fillColor=#ED7100;strokeColor=none;fontColor=#E0E0E0;fontSize=14;verticalLabelPosition=bottom;verticalAlign=top;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="849" y="668" width="36" height="36" as="geometry"/>
+                </mxCell>
+                <mxCell id="t8" value="9 Tools&#10;Ops, Steampipe query" style="rounded=4;whiteSpace=wrap;html=1;fontSize=13;fontFamily=Amazon Ember;align=left;spacingLeft=42;fontColor=#E040FB;strokeColor=#E040FB;" parent="1" vertex="1">
+                    <mxGeometry x="964" y="666" width="160" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="a1" style="strokeColor=#4A5568;strokeWidth=2;" parent="1" source="cf" target="alb" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="a2" style="strokeColor=#4A5568;strokeWidth=2;" parent="1" source="alb" target="ec2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="a3" style="strokeColor=#4A5568;strokeWidth=1;dashed=1;" parent="1" source="cf" target="ledge" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="a4" style="strokeColor=#4A5568;strokeWidth=1;dashed=1;" parent="1" source="ledge" target="cognito" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="a5" style="strokeColor=#8C4FFF;strokeWidth=3;dashed=1;edgeStyle=orthogonalEdgeStyle;" parent="1" source="ec2" target="memory" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="480" y="122"/>
+                            <mxPoint x="480" y="37"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="a6" style="strokeColor=#8C4FFF;strokeWidth=3;entryX=-0.005;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" edge="1" target="runtime">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="364" y="122" as="sourcePoint"/>
+                        <mxPoint x="506" y="120" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="a7" style="strokeColor=#8C4FFF;strokeWidth=3;dashed=1;edgeStyle=orthogonalEdgeStyle;entryX=0.023;entryY=0.386;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="ec2" edge="1" target="codeint">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="470" y="244" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="479" y="122"/>
+                            <mxPoint x="479" y="218"/>
+                            <mxPoint x="506" y="218"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="a8" style="strokeColor=#01A88D;strokeWidth=2;" parent="1" source="ec2" target="bedrock" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="a9" value="" style="strokeColor=#01A88D;strokeWidth=2;dashed=1;fontColor=#E6E6E6;fontSize=14;fontFamily=Amazon Ember;textDirection=rtl;fillColor=#ffff88;labelBackgroundColor=#4D4D4D;" parent="1" source="runtime" target="bedrock" edge="1">
+                    <mxGeometry x="0.0313" y="5" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="r1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#8C4FFF;strokeWidth=1;" parent="1" source="runtime" target="gw1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="665" y="121"/>
+                            <mxPoint x="665" y="33"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="r2" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#8C4FFF;strokeWidth=1;" parent="1" source="runtime" target="gw2" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="694" y="122"/>
+                            <mxPoint x="694" y="122"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="r3" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#8C4FFF;strokeWidth=1;" parent="1" source="runtime" target="gw3" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="665" y="122"/>
+                            <mxPoint x="665" y="217"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="r4" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#8C4FFF;strokeWidth=1;" parent="1" source="runtime" target="gw4" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="665" y="121"/>
+                            <mxPoint x="665" y="311"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="r5" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#8C4FFF;strokeWidth=1;" parent="1" source="runtime" target="gw5" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="665" y="122"/>
+                            <mxPoint x="665" y="405"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="r6" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#8C4FFF;strokeWidth=1;" parent="1" source="runtime" target="gw6" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="665" y="122"/>
+                            <mxPoint x="665" y="498"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="r7" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#8C4FFF;strokeWidth=1;" parent="1" source="runtime" target="gw7" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="665" y="122"/>
+                            <mxPoint x="665" y="592"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="r8" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#8C4FFF;strokeWidth=1;" parent="1" source="runtime" target="gw8" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="665" y="122"/>
+                            <mxPoint x="665" y="686"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="g1a" style="strokeColor=#ED7100;strokeWidth=1;" parent="1" source="gw1" target="lam1" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="g1b" style="strokeColor=#ED7100;strokeWidth=1;" parent="1" source="lam1" target="t1" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="g2a" style="strokeColor=#ED7100;strokeWidth=1;" parent="1" source="gw2" target="lam2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="g2b" style="strokeColor=#ED7100;strokeWidth=1;" parent="1" source="lam2" target="t2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="g3a" style="strokeColor=#ED7100;strokeWidth=1;" parent="1" source="gw3" target="lam3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="g3b" style="strokeColor=#ED7100;strokeWidth=1;" parent="1" source="lam3" target="t3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="g4a" style="strokeColor=#ED7100;strokeWidth=1;" parent="1" source="gw4" target="lam4" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="g4b" style="strokeColor=#ED7100;strokeWidth=1;" parent="1" source="lam4" target="t4" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="g5a" style="strokeColor=#ED7100;strokeWidth=1;" parent="1" source="gw5" target="lam5" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="g5b" style="strokeColor=#ED7100;strokeWidth=1;" parent="1" source="lam5" target="t5" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="g6a" style="strokeColor=#ED7100;strokeWidth=1;" parent="1" source="gw6" target="lam6" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="g6b" style="strokeColor=#ED7100;strokeWidth=1;" parent="1" source="lam6" target="t6" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="g7a" style="strokeColor=#ED7100;strokeWidth=1;" parent="1" source="gw7" target="lam7" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="g7b" style="strokeColor=#ED7100;strokeWidth=1;" parent="1" source="lam7" target="t7" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="g8a" style="strokeColor=#ED7100;strokeWidth=1;" parent="1" source="gw8" target="lam8" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="g8b" style="strokeColor=#ED7100;strokeWidth=1;" parent="1" source="lam8" target="t8" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="detail" value="" style="rounded=8;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#4A5568;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="27" y="384" width="620" height="344" as="geometry"/>
+                </mxCell>
+                <mxCell id="detail_icon" value="" style="shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.ec2;fillColor=#ED7100;strokeColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="35" y="388" width="24" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="d1" value="Next.js 14&#10;-  App Router&#10;-  36 Pages | 13 API Routes&#10;-  SSE Streaming&#10;-  18 AI Routes" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontColor=#E0E0E0;fontSize=13;fontFamily=Amazon Ember;fontStyle=1;spacingLeft=4;" parent="1" vertex="1">
+                    <mxGeometry x="69" y="391" width="200" height="85" as="geometry"/>
+                </mxCell>
+                <mxCell id="d2" value="AWS CLIv2&#10;-  CloudWatch get-metric-data&#10;-  execFileSync" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontColor=#E0E0E0;fontSize=13;fontFamily=Amazon Ember;fontStyle=1;spacingLeft=4;" parent="1" vertex="1">
+                    <mxGeometry x="69" y="481" width="240" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="d3" value="kubectl&#10;-  ~/.kube/config&#10;-  EKS access | Access entry Auth" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontColor=#E0E0E0;fontSize=13;fontFamily=Amazon Ember;fontStyle=1;spacingLeft=4;" parent="1" vertex="1">
+                    <mxGeometry x="69" y="537" width="240" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="d4" value="6 Auto-Collect AI Agents&#10;-  eks-optimize | db-optimize | msk-optimize&#10;-  idle-scan | trace-analyze | incident" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontColor=#8C4FFF;fontSize=13;fontFamily=Amazon Ember;fontStyle=1;spacingLeft=4;" parent="1" vertex="1">
+                    <mxGeometry x="69" y="592" width="280" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="d5" value="Comprehensive Diagnosis Report&#10;-  15 Sections | 6 WA Pillars | DOCX/MD/PDF&#10;CIS Benchmark v1.5~v4.0 (431 Controls)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontColor=#E040FB;fontSize=13;fontFamily=Amazon Ember;fontStyle=1;spacingLeft=4;" parent="1" vertex="1">
+                    <mxGeometry x="69" y="655" width="280" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="d6" value="Steampipe&#10;-  AWS plugin (380+ tables)&#10;-  K8s plugin (60+ tables)&#10;-  --database-listen network&#10;-  VPC Lambda access : 9193" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontColor=#E0E0E0;fontSize=13;fontFamily=Amazon Ember;fontStyle=1;spacingLeft=4;" parent="1" vertex="1">
+                    <mxGeometry x="365" y="391" width="270" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="d7" value="Docker(buildx)&#10;-  Agent img build (arm64)&#10;-  ECR Push → AgentCore" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontColor=#E0E0E0;fontSize=13;fontFamily=Amazon Ember;fontStyle=1;spacingLeft=4;" parent="1" vertex="1">
+                    <mxGeometry x="365" y="486" width="240" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="d8" value="Data Directory&#10;-  data/config.json (App config)&#10;-  data/memory/ (dialog history)&#10;-  data/inventory/ (Inventory)&#10;-  data/cost/ (Cost Snapshot)&#10;-  data/reports/ (Diagnosis DOCX/MD/PDF)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontColor=#E0E0E0;fontSize=13;fontFamily=Amazon Ember;fontStyle=1;spacingLeft=4;" parent="1" vertex="1">
+                    <mxGeometry x="365" y="547" width="280" height="105" as="geometry"/>
+                </mxCell>
+                <mxCell id="d9" value="Datasource Client (7 types)&#10;Prometheus | Loki | Tempo | Jaeger&#10;ClickHouse | Datadog | Dynatrace" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontColor=#01A88D;fontSize=13;fontFamily=Amazon Ember;fontStyle=1;spacingLeft=4;" parent="1" vertex="1">
+                    <mxGeometry x="365" y="654" width="280" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="ti1" value="" style="shape=mxgraph.aws4.gear;fillColor=#E040FB;strokeColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="969" y="19" width="28" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="ti2" value="" style="shape=mxgraph.aws4.gear;fillColor=#E040FB;strokeColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="969" y="109" width="28" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="ti3" value="" style="shape=mxgraph.aws4.gear;fillColor=#E040FB;strokeColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="969" y="203" width="28" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="ti4" value="" style="shape=mxgraph.aws4.gear;fillColor=#E040FB;strokeColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="969" y="297" width="28" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="ti5" value="" style="shape=mxgraph.aws4.gear;fillColor=#E040FB;strokeColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="969" y="391" width="28" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="ti6" value="" style="shape=mxgraph.aws4.gear;fillColor=#E040FB;strokeColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="969" y="484" width="28" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="ti7" value="" style="shape=mxgraph.aws4.gear;fillColor=#E040FB;strokeColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="969" y="578" width="28" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="ti8" value="" style="shape=mxgraph.aws4.gear;fillColor=#E040FB;strokeColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="969" y="672" width="28" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="strands" value="STRANDS&#10;AGENTS" style="rounded=4;whiteSpace=wrap;html=1;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontSize=7;fontStyle=1;fontFamily=Amazon Ember;" parent="1" vertex="1">
+                    <mxGeometry x="550" y="107" width="50" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="2" value="Tool + Run" style="rounded=4;whiteSpace=wrap;html=1;fillColor=#006666;strokeColor=#4A5568;strokeWidth=1;fontColor=#E6E6E6;fontSize=14;fontFamily=Amazon Ember;align=left;spacingLeft=4;rotation=-45;" vertex="1" parent="1">
+                    <mxGeometry x="406" y="208.99999999999997" width="74" height="21" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

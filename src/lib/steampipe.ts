@@ -72,7 +72,7 @@ function validateQuery(sql: string): void {
   if (!ALLOWED_PATTERN.test(sql.trim())) {
     throw new Error('Only SELECT queries are allowed');
   }
-  if (/[|&`]/.test(sql)) {
+  if (/[&`]/.test(sql) || /(?<!\|)\|(?!\|)/.test(sql)) {
     throw new Error('Query contains forbidden characters');
   }
 }

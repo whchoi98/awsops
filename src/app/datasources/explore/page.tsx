@@ -8,7 +8,7 @@ import { Play, Clock, Database, Activity, FileText, Waypoints, ChevronDown, Rada
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, Legend,
 } from 'recharts';
-import { ResponsiveContainer } from 'recharts';
+import SafeResponsiveContainer from '@/components/charts/SafeResponsiveContainer';
 
 // --- Types / 타입 정의 ---
 
@@ -717,7 +717,7 @@ export default function DatasourceExplorePage() {
               </div>
             </div>
             <div className="h-56">
-              <ResponsiveContainer>
+              <SafeResponsiveContainer>
                 {chartType === 'line' ? (
                   <LineChart data={chartData}>
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 10 }} interval="preserveStartEnd" />
@@ -755,7 +755,7 @@ export default function DatasourceExplorePage() {
                     ))}
                   </BarChart>
                 )}
-              </ResponsiveContainer>
+              </SafeResponsiveContainer>
             </div>
           </div>
         )}

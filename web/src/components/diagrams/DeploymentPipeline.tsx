@@ -12,18 +12,31 @@ interface Step {
 }
 
 const STEPS: Step[] = [
-  // Row 1
-  { id: '0', num: '0', script: '00-deploy-infra.sh', where: 'Local', description: 'CDK Infrastructure (VPC, EC2, ALB, CloudFront)', color: THEME.purple, row: 0 },
+  // Row 0 — Required Setup (cyan)
+  { id: '0', num: '0', script: '00-deploy-infra.sh', where: 'Local', description: 'CDK Infrastructure (VPC, EC2, ALB, CloudFront)', color: THEME.cyan, row: 0 },
   { id: '1', num: '1', script: '01-install-base.sh', where: 'EC2', description: 'Steampipe + Powerpipe', color: THEME.cyan, row: 0 },
   { id: '2', num: '2', script: '02-setup-nextjs.sh', where: 'EC2', description: 'Next.js + Steampipe Service', color: THEME.cyan, row: 0 },
-  { id: '3', num: '3', script: '03-build-deploy.sh', where: 'EC2', description: 'Production Build', color: THEME.green, row: 0 },
-  // Row 2
-  { id: '5', num: '5', script: '05-setup-cognito.sh', where: 'EC2', description: 'Cognito Auth', color: THEME.orange, row: 1 },
-  { id: '6', num: '6a-6f', script: '06a~06f*.sh', where: 'EC2', description: 'AgentCore (Runtime, 8 Gateway, 19 Lambda, Code Interpreter, Memory)', color: THEME.purple, row: 1 },
-  { id: '7', num: '7', script: '07-setup-cloudfront-auth.sh', where: 'EC2', description: 'Lambda@Edge -> CloudFront', color: THEME.orange, row: 1 },
+  { id: '3', num: '3', script: '03-build-deploy.sh', where: 'EC2', description: 'Production Build', color: THEME.cyan, row: 0 },
+  // Row 1 — Required Setup continued (cyan)
+  { id: '4', num: '4', script: '04-setup-eks-access.sh', where: 'EC2', description: 'EKS Access (kubectl, kubeconfig, access entry)', color: THEME.cyan, row: 1 },
+  { id: '5', num: '5', script: '05-setup-cognito.sh', where: 'EC2', description: 'Cognito Auth', color: THEME.cyan, row: 1 },
+  { id: '6', num: '6a-6f', script: '06a~06f*.sh', where: 'EC2', description: 'AgentCore (Runtime, Gateway, Tools, Interpreter, Config, Memory, OpenCost)', color: THEME.cyan, row: 1 },
+  { id: '7', num: '7', script: '07-setup-cloudfront-auth.sh', where: 'EC2', description: 'Lambda@Edge -> CloudFront', color: THEME.cyan, row: 1 },
+  // Row 2 — Operations (green), Verification (purple), Optional (orange)
+  { id: '8', num: '8', script: '08-start-all.sh', where: 'EC2', description: 'Start All Services (Steampipe + Next.js + OpenCost)', color: THEME.green, row: 2 },
+  { id: '9', num: '9', script: '09-stop-all.sh', where: 'EC2', description: 'Stop All Services', color: THEME.green, row: 2 },
+  { id: '10', num: '10', script: '10-verify.sh', where: 'EC2', description: 'Verify & Health Check (5-stage validation)', color: THEME.purple, row: 2 },
+  { id: '11', num: '11', script: '11-setup-multi-account.sh', where: 'EC2', description: 'Multi-Account Setup (Aggregator + cross-account IAM)', color: THEME.orange, row: 2 },
 ];
 
-const CANVAS_HEIGHT = 400;
+const CANVAS_HEIGHT = 520;
+
+// Row labels with their colors
+const ROW_LABELS = [
+  { label: 'Setup', color: THEME.cyan },
+  { label: 'Setup', color: THEME.cyan },
+  { label: 'Ops / Verify / Optional', color: THEME.green },
+];
 
 export default function DeploymentPipeline() {
   const [activeStep, setActiveStep] = useState<string | null>(null);
@@ -38,7 +51,6 @@ export default function DeploymentPipeline() {
       setAutoPlayIndex((prev) => {
         const next = (prev + 1) % (STEPS.length + 1);
         if (next === STEPS.length) {
-          // Completed all steps, reset
           return 0;
         }
         setActiveStep(STEPS[next].id);
@@ -53,20 +65,33 @@ export default function DeploymentPipeline() {
 
     const pad = 24 * dpr;
     const progressBarHeight = 8 * dpr;
-    const topMargin = 60 * dpr;
-    const rowHeight = 140 * dpr;
-    const stepGap = 16 * dpr;
+    const topMargin = 50 * dpr;
+    const rowHeight = 110 * dpr;
+    const stepGap = 12 * dpr;
     const arrowSize = 8 * dpr;
 
     // Calculate step dimensions
     const contentWidth = width - pad * 2;
-    const row1Steps = STEPS.filter(s => s.row === 0);
-    const row2Steps = STEPS.filter(s => s.row === 1);
+    const rows = [
+      STEPS.filter(s => s.row === 0),
+      STEPS.filter(s => s.row === 1),
+      STEPS.filter(s => s.row === 2),
+    ];
 
-    // Step 6 is wider
-    const normalStepWidth = (contentWidth - stepGap * 4) / 4.5;
-    const wideStepWidth = normalStepWidth * 1.5;
-    const stepHeight = 80 * dpr;
+    const stepHeight = 72 * dpr;
+
+    // Step 6 is wider (1.4x) in its row
+    function getStepWidth(step: Step, rowSteps: Step[]): number {
+      const hasWide = rowSteps.some(s => s.id === '6');
+      if (hasWide) {
+        const normalCount = rowSteps.length - 1;
+        const totalGaps = (rowSteps.length - 1) * stepGap;
+        const normalW = (contentWidth - totalGaps) / (normalCount + 1.4);
+        return step.id === '6' ? normalW * 1.4 : normalW;
+      }
+      const totalGaps = (rowSteps.length - 1) * stepGap;
+      return (contentWidth - totalGaps) / rowSteps.length;
+    }
 
     // Calculate progress
     const progress = autoPlay ? (autoPlayIndex / STEPS.length) :
@@ -77,11 +102,14 @@ export default function DeploymentPipeline() {
     roundRect(ctx, pad, pad, contentWidth, progressBarHeight, 4 * dpr);
     ctx.fill();
 
-    // Draw progress bar fill
+    // Draw progress bar fill with multi-color gradient
     if (progress > 0) {
       const gradient = ctx.createLinearGradient(pad, 0, pad + contentWidth * progress, 0);
       gradient.addColorStop(0, THEME.cyan);
-      gradient.addColorStop(1, THEME.green);
+      gradient.addColorStop(0.65, THEME.cyan);
+      gradient.addColorStop(0.75, THEME.green);
+      gradient.addColorStop(0.85, THEME.purple);
+      gradient.addColorStop(1, THEME.orange);
       ctx.fillStyle = gradient;
       roundRect(ctx, pad, pad, contentWidth * progress, progressBarHeight, 4 * dpr);
       ctx.fill();
@@ -89,21 +117,29 @@ export default function DeploymentPipeline() {
 
     // Progress text
     ctx.fillStyle = THEME.muted;
-    ctx.font = `${12 * dpr}px system-ui, sans-serif`;
+    ctx.font = `${11 * dpr}px system-ui, sans-serif`;
     ctx.textAlign = 'right';
-    ctx.fillText(`${Math.round(progress * 100)}% Complete`, width - pad, pad + progressBarHeight + 16 * dpr);
+    ctx.fillText(`${Math.round(progress * 100)}% Complete`, width - pad, pad + progressBarHeight + 14 * dpr);
 
-    // Helper to draw laptop icon
-    function drawLaptopIcon(x: number, y: number, size: number) {
-      ctx.strokeStyle = THEME.muted;
-      ctx.lineWidth = 1.5 * dpr;
-      // Screen
-      ctx.strokeRect(x - size/2, y - size/2, size, size * 0.7);
-      // Base
+    // Legend
+    ctx.textAlign = 'left';
+    const legendY = pad + progressBarHeight + 14 * dpr;
+    const legendItems = [
+      { label: 'Required', color: THEME.cyan },
+      { label: 'Operations', color: THEME.green },
+      { label: 'Verification', color: THEME.purple },
+      { label: 'Optional', color: THEME.orange },
+    ];
+    let legendX = pad;
+    for (const item of legendItems) {
+      ctx.fillStyle = item.color;
       ctx.beginPath();
-      ctx.moveTo(x - size/2 - size * 0.1, y + size * 0.25);
-      ctx.lineTo(x + size/2 + size * 0.1, y + size * 0.25);
-      ctx.stroke();
+      ctx.arc(legendX + 5 * dpr, legendY - 3 * dpr, 4 * dpr, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = THEME.muted;
+      ctx.font = `${10 * dpr}px system-ui, sans-serif`;
+      ctx.fillText(item.label, legendX + 12 * dpr, legendY);
+      legendX += ctx.measureText(item.label).width + 24 * dpr;
     }
 
     // Helper to draw server icon
@@ -111,16 +147,25 @@ export default function DeploymentPipeline() {
       ctx.strokeStyle = THEME.muted;
       ctx.lineWidth = 1.5 * dpr;
       const boxH = size * 0.35;
-      // Top box
       ctx.strokeRect(x - size/2, y - size/2, size, boxH);
       ctx.beginPath();
       ctx.arc(x - size/2 + size * 0.2, y - size/2 + boxH/2, 2 * dpr, 0, Math.PI * 2);
       ctx.fill();
-      // Bottom box
       ctx.strokeRect(x - size/2, y - size/2 + boxH + 2 * dpr, size, boxH);
       ctx.beginPath();
       ctx.arc(x - size/2 + size * 0.2, y - size/2 + boxH * 1.5 + 2 * dpr, 2 * dpr, 0, Math.PI * 2);
       ctx.fill();
+    }
+
+    // Helper to draw laptop icon
+    function drawLaptopIcon(x: number, y: number, size: number) {
+      ctx.strokeStyle = THEME.muted;
+      ctx.lineWidth = 1.5 * dpr;
+      ctx.strokeRect(x - size/2, y - size/2, size, size * 0.7);
+      ctx.beginPath();
+      ctx.moveTo(x - size/2 - size * 0.1, y + size * 0.25);
+      ctx.lineTo(x + size/2 + size * 0.1, y + size * 0.25);
+      ctx.stroke();
     }
 
     // Helper to draw arrow
@@ -128,13 +173,10 @@ export default function DeploymentPipeline() {
       ctx.strokeStyle = color;
       ctx.fillStyle = color;
       ctx.lineWidth = 2 * dpr;
-
       ctx.beginPath();
       ctx.moveTo(fromX, fromY);
       ctx.lineTo(toX - arrowSize, toY);
       ctx.stroke();
-
-      // Arrow head
       ctx.beginPath();
       ctx.moveTo(toX, toY);
       ctx.lineTo(toX - arrowSize, toY - arrowSize / 2);
@@ -173,22 +215,22 @@ export default function DeploymentPipeline() {
       ctx.shadowBlur = 0;
 
       // Step number badge
-      const badgeSize = 24 * dpr;
+      const badgeSize = 22 * dpr;
       ctx.fillStyle = step.color;
       ctx.beginPath();
-      ctx.arc(x + badgeSize / 2 + 8 * dpr, y + badgeSize / 2 + 8 * dpr, badgeSize / 2, 0, Math.PI * 2);
+      ctx.arc(x + badgeSize / 2 + 6 * dpr, y + badgeSize / 2 + 6 * dpr, badgeSize / 2, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = THEME.bg;
-      ctx.font = `bold ${11 * dpr}px system-ui, sans-serif`;
+      ctx.font = `bold ${10 * dpr}px system-ui, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(step.num, x + badgeSize / 2 + 8 * dpr, y + badgeSize / 2 + 8 * dpr);
+      ctx.fillText(step.num, x + badgeSize / 2 + 6 * dpr, y + badgeSize / 2 + 6 * dpr);
 
       // Location icon
-      const iconX = x + w - 20 * dpr;
-      const iconY = y + 20 * dpr;
-      const iconSize = 16 * dpr;
+      const iconX = x + w - 16 * dpr;
+      const iconY = y + 16 * dpr;
+      const iconSize = 14 * dpr;
       if (step.where === 'Local') {
         drawLaptopIcon(iconX, iconY, iconSize);
       } else {
@@ -197,11 +239,11 @@ export default function DeploymentPipeline() {
 
       // Description (truncated)
       ctx.fillStyle = THEME.text;
-      ctx.font = `${13 * dpr}px system-ui, sans-serif`;
+      ctx.font = `${12 * dpr}px system-ui, sans-serif`;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
 
-      const maxTextWidth = w - 24 * dpr;
+      const maxTextWidth = w - 20 * dpr;
       let desc = step.description;
       if (ctx.measureText(desc).width > maxTextWidth) {
         while (ctx.measureText(desc + '...').width > maxTextWidth && desc.length > 0) {
@@ -209,79 +251,75 @@ export default function DeploymentPipeline() {
         }
         desc += '...';
       }
-      ctx.fillText(desc, x + 12 * dpr, y + 40 * dpr);
+      ctx.fillText(desc, x + 10 * dpr, y + 34 * dpr);
 
       // Where label
       ctx.fillStyle = THEME.muted;
-      ctx.font = `${11 * dpr}px system-ui, sans-serif`;
-      ctx.fillText(step.where, x + 12 * dpr, y + h - 16 * dpr);
+      ctx.font = `${10 * dpr}px system-ui, sans-serif`;
+      ctx.fillText(step.where, x + 10 * dpr, y + h - 14 * dpr);
 
       return { x, y, w, h, step, isHovered };
     }
 
-    // Draw Row 1
-    let xPos = pad;
-    const row1Y = topMargin;
+    // Draw all rows
     const drawnSteps: { x: number; y: number; w: number; h: number; step: Step }[] = [];
 
-    row1Steps.forEach((step, i) => {
-      const w = normalStepWidth;
-      const info = drawStep(step, xPos, row1Y, w, stepHeight);
-      drawnSteps.push(info);
+    rows.forEach((rowSteps, rowIndex) => {
+      let xPos = pad;
+      const rowY = topMargin + 20 * dpr + rowIndex * rowHeight;
 
-      // Draw arrow to next step
-      if (i < row1Steps.length - 1) {
-        drawArrow(xPos + w, row1Y + stepHeight / 2, xPos + w + stepGap, row1Y + stepHeight / 2, THEME.dim);
-      }
+      rowSteps.forEach((step, i) => {
+        const w = getStepWidth(step, rowSteps);
+        const info = drawStep(step, xPos, rowY, w, stepHeight);
+        drawnSteps.push(info);
 
-      xPos += w + stepGap;
+        // Draw arrow to next step in same row
+        if (i < rowSteps.length - 1) {
+          drawArrow(xPos + w, rowY + stepHeight / 2, xPos + w + stepGap, rowY + stepHeight / 2, THEME.dim);
+        }
+
+        xPos += w + stepGap;
+      });
     });
 
-    // Draw Row 2
-    xPos = pad;
-    const row2Y = topMargin + rowHeight;
+    // Draw connecting arrows between rows
+    function drawRowConnection(fromStepId: string, toStepId: string) {
+      const fromStep = drawnSteps.find(d => d.step.id === fromStepId);
+      const toStep = drawnSteps.find(d => d.step.id === toStepId);
+      if (!fromStep || !toStep) return;
 
-    row2Steps.forEach((step, i) => {
-      const w = step.id === '6' ? wideStepWidth : normalStepWidth;
-      const info = drawStep(step, xPos, row2Y, w, stepHeight);
-      drawnSteps.push(info);
-
-      // Draw arrow to next step
-      if (i < row2Steps.length - 1) {
-        drawArrow(xPos + w, row2Y + stepHeight / 2, xPos + w + stepGap, row2Y + stepHeight / 2, THEME.dim);
-      }
-
-      xPos += w + stepGap;
-    });
-
-    // Draw connecting arrow from row 1 to row 2
-    const lastRow1 = drawnSteps.find(d => d.step.id === '3');
-    const firstRow2 = drawnSteps.find(d => d.step.id === '5');
-    if (lastRow1 && firstRow2) {
       ctx.strokeStyle = THEME.dim;
       ctx.lineWidth = 2 * dpr;
       ctx.setLineDash([4 * dpr, 4 * dpr]);
       ctx.beginPath();
-      ctx.moveTo(lastRow1.x + lastRow1.w / 2, lastRow1.y + lastRow1.h);
-      ctx.lineTo(lastRow1.x + lastRow1.w / 2, lastRow1.y + lastRow1.h + (rowHeight - stepHeight) / 2);
-      ctx.lineTo(firstRow2.x + firstRow2.w / 2, lastRow1.y + lastRow1.h + (rowHeight - stepHeight) / 2);
-      ctx.lineTo(firstRow2.x + firstRow2.w / 2, firstRow2.y);
+
+      const midY = fromStep.y + fromStep.h + (rowHeight - stepHeight) / 2;
+      ctx.moveTo(fromStep.x + fromStep.w / 2, fromStep.y + fromStep.h);
+      ctx.lineTo(fromStep.x + fromStep.w / 2, midY);
+      ctx.lineTo(toStep.x + toStep.w / 2, midY);
+      ctx.lineTo(toStep.x + toStep.w / 2, toStep.y);
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Arrow head at row 2
+      // Arrow head
       ctx.fillStyle = THEME.dim;
       ctx.beginPath();
-      ctx.moveTo(firstRow2.x + firstRow2.w / 2, firstRow2.y);
-      ctx.lineTo(firstRow2.x + firstRow2.w / 2 - arrowSize / 2, firstRow2.y - arrowSize);
-      ctx.lineTo(firstRow2.x + firstRow2.w / 2 + arrowSize / 2, firstRow2.y - arrowSize);
+      ctx.moveTo(toStep.x + toStep.w / 2, toStep.y);
+      ctx.lineTo(toStep.x + toStep.w / 2 - arrowSize / 2, toStep.y - arrowSize);
+      ctx.lineTo(toStep.x + toStep.w / 2 + arrowSize / 2, toStep.y - arrowSize);
       ctx.closePath();
       ctx.fill();
     }
 
+    // Row 0 -> Row 1 (Step 3 -> Step 4)
+    drawRowConnection('3', '4');
+    // Row 1 -> Row 2 (Step 7 -> Step 8)
+    drawRowConnection('7', '8');
+
     // Draw detail panel for active step
-    const detailY = row2Y + stepHeight + 30 * dpr;
-    const detailHeight = 70 * dpr;
+    const lastRowY = topMargin + 20 * dpr + 2 * rowHeight;
+    const detailY = lastRowY + stepHeight + 20 * dpr;
+    const detailHeight = 60 * dpr;
     const activeStepData = STEPS.find(s => s.id === activeStep);
 
     if (activeStepData) {
@@ -296,20 +334,20 @@ export default function DeploymentPipeline() {
 
       // Script name
       ctx.fillStyle = activeStepData.color;
-      ctx.font = `bold ${14 * dpr}px monospace`;
+      ctx.font = `bold ${13 * dpr}px monospace`;
       ctx.textAlign = 'left';
-      ctx.fillText(activeStepData.script, pad + 16 * dpr, detailY + 24 * dpr);
+      ctx.fillText(activeStepData.script, pad + 16 * dpr, detailY + 22 * dpr);
 
       // Full description
       ctx.fillStyle = THEME.text;
-      ctx.font = `${13 * dpr}px system-ui, sans-serif`;
-      ctx.fillText(activeStepData.description, pad + 16 * dpr, detailY + 48 * dpr);
+      ctx.font = `${12 * dpr}px system-ui, sans-serif`;
+      ctx.fillText(activeStepData.description, pad + 16 * dpr, detailY + 42 * dpr);
 
       // Location badge
       ctx.fillStyle = THEME.muted;
       ctx.font = `${11 * dpr}px system-ui, sans-serif`;
       ctx.textAlign = 'right';
-      ctx.fillText(`Runs on: ${activeStepData.where}`, width - pad - 16 * dpr, detailY + 24 * dpr);
+      ctx.fillText(`Runs on: ${activeStepData.where}`, width - pad - 16 * dpr, detailY + 22 * dpr);
     }
 
     // Check for mouse leave
@@ -331,42 +369,43 @@ export default function DeploymentPipeline() {
     const my = (e.clientY - rect.top) * dpr;
 
     const pad = 24 * dpr;
-    const topMargin = 60 * dpr;
-    const rowHeight = 140 * dpr;
-    const stepGap = 16 * dpr;
+    const topMargin = 50 * dpr;
+    const rowHeight = 110 * dpr;
+    const stepGap = 12 * dpr;
     const contentWidth = canvas.width - pad * 2;
-    const normalStepWidth = (contentWidth - stepGap * 4) / 4.5;
-    const wideStepWidth = normalStepWidth * 1.5;
-    const stepHeight = 80 * dpr;
+    const stepHeight = 72 * dpr;
 
-    // Check row 1
-    let xPos = pad;
-    const row1Y = topMargin;
-    const row1Steps = STEPS.filter(s => s.row === 0);
+    const rowConfigs = [
+      STEPS.filter(s => s.row === 0),
+      STEPS.filter(s => s.row === 1),
+      STEPS.filter(s => s.row === 2),
+    ];
 
-    for (const step of row1Steps) {
-      const w = normalStepWidth;
-      if (isHover(mx, my, xPos, row1Y, w, stepHeight)) {
-        setActiveStep(activeStep === step.id ? null : step.id);
-        setAutoPlay(false);
-        return;
+    for (let rowIdx = 0; rowIdx < rowConfigs.length; rowIdx++) {
+      const rowSteps = rowConfigs[rowIdx];
+      let xPos = pad;
+      const rowY = topMargin + 20 * dpr + rowIdx * rowHeight;
+
+      for (const step of rowSteps) {
+        const hasWide = rowSteps.some(s => s.id === '6');
+        let w: number;
+        if (hasWide) {
+          const normalCount = rowSteps.length - 1;
+          const totalGaps = (rowSteps.length - 1) * stepGap;
+          const normalW = (contentWidth - totalGaps) / (normalCount + 1.4);
+          w = step.id === '6' ? normalW * 1.4 : normalW;
+        } else {
+          const totalGaps = (rowSteps.length - 1) * stepGap;
+          w = (contentWidth - totalGaps) / rowSteps.length;
+        }
+
+        if (isHover(mx, my, xPos, rowY, w, stepHeight)) {
+          setActiveStep(activeStep === step.id ? null : step.id);
+          setAutoPlay(false);
+          return;
+        }
+        xPos += w + stepGap;
       }
-      xPos += w + stepGap;
-    }
-
-    // Check row 2
-    xPos = pad;
-    const row2Y = topMargin + rowHeight;
-    const row2Steps = STEPS.filter(s => s.row === 1);
-
-    for (const step of row2Steps) {
-      const w = step.id === '6' ? wideStepWidth : normalStepWidth;
-      if (isHover(mx, my, xPos, row2Y, w, stepHeight)) {
-        setActiveStep(activeStep === step.id ? null : step.id);
-        setAutoPlay(false);
-        return;
-      }
-      xPos += w + stepGap;
     }
   }, [activeStep, canvasRef]);
 

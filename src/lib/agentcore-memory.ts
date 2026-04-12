@@ -1,10 +1,13 @@
 // AgentCore Memory — 대화 이력 영구 저장 (인메모리 캐시 + 디바운스 flush)
 // Persistent conversation history with in-memory cache + debounced flush
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, unlinkSync } from 'fs';
 import { join, resolve } from 'path';
 
 const DATA_DIR = resolve(process.cwd(), 'data/memory');
+const SESSIONS_DIR = resolve(DATA_DIR, 'sessions');
 const MAX_CONVERSATIONS = 100;
+const MAX_SESSIONS = 50;
+const MAX_SESSION_MESSAGES = 200;
 
 export interface ConversationRecord {
   id: string;
@@ -87,6 +90,133 @@ export async function searchConversations(query: string, limit = 10, userId?: st
     c.route.includes(q) ||
     c.usedTools.some(t => t.toLowerCase().includes(q)))
   ).slice(0, limit);
+}
+
+// ============================================================================
+// Chat Sessions — 전체 대화 이력 저장 / Full conversation history storage
+// ============================================================================
+
+export interface SessionMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  route?: string;
+  via?: string;
+  usedTools?: string[];
+  model?: string;
+  responseTimeMs?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  timestamp: string;
+}
+
+export interface ChatSession {
+  id: string;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+  title: string;
+  messages: SessionMessage[];
+}
+
+export interface SessionSummary {
+  id: string;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+  title: string;
+  messageCount: number;
+  lastRoute?: string;
+}
+
+function ensureSessionsDir(): void {
+  if (!existsSync(SESSIONS_DIR)) mkdirSync(SESSIONS_DIR, { recursive: true });
+}
+
+// 세션 저장 / Save session (append messages)
+export async function saveSession(sessionId: string, userId: string, userMessage: SessionMessage, assistantMessage: SessionMessage): Promise<void> {
+  ensureSessionsDir();
+  const filePath = join(SESSIONS_DIR, `${sessionId}.json`);
+  let session: ChatSession;
+
+  try {
+    const raw = readFileSync(filePath, 'utf-8');
+    session = JSON.parse(raw);
+  } catch {
+    session = {
+      id: sessionId,
+      userId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      title: userMessage.content.slice(0, 100),
+      messages: [],
+    };
+  }
+
+  session.messages.push(userMessage, assistantMessage);
+  if (session.messages.length > MAX_SESSION_MESSAGES) {
+    session.messages = session.messages.slice(-MAX_SESSION_MESSAGES);
+  }
+  session.updatedAt = new Date().toISOString();
+
+  try {
+    writeFileSync(filePath, JSON.stringify(session, null, 2), 'utf-8');
+  } catch {}
+}
+
+// 세션 조회 / Get full session
+export async function getSession(sessionId: string): Promise<ChatSession | null> {
+  const filePath = join(SESSIONS_DIR, `${sessionId}.json`);
+  try {
+    const raw = readFileSync(filePath, 'utf-8');
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+// 세션 목록 (사용자별, 메타데이터만) / List sessions (per user, metadata only)
+export async function listSessions(userId?: string, limit = 30): Promise<SessionSummary[]> {
+  ensureSessionsDir();
+  try {
+    const files = readdirSync(SESSIONS_DIR).filter(f => f.endsWith('.json')).sort().reverse();
+    const summaries: SessionSummary[] = [];
+
+    for (const file of files) {
+      if (summaries.length >= limit) break;
+      try {
+        const raw = readFileSync(join(SESSIONS_DIR, file), 'utf-8');
+        const session: ChatSession = JSON.parse(raw);
+        if (userId && session.userId !== userId) continue;
+        const lastAssistant = [...session.messages].reverse().find(m => m.role === 'assistant');
+        summaries.push({
+          id: session.id,
+          userId: session.userId,
+          createdAt: session.createdAt,
+          updatedAt: session.updatedAt,
+          title: session.title,
+          messageCount: session.messages.length,
+          lastRoute: lastAssistant?.route,
+        });
+      } catch {}
+    }
+
+    return summaries;
+  } catch {
+    return [];
+  }
+}
+
+// 오래된 세션 정리 / Cleanup old sessions
+export function cleanupOldSessions(): void {
+  ensureSessionsDir();
+  try {
+    const files = readdirSync(SESSIONS_DIR).filter(f => f.endsWith('.json')).sort().reverse();
+    if (files.length > MAX_SESSIONS) {
+      for (const file of files.slice(MAX_SESSIONS)) {
+        try { unlinkSync(join(SESSIONS_DIR, file)); } catch {}
+      }
+    }
+  } catch {}
 }
 
 // 요약 통계 / Summary stats

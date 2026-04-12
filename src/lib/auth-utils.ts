@@ -7,9 +7,10 @@ import { NextRequest } from 'next/server';
 export interface UserInfo {
   email: string;
   sub: string;    // Cognito user ID
+  groups: string[];  // Cognito User Pool 그룹 (cognito:groups 클레임)
 }
 
-const ANONYMOUS: UserInfo = { email: 'anonymous', sub: 'anonymous' };
+const ANONYMOUS: UserInfo = { email: 'anonymous', sub: 'anonymous', groups: [] };
 
 export function getUserFromRequest(request: NextRequest): UserInfo {
   try {
@@ -35,6 +36,7 @@ export function getUserFromRequest(request: NextRequest): UserInfo {
     return {
       email: payload.email || payload['cognito:username'] || payload.sub || 'unknown',
       sub: payload.sub || 'unknown',
+      groups: Array.isArray(payload['cognito:groups']) ? payload['cognito:groups'] : [],
     };
   } catch {
     return ANONYMOUS;

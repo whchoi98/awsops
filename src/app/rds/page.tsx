@@ -9,7 +9,8 @@ import PieChartCard from '@/components/charts/PieChartCard';
 import BarChartCard from '@/components/charts/BarChartCard';
 import DataTable from '@/components/table/DataTable';
 import { Database, X, HardDrive, Network, Shield, Tag, Activity, Search } from 'lucide-react';
-import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
+import { LineChart, Line, Tooltip, XAxis } from 'recharts';
+import SafeResponsiveContainer from '@/components/charts/SafeResponsiveContainer';
 import { queries as rdsQ } from '@/lib/queries/rds';
 import { useAccountContext } from '@/contexts/AccountContext';
 import AccountBadge from '@/components/dashboard/AccountBadge';
@@ -443,13 +444,13 @@ export default function RDSPage() {
                             </div>
                             {chartData.length > 2 ? (
                               <div className="h-20">
-                                <ResponsiveContainer width="100%" height="100%">
+                                <SafeResponsiveContainer>
                                   <LineChart data={chartData}>
                                     <XAxis dataKey="name" hide />
                                     <Tooltip contentStyle={{ background: '#0f1629', border: '1px solid #1a2540', borderRadius: 8, fontSize: 11 }} labelStyle={{ color: '#6b7280' }} />
                                     <Line type="monotone" dataKey="value" stroke={name === 'CPUUtilization' ? '#ef4444' : '#00d4ff'} strokeWidth={1.5} dot={false} />
                                   </LineChart>
-                                </ResponsiveContainer>
+                                </SafeResponsiveContainer>
                               </div>
                             ) : (
                               <div className="grid grid-cols-3 gap-2 text-[10px] font-mono">

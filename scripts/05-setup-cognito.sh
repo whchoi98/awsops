@@ -345,6 +345,53 @@ LAMBDA_ARN="arn:aws:lambda:us-east-1:${ACCOUNT_ID}:function:awsops-cognito-auth:
 echo "  Version: $LAMBDA_VERSION"
 echo "  ARN:     $LAMBDA_ARN"
 
+# -- [Optional] Department Groups ----------------------------------------------
+#   Creates Cognito groups for department-based account filtering.
+#   Groups map to departments in data/config.json → departments[].cognitoGroup
+#   JWT will include cognito:groups claim automatically.
+#
+#   To create groups, set DEPARTMENT_GROUPS env var (comma-separated):
+#     DEPARTMENT_GROUPS="Admin,DevTeam,OpsTeam" bash 05-setup-cognito.sh
+#   Admin user is auto-assigned to the first group (typically "Admin").
+DEPARTMENT_GROUPS="${DEPARTMENT_GROUPS:-}"
+
+if [ -n "$DEPARTMENT_GROUPS" ]; then
+    echo ""
+    echo -e "${CYAN}[Optional] Creating department groups...${NC}"
+    IFS=',' read -ra GROUPS <<< "$DEPARTMENT_GROUPS"
+    FIRST_GROUP=""
+    for GROUP in "${GROUPS[@]}"; do
+        GROUP=$(echo "$GROUP" | xargs)  # trim whitespace
+        [ -z "$GROUP" ] && continue
+        [ -z "$FIRST_GROUP" ] && FIRST_GROUP="$GROUP"
+        aws cognito-idp create-group \
+            --user-pool-id "$POOL_ID" \
+            --group-name "$GROUP" \
+            --description "AWSops department group: $GROUP" \
+            --region "$REGION" 2>/dev/null && \
+            echo "  Created group: $GROUP" || \
+            echo "  Group already exists: $GROUP"
+    done
+    # Assign admin user to first group (typically "Admin")
+    if [ -n "$FIRST_GROUP" ]; then
+        aws cognito-idp admin-add-user-to-group \
+            --user-pool-id "$POOL_ID" \
+            --username "$ADMIN_EMAIL" \
+            --group-name "$FIRST_GROUP" \
+            --region "$REGION" 2>/dev/null && \
+            echo "  Assigned $ADMIN_EMAIL → $FIRST_GROUP" || true
+    fi
+    echo ""
+    echo -e "  ${YELLOW}Configure data/config.json departments to map groups → accounts:${NC}"
+    echo '  "departments": ['
+    for GROUP in "${GROUPS[@]}"; do
+        GROUP=$(echo "$GROUP" | xargs)
+        [ -z "$GROUP" ] && continue
+        echo "    { \"name\": \"$GROUP\", \"cognitoGroup\": \"$GROUP\", \"accounts\": [\"*\"] },"
+    done
+    echo '  ]'
+fi
+
 # -- Summary -------------------------------------------------------------------
 echo ""
 echo -e "${GREEN}=================================================================${NC}"
@@ -357,6 +404,9 @@ echo "  Cognito Domain:   $COGNITO_DOMAIN"
 echo "  Admin Login:      $ADMIN_EMAIL / ********"
 echo "  Lambda@Edge:      awsops-cognito-auth:$LAMBDA_VERSION (us-east-1)"
 echo "  Lambda ARN:       $LAMBDA_ARN"
+if [ -n "$DEPARTMENT_GROUPS" ]; then
+echo "  Dept Groups:      $DEPARTMENT_GROUPS"
+fi
 echo ""
 echo "  NEXT: Attach Lambda@Edge to CloudFront distribution"
 echo "    CloudFront -> Behaviors -> /awsops* -> Viewer Request -> $LAMBDA_ARN"

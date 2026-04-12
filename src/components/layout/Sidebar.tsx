@@ -132,7 +132,7 @@ export default function Sidebar() {
   const [customerName, setCustomerName] = useState<string | null>(null);
   const [customerLogoBg, setCustomerLogoBg] = useState<string>('dark'); // 'light' for white bg, 'dark' for transparent / 밝은 로고는 light, 어두운 로고는 dark
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
-  const { getFeatures, isMultiAccount } = useAccountContext();
+  const { getFeatures, isMultiAccount, allowedPages } = useAccountContext();
   const features = getFeatures();
 
   useEffect(() => {
@@ -150,7 +150,7 @@ export default function Sidebar() {
   const isActive = (href: string) => {
     const path = pathname.replace('/awsops', '') || '/';
     if (href === '/') return path === '/';
-    return path.startsWith(href);
+    return path === href || path.startsWith(href + '/');
   };
 
   const toggleMenu = (href: string) => {
@@ -277,7 +277,7 @@ export default function Sidebar() {
           <button
             onClick={async () => {
               await fetch('/awsops/api/auth', { method: 'POST' });
-              window.location.href = '/awsops';
+              window.location.href = '/awsops/login';
             }}
             className="p-2 rounded-lg text-gray-500 hover:text-accent-red hover:bg-navy-700 transition-colors"
             title={t('sidebar.signOut')}
@@ -303,6 +303,11 @@ export default function Sidebar() {
             <div className="space-y-0.5">
               {group.items
                 .filter(item => {
+                  // Department page filter / 부서별 페이지 필터
+                  if (allowedPages && !allowedPages.some(p => item.href === p || item.href.startsWith(p + '/'))) {
+                    // Always show dashboard / 대시보드는 항상 표시
+                    if (item.href !== '/') return false;
+                  }
                   // Cost items: show if global costEnabled AND (single-account OR account has cost)
                   if (item.href === '/cost' || item.href === '/container-cost' || item.href === '/eks-container-cost') {
                     return costEnabled && (!isMultiAccount || features.costEnabled);

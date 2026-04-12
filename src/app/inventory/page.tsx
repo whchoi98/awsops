@@ -7,8 +7,8 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  ResponsiveContainer,
 } from 'recharts';
+import SafeResponsiveContainer from '@/components/charts/SafeResponsiveContainer';
 import Header from '@/components/layout/Header';
 import DataTable from '@/components/table/DataTable';
 import { TrendingUp, Info, BarChart3 } from 'lucide-react';
@@ -324,7 +324,7 @@ export default function InventoryPage() {
 
           {/* Chart */}
           <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
+            <SafeResponsiveContainer>
               <LineChart data={chartData}>
                 <XAxis
                   dataKey="name"
@@ -352,7 +352,7 @@ export default function InventoryPage() {
                   />
                 ))}
               </LineChart>
-            </ResponsiveContainer>
+            </SafeResponsiveContainer>
           </div>
 
           {/* Resource Toggle Chips */}
