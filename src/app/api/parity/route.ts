@@ -17,6 +17,8 @@ import { isAuroraEnabled, checkDbHealth } from '@/lib/db';
 import { getDriftCounters } from '@/lib/db/drift';
 import { countAuroraCalls } from '@/lib/db/agentcore-stats-writer';
 import { getStats } from '@/lib/agentcore-stats';
+import { countAuroraDiagnoses } from '@/lib/db/alert-diagnosis-writer';
+import { countJsonDiagnoses } from '@/lib/alert-knowledge-fs';
 
 function isAdminUser(req: NextRequest): boolean {
   const user = getUserFromRequest(req);
@@ -59,6 +61,30 @@ async function agentcoreStatsParity(hours: number): Promise<AgentCoreStatsParity
   };
 }
 
+interface AlertDiagnosisParity {
+  source: 'alert_diagnosis';
+  inSync: boolean;
+  jsonCount: number;
+  auroraCount: number;
+  drift: number;
+  note: string;
+}
+
+async function alertDiagnosisParity(): Promise<AlertDiagnosisParity> {
+  const jsonCount = countJsonDiagnoses();
+  const auroraCount = await countAuroraDiagnoses();
+  return {
+    source: 'alert_diagnosis',
+    inSync: jsonCount === auroraCount,
+    jsonCount,
+    auroraCount,
+    drift: Math.abs(auroraCount - jsonCount),
+    note:
+      'Count-based parity. INSERT is idempotent on (incident_id), so duplicate ' +
+      'dispatches do not inflate Aurora.',
+  };
+}
+
 export async function GET(req: NextRequest) {
   if (!isAdminUser(req)) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
@@ -94,15 +120,22 @@ export async function GET(req: NextRequest) {
       parity: [await agentcoreStatsParity(hours)],
     });
   }
+  if (source === 'alert_diagnosis') {
+    return NextResponse.json({
+      auroraEnabled: true,
+      health,
+      drift: driftCounters.filter((c) => c.source === source),
+      parity: [await alertDiagnosisParity()],
+    });
+  }
 
   return NextResponse.json({
     auroraEnabled: true,
     health,
     drift: driftCounters,
-    parity: [await agentcoreStatsParity(hours)],
+    parity: [await agentcoreStatsParity(hours), await alertDiagnosisParity()],
     note:
-      'Phase 1 dual-write — agentcore_stats is the only source wired so far. ' +
-      'Other sources (inventory, cost, memory, alerts, event-scaling, schedules) ' +
-      'land in subsequent commits.',
+      'Phase 1 dual-write — agentcore_stats + alert_diagnosis wired so far. ' +
+      'Other sources (inventory, cost, memory, event-scaling, schedules) land in subsequent commits.',
   });
 }

@@ -202,12 +202,18 @@ async function investigateIncident(incident: Incident): Promise<void> {
     // Phase 3: Dispatch results
     await dispatchResults(incident, result);
 
-    // Phase 4: Save to knowledge base
+    // Phase 4: Save to knowledge base (JSON, source of truth during Phase 1)
     try {
       await saveAlertDiagnosis(incident, result);
     } catch (err) {
       console.error('[AlertDiagnosis] Failed to save to knowledge base:', err instanceof Error ? err.message : err);
     }
+    // ADR-030 Phase 1 dual-write — fire-and-forget shadow into Aurora's
+    // alert_diagnosis table. Idempotent on incident_id; failures land in
+    // /api/parity drift and never block dispatch.
+    void import('@/lib/db/alert-diagnosis-writer')
+      .then((m) => m.fireAndForgetSaveDiagnosis(incident, result))
+      .catch(() => { /* dynamic import failure is non-fatal */ });
   } catch (err) {
     console.error(`[AlertDiagnosis] Investigation failed for ${incident.id}:`, err instanceof Error ? err.message : err);
     updateIncident(incident.id, { status: 'analyzed' }); // mark as done even on failure
