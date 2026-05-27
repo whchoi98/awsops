@@ -17,6 +17,8 @@ import { isAuroraEnabled, checkDbHealth } from '@/lib/db';
 import { getDriftCounters } from '@/lib/db/drift';
 import { countAuroraCalls } from '@/lib/db/agentcore-stats-writer';
 import { getStats } from '@/lib/agentcore-stats';
+import { countJsonInventoryDays } from '@/lib/inventory-fs';
+import { countAuroraInventoryRows } from '@/lib/db/inventory-writer';
 
 function isAdminUser(req: NextRequest): boolean {
   const user = getUserFromRequest(req);
@@ -59,6 +61,33 @@ async function agentcoreStatsParity(hours: number): Promise<AgentCoreStatsParity
   };
 }
 
+interface InventorySnapshotsParity {
+  source: 'inventory_snapshots';
+  inSync: boolean;
+  jsonCount: number;
+  auroraCount: number;
+  drift: number;
+  note: string;
+}
+
+async function inventorySnapshotsParity(): Promise<InventorySnapshotsParity> {
+  // JSON layer: one file per (account, day). Aurora: many rows per snapshot
+  // (one per resource_type). Use distinct (account_id, DATE(captured_at))
+  // on Aurora so both sides count snapshot-days, not rows.
+  const jsonCount = countJsonInventoryDays();
+  const auroraCount = await countAuroraInventoryRows({ distinct: true });
+  return {
+    source: 'inventory_snapshots',
+    inSync: jsonCount === auroraCount,
+    jsonCount,
+    auroraCount,
+    drift: Math.abs(auroraCount - jsonCount),
+    note:
+      'Compares snapshot-days, not rows. Aurora stores N rows per snapshot ' +
+      '(one per resource_type) so a row-count comparison would always show drift.',
+  };
+}
+
 export async function GET(req: NextRequest) {
   if (!isAdminUser(req)) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
@@ -94,15 +123,22 @@ export async function GET(req: NextRequest) {
       parity: [await agentcoreStatsParity(hours)],
     });
   }
+  if (source === 'inventory_snapshots') {
+    return NextResponse.json({
+      auroraEnabled: true,
+      health,
+      drift: driftCounters.filter((c) => c.source === source),
+      parity: [await inventorySnapshotsParity()],
+    });
+  }
 
   return NextResponse.json({
     auroraEnabled: true,
     health,
     drift: driftCounters,
-    parity: [await agentcoreStatsParity(hours)],
+    parity: [await agentcoreStatsParity(hours), await inventorySnapshotsParity()],
     note:
-      'Phase 1 dual-write — agentcore_stats is the only source wired so far. ' +
-      'Other sources (inventory, cost, memory, alerts, event-scaling, schedules) ' +
-      'land in subsequent commits.',
+      'Phase 1 dual-write — agentcore_stats + inventory_snapshots wired so far. ' +
+      'Other sources (cost, memory, alerts, event-scaling, schedules) land in subsequent commits.',
   });
 }

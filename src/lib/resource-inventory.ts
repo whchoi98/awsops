@@ -72,7 +72,7 @@ function dateStr(d: Date = new Date()): string {
 export async function saveSnapshot(
   dashboardData: Record<string, { rows: unknown[]; error?: string }>,
   accountId?: string
-): Promise<void> {
+): Promise<InventorySnapshot | null> {
   const dir = getInventoryDir(accountId);
   ensureDir(dir);
   const today = dateStr();
@@ -143,6 +143,8 @@ export async function saveSnapshot(
       writeFileSync(prevPerAcctPath, JSON.stringify(resources), 'utf-8');
     } catch { /* non-critical */ }
   }
+
+  return snapshot;
 }
 
 export async function getHistory(days: number = 90, accountId?: string): Promise<InventorySnapshot[]> {

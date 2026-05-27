@@ -15,6 +15,8 @@ const checkDbHealthMock = vi.fn();
 const getDriftCountersMock = vi.fn();
 const countAuroraCallsMock = vi.fn();
 const getStatsMock = vi.fn();
+const countJsonInventoryDaysMock = vi.fn();
+const countAuroraInventoryRowsMock = vi.fn();
 
 vi.mock('@/lib/auth-utils', () => ({
   getUserFromRequest: (...args: unknown[]) => getUserFromRequestMock(...args),
@@ -34,6 +36,12 @@ vi.mock('@/lib/db/agentcore-stats-writer', () => ({
 }));
 vi.mock('@/lib/agentcore-stats', () => ({
   getStats: () => getStatsMock(),
+}));
+vi.mock('@/lib/inventory-fs', () => ({
+  countJsonInventoryDays: () => countJsonInventoryDaysMock(),
+}));
+vi.mock('@/lib/db/inventory-writer', () => ({
+  countAuroraInventoryRows: (opts?: { distinct?: boolean }) => countAuroraInventoryRowsMock(opts),
 }));
 
 import { GET } from '@/app/api/parity/route';
@@ -63,6 +71,10 @@ describe('parity route — GET /api/parity', () => {
     getDriftCountersMock.mockReset();
     countAuroraCallsMock.mockReset();
     getStatsMock.mockReset();
+    countJsonInventoryDaysMock.mockReset();
+    countAuroraInventoryRowsMock.mockReset();
+    countJsonInventoryDaysMock.mockReturnValue(0);
+    countAuroraInventoryRowsMock.mockResolvedValue(0);
 
     // Sensible defaults — individual tests override.
     getUserFromRequestMock.mockReturnValue(adminUser());
@@ -171,8 +183,60 @@ describe('parity route — GET /api/parity', () => {
 
     const res = await GET(makeReq());
     const body = await res.json();
-    expect(body.parity[0].jsonRecentCalls).toBe(2);
-    expect(body.parity[0].auroraCount).toBe(7);
-    expect(body.parity[0].drift).toBe(5);
+    const statsParity = body.parity.find((p: { source: string }) => p.source === 'agentcore_stats');
+    expect(statsParity.jsonRecentCalls).toBe(2);
+    expect(statsParity.auroraCount).toBe(7);
+    expect(statsParity.drift).toBe(5);
+  });
+
+  describe('inventory_snapshots parity', () => {
+    it('includes an inventory_snapshots entry in the default parity array', async () => {
+      const res = await GET(makeReq());
+      const body = await res.json();
+      const sources = body.parity.map((p: { source: string }) => p.source);
+      expect(sources).toContain('inventory_snapshots');
+    });
+
+    it('reports inSync:true when JSON snapshot-day count matches Aurora distinct (account,day)', async () => {
+      countJsonInventoryDaysMock.mockReturnValue(4);
+      countAuroraInventoryRowsMock.mockResolvedValue(4);
+      const res = await GET(makeReq());
+      const body = await res.json();
+      const inv = body.parity.find((p: { source: string }) => p.source === 'inventory_snapshots');
+      expect(inv.inSync).toBe(true);
+      expect(inv.jsonCount).toBe(4);
+      expect(inv.auroraCount).toBe(4);
+      expect(inv.drift).toBe(0);
+    });
+
+    it('reports inSync:false when counts diverge', async () => {
+      countJsonInventoryDaysMock.mockReturnValue(5);
+      countAuroraInventoryRowsMock.mockResolvedValue(2);
+      const res = await GET(makeReq());
+      const body = await res.json();
+      const inv = body.parity.find((p: { source: string }) => p.source === 'inventory_snapshots');
+      expect(inv.inSync).toBe(false);
+      expect(inv.drift).toBe(3);
+    });
+
+    it('passes distinct:true to the aurora counter so we count snapshot-days not rows', async () => {
+      await GET(makeReq());
+      const calls = countAuroraInventoryRowsMock.mock.calls;
+      expect(calls.length).toBeGreaterThan(0);
+      expect(calls[calls.length - 1][0]).toEqual({ distinct: true });
+    });
+
+    it('?source=inventory_snapshots filters parity + drift to that source only', async () => {
+      getDriftCountersMock.mockReturnValue([
+        { source: 'agentcore_stats', writes: 5, failures: 0, failureRate: 0, lastFailureAt: null, lastFailureMessage: null },
+        { source: 'inventory_snapshots', writes: 2, failures: 0, failureRate: 0, lastFailureAt: null, lastFailureMessage: null },
+      ]);
+      const res = await GET(makeReq('http://x/api/parity?source=inventory_snapshots'));
+      const body = await res.json();
+      expect(body.parity).toHaveLength(1);
+      expect(body.parity[0].source).toBe('inventory_snapshots');
+      expect(body.drift).toHaveLength(1);
+      expect(body.drift[0].source).toBe('inventory_snapshots');
+    });
   });
 });
