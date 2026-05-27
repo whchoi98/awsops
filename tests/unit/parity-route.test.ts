@@ -15,6 +15,8 @@ const checkDbHealthMock = vi.fn();
 const getDriftCountersMock = vi.fn();
 const countAuroraCallsMock = vi.fn();
 const getStatsMock = vi.fn();
+const getConversationsMock = vi.fn();
+const countAuroraMemoryMock = vi.fn();
 
 vi.mock('@/lib/auth-utils', () => ({
   getUserFromRequest: (...args: unknown[]) => getUserFromRequestMock(...args),
@@ -34,6 +36,12 @@ vi.mock('@/lib/db/agentcore-stats-writer', () => ({
 }));
 vi.mock('@/lib/agentcore-stats', () => ({
   getStats: () => getStatsMock(),
+}));
+vi.mock('@/lib/agentcore-memory', () => ({
+  getConversations: (limit?: number, userId?: string) => getConversationsMock(limit, userId),
+}));
+vi.mock('@/lib/db/agentcore-memory-writer', () => ({
+  countAuroraMemory: (sub?: string) => countAuroraMemoryMock(sub),
 }));
 
 import { GET } from '@/app/api/parity/route';
@@ -63,6 +71,10 @@ describe('parity route — GET /api/parity', () => {
     getDriftCountersMock.mockReset();
     countAuroraCallsMock.mockReset();
     getStatsMock.mockReset();
+    getConversationsMock.mockReset();
+    countAuroraMemoryMock.mockReset();
+    getConversationsMock.mockResolvedValue([]);
+    countAuroraMemoryMock.mockResolvedValue(0);
 
     // Sensible defaults — individual tests override.
     getUserFromRequestMock.mockReturnValue(adminUser());
@@ -171,8 +183,53 @@ describe('parity route — GET /api/parity', () => {
 
     const res = await GET(makeReq());
     const body = await res.json();
-    expect(body.parity[0].jsonRecentCalls).toBe(2);
-    expect(body.parity[0].auroraCount).toBe(7);
-    expect(body.parity[0].drift).toBe(5);
+    const statsParity = body.parity.find((p: { source: string }) => p.source === 'agentcore_stats');
+    expect(statsParity.jsonRecentCalls).toBe(2);
+    expect(statsParity.auroraCount).toBe(7);
+    expect(statsParity.drift).toBe(5);
+  });
+
+  describe('agentcore_memory parity', () => {
+    it('includes an agentcore_memory entry in the default parity array', async () => {
+      const res = await GET(makeReq());
+      const body = await res.json();
+      const sources = body.parity.map((p: { source: string }) => p.source);
+      expect(sources).toContain('agentcore_memory');
+    });
+
+    it('reports inSync:true when JSON conversation count matches Aurora count', async () => {
+      getConversationsMock.mockResolvedValue([{ id: 'a' }, { id: 'b' }, { id: 'c' }]);
+      countAuroraMemoryMock.mockResolvedValue(3);
+      const res = await GET(makeReq());
+      const body = await res.json();
+      const mem = body.parity.find((p: { source: string }) => p.source === 'agentcore_memory');
+      expect(mem.inSync).toBe(true);
+      expect(mem.jsonCount).toBe(3);
+      expect(mem.auroraCount).toBe(3);
+      expect(mem.drift).toBe(0);
+    });
+
+    it('reports inSync:false when counts diverge', async () => {
+      getConversationsMock.mockResolvedValue([{ id: 'a' }, { id: 'b' }]);
+      countAuroraMemoryMock.mockResolvedValue(5);
+      const res = await GET(makeReq());
+      const body = await res.json();
+      const mem = body.parity.find((p: { source: string }) => p.source === 'agentcore_memory');
+      expect(mem.inSync).toBe(false);
+      expect(mem.drift).toBe(3);
+    });
+
+    it('?source=agentcore_memory filters parity + drift to that source only', async () => {
+      getDriftCountersMock.mockReturnValue([
+        { source: 'agentcore_stats', writes: 5, failures: 0, failureRate: 0, lastFailureAt: null, lastFailureMessage: null },
+        { source: 'agentcore_memory', writes: 2, failures: 0, failureRate: 0, lastFailureAt: null, lastFailureMessage: null },
+      ]);
+      const res = await GET(makeReq('http://x/api/parity?source=agentcore_memory'));
+      const body = await res.json();
+      expect(body.parity).toHaveLength(1);
+      expect(body.parity[0].source).toBe('agentcore_memory');
+      expect(body.drift).toHaveLength(1);
+      expect(body.drift[0].source).toBe('agentcore_memory');
+    });
   });
 });

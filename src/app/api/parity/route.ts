@@ -17,6 +17,8 @@ import { isAuroraEnabled, checkDbHealth } from '@/lib/db';
 import { getDriftCounters } from '@/lib/db/drift';
 import { countAuroraCalls } from '@/lib/db/agentcore-stats-writer';
 import { getStats } from '@/lib/agentcore-stats';
+import { getConversations } from '@/lib/agentcore-memory';
+import { countAuroraMemory } from '@/lib/db/agentcore-memory-writer';
 
 function isAdminUser(req: NextRequest): boolean {
   const user = getUserFromRequest(req);
@@ -59,6 +61,33 @@ async function agentcoreStatsParity(hours: number): Promise<AgentCoreStatsParity
   };
 }
 
+interface AgentCoreMemoryParity {
+  source: 'agentcore_memory';
+  inSync: boolean;
+  jsonCount: number;
+  auroraCount: number;
+  drift: number;
+  note: string;
+}
+
+async function agentcoreMemoryParity(): Promise<AgentCoreMemoryParity> {
+  // JSON layer caps at MAX_CONVERSATIONS=100 most-recent records; pass a
+  // large limit so we exercise the full retained set for parity.
+  const jsonCount = (await getConversations(10_000)).length;
+  const auroraCount = await countAuroraMemory();
+  return {
+    source: 'agentcore_memory',
+    inSync: jsonCount === auroraCount,
+    jsonCount,
+    auroraCount,
+    drift: Math.abs(auroraCount - jsonCount),
+    note:
+      'JSON side keeps the last 100 conversations only; Aurora keeps them until ' +
+      'expires_at (365 days). Exact parity is meaningful only when conversation ' +
+      'volume in the JSON window < 100.',
+  };
+}
+
 export async function GET(req: NextRequest) {
   if (!isAdminUser(req)) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
@@ -94,15 +123,22 @@ export async function GET(req: NextRequest) {
       parity: [await agentcoreStatsParity(hours)],
     });
   }
+  if (source === 'agentcore_memory') {
+    return NextResponse.json({
+      auroraEnabled: true,
+      health,
+      drift: driftCounters.filter((c) => c.source === source),
+      parity: [await agentcoreMemoryParity()],
+    });
+  }
 
   return NextResponse.json({
     auroraEnabled: true,
     health,
     drift: driftCounters,
-    parity: [await agentcoreStatsParity(hours)],
+    parity: [await agentcoreStatsParity(hours), await agentcoreMemoryParity()],
     note:
-      'Phase 1 dual-write — agentcore_stats is the only source wired so far. ' +
-      'Other sources (inventory, cost, memory, alerts, event-scaling, schedules) ' +
-      'land in subsequent commits.',
+      'Phase 1 dual-write — agentcore_stats + agentcore_memory wired so far. ' +
+      'Other sources (inventory, cost, alerts, event-scaling, schedules) land in subsequent commits.',
   });
 }

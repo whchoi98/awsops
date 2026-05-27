@@ -991,7 +991,14 @@ function recordAndSave(p: {
   void import('@/lib/db/agentcore-stats-writer')
     .then((m) => m.fireAndForgetCallToAurora(callRecord))
     .catch(() => { /* dynamic import failure is non-fatal */ });
-  saveConversation({ id: `${Date.now()}`, userId: p.userId, timestamp: new Date().toISOString(), route: p.route, gateway: p.gateway, question: p.question.slice(0, 100), summary: p.summary.slice(0, 200), usedTools: p.usedTools, responseTimeMs: p.responseTimeMs, via: p.via }).catch(() => {});
+  const conversationRecord = { id: `${Date.now()}`, userId: p.userId, timestamp: new Date().toISOString(), route: p.route, gateway: p.gateway, question: p.question.slice(0, 100), summary: p.summary.slice(0, 200), usedTools: p.usedTools, responseTimeMs: p.responseTimeMs, via: p.via };
+  saveConversation(conversationRecord).catch(() => {});
+  // ADR-030 Phase 1 dual-write — fire-and-forget shadow into Aurora's
+  // agentcore_memory table. Failures land in /api/parity drift; the JSON
+  // saveConversation above remains the source of truth.
+  void import('@/lib/db/agentcore-memory-writer')
+    .then((m) => m.fireAndForgetSaveConversation(conversationRecord))
+    .catch(() => { /* dynamic import failure is non-fatal */ });
 }
 
 // POST handler — SSE streaming with step-by-step progress events
