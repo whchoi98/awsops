@@ -36,7 +36,7 @@ function dateStr(d: Date = new Date()): string {
 export async function saveCostSnapshot(
   batchResults: Record<string, { rows: unknown[]; error?: string }>,
   accountId?: string
-): Promise<void> {
+): Promise<CostSnapshot | null> {
   // Extract cost-related results — accept both dashboard and cost page query keys
   const monthly = batchResults['monthlyCost'] || batchResults['costSummary'];
   const daily = batchResults['dailyCost'];
@@ -44,7 +44,7 @@ export async function saveCostSnapshot(
 
   // At minimum need monthly data to save
   const monthlyRows = monthly?.rows || [];
-  if (monthlyRows.length === 0 || monthly?.error) return;
+  if (monthlyRows.length === 0 || monthly?.error) return null;
 
   const dir = getCostDir(accountId);
   ensureDir(dir);
@@ -60,6 +60,7 @@ export async function saveCostSnapshot(
 
   writeFileSync(join(dir, `${today}.json`), JSON.stringify(snapshot, null, 2), 'utf-8');
   cleanOldSnapshots(180, dir);
+  return snapshot;
 }
 
 /**

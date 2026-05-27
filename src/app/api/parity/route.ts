@@ -17,6 +17,8 @@ import { isAuroraEnabled, checkDbHealth } from '@/lib/db';
 import { getDriftCounters } from '@/lib/db/drift';
 import { countAuroraCalls } from '@/lib/db/agentcore-stats-writer';
 import { getStats } from '@/lib/agentcore-stats';
+import { countJsonCostSnapshots } from '@/lib/cost-fs';
+import { countAuroraCostSnapshots } from '@/lib/db/cost-writer';
 
 function isAdminUser(req: NextRequest): boolean {
   const user = getUserFromRequest(req);
@@ -59,6 +61,30 @@ async function agentcoreStatsParity(hours: number): Promise<AgentCoreStatsParity
   };
 }
 
+interface CostSnapshotsParity {
+  source: 'cost_snapshots';
+  inSync: boolean;
+  jsonCount: number;
+  auroraCount: number;
+  drift: number;
+  note: string;
+}
+
+async function costSnapshotsParity(): Promise<CostSnapshotsParity> {
+  const jsonCount = countJsonCostSnapshots();
+  const auroraCount = await countAuroraCostSnapshots();
+  return {
+    source: 'cost_snapshots',
+    inSync: jsonCount === auroraCount,
+    jsonCount,
+    auroraCount,
+    drift: Math.abs(auroraCount - jsonCount),
+    note:
+      'JSON layer keeps one file per (account, day); Aurora keeps one row per ' +
+      '(account, day, granularity=SNAPSHOT). Counts compare 1:1.',
+  };
+}
+
 export async function GET(req: NextRequest) {
   if (!isAdminUser(req)) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
@@ -94,15 +120,22 @@ export async function GET(req: NextRequest) {
       parity: [await agentcoreStatsParity(hours)],
     });
   }
+  if (source === 'cost_snapshots') {
+    return NextResponse.json({
+      auroraEnabled: true,
+      health,
+      drift: driftCounters.filter((c) => c.source === source),
+      parity: [await costSnapshotsParity()],
+    });
+  }
 
   return NextResponse.json({
     auroraEnabled: true,
     health,
     drift: driftCounters,
-    parity: [await agentcoreStatsParity(hours)],
+    parity: [await agentcoreStatsParity(hours), await costSnapshotsParity()],
     note:
-      'Phase 1 dual-write — agentcore_stats is the only source wired so far. ' +
-      'Other sources (inventory, cost, memory, alerts, event-scaling, schedules) ' +
-      'land in subsequent commits.',
+      'Phase 1 dual-write — agentcore_stats + cost_snapshots wired so far. ' +
+      'Other sources (inventory, memory, alerts, event-scaling, schedules) land in subsequent commits.',
   });
 }

@@ -849,7 +849,16 @@ export async function POST(request: NextRequest) {
 
     // 비용 쿼리 성공 시 스냅샷 백그라운드 저장 (dashboard costSummary or cost page monthlyCost)
     if (results['monthlyCost']?.rows?.length || results['costSummary']?.rows?.length) {
-      saveCostSnapshot(results, safeAccountId).catch(() => {});
+      saveCostSnapshot(results, safeAccountId)
+        .then((snapshot) => {
+          // ADR-030 Phase 1 dual-write — shadow into Aurora cost_snapshots.
+          // Failures land in /api/parity drift; JSON write above is unaffected.
+          if (!snapshot) return;
+          return import('@/lib/db/cost-writer').then((m) =>
+            m.fireAndForgetSaveCostSnapshot(snapshot, safeAccountId),
+          );
+        })
+        .catch(() => { /* save + shadow are best-effort */ });
     }
 
     return NextResponse.json(results);

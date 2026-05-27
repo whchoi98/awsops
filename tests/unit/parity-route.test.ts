@@ -15,6 +15,8 @@ const checkDbHealthMock = vi.fn();
 const getDriftCountersMock = vi.fn();
 const countAuroraCallsMock = vi.fn();
 const getStatsMock = vi.fn();
+const countJsonCostSnapshotsMock = vi.fn();
+const countAuroraCostSnapshotsMock = vi.fn();
 
 vi.mock('@/lib/auth-utils', () => ({
   getUserFromRequest: (...args: unknown[]) => getUserFromRequestMock(...args),
@@ -34,6 +36,12 @@ vi.mock('@/lib/db/agentcore-stats-writer', () => ({
 }));
 vi.mock('@/lib/agentcore-stats', () => ({
   getStats: () => getStatsMock(),
+}));
+vi.mock('@/lib/cost-fs', () => ({
+  countJsonCostSnapshots: () => countJsonCostSnapshotsMock(),
+}));
+vi.mock('@/lib/db/cost-writer', () => ({
+  countAuroraCostSnapshots: () => countAuroraCostSnapshotsMock(),
 }));
 
 import { GET } from '@/app/api/parity/route';
@@ -63,6 +71,10 @@ describe('parity route — GET /api/parity', () => {
     getDriftCountersMock.mockReset();
     countAuroraCallsMock.mockReset();
     getStatsMock.mockReset();
+    countJsonCostSnapshotsMock.mockReset();
+    countAuroraCostSnapshotsMock.mockReset();
+    countJsonCostSnapshotsMock.mockReturnValue(0);
+    countAuroraCostSnapshotsMock.mockResolvedValue(0);
 
     // Sensible defaults — individual tests override.
     getUserFromRequestMock.mockReturnValue(adminUser());
@@ -171,8 +183,53 @@ describe('parity route — GET /api/parity', () => {
 
     const res = await GET(makeReq());
     const body = await res.json();
-    expect(body.parity[0].jsonRecentCalls).toBe(2);
-    expect(body.parity[0].auroraCount).toBe(7);
-    expect(body.parity[0].drift).toBe(5);
+    const statsParity = body.parity.find((p: { source: string }) => p.source === 'agentcore_stats');
+    expect(statsParity.jsonRecentCalls).toBe(2);
+    expect(statsParity.auroraCount).toBe(7);
+    expect(statsParity.drift).toBe(5);
+  });
+
+  describe('cost_snapshots parity', () => {
+    it('includes a cost_snapshots entry in the default parity array', async () => {
+      const res = await GET(makeReq());
+      const body = await res.json();
+      const sources = body.parity.map((p: { source: string }) => p.source);
+      expect(sources).toContain('cost_snapshots');
+    });
+
+    it('reports inSync:true when JSON cost-snapshot count matches Aurora row count', async () => {
+      countJsonCostSnapshotsMock.mockReturnValue(7);
+      countAuroraCostSnapshotsMock.mockResolvedValue(7);
+      const res = await GET(makeReq());
+      const body = await res.json();
+      const cost = body.parity.find((p: { source: string }) => p.source === 'cost_snapshots');
+      expect(cost.inSync).toBe(true);
+      expect(cost.jsonCount).toBe(7);
+      expect(cost.auroraCount).toBe(7);
+      expect(cost.drift).toBe(0);
+    });
+
+    it('reports inSync:false when counts diverge', async () => {
+      countJsonCostSnapshotsMock.mockReturnValue(10);
+      countAuroraCostSnapshotsMock.mockResolvedValue(6);
+      const res = await GET(makeReq());
+      const body = await res.json();
+      const cost = body.parity.find((p: { source: string }) => p.source === 'cost_snapshots');
+      expect(cost.inSync).toBe(false);
+      expect(cost.drift).toBe(4);
+    });
+
+    it('?source=cost_snapshots filters parity + drift to that source only', async () => {
+      getDriftCountersMock.mockReturnValue([
+        { source: 'agentcore_stats', writes: 5, failures: 0, failureRate: 0, lastFailureAt: null, lastFailureMessage: null },
+        { source: 'cost_snapshots', writes: 3, failures: 0, failureRate: 0, lastFailureAt: null, lastFailureMessage: null },
+      ]);
+      const res = await GET(makeReq('http://x/api/parity?source=cost_snapshots'));
+      const body = await res.json();
+      expect(body.parity).toHaveLength(1);
+      expect(body.parity[0].source).toBe('cost_snapshots');
+      expect(body.drift).toHaveLength(1);
+      expect(body.drift[0].source).toBe('cost_snapshots');
+    });
   });
 });
