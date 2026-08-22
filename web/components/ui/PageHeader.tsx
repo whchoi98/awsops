@@ -27,7 +27,7 @@ export default function PageHeader({
   right?: ReactNode;
   className?: string;
 }) {
-  const { tt } = useI18n();
+  const { tt, lang } = useI18n();
   const tTitle = typeof title === 'string' ? tt(title) : title;
   const tSubtitle = typeof subtitle === 'string' ? tt(subtitle) : subtitle;
   return (
@@ -41,7 +41,12 @@ export default function PageHeader({
             </Badge>
           )}
         </div>
-        {subtitle != null && <p className="text-[14px] text-chrome-fg-muted mt-1.5 max-w-[680px]">{tSubtitle}</p>}
+        {/* 한국어만 break-keep: 단어 중간 줄바꿈 방지. zh/ja는 띄어쓰기가 없어 keep-all이 역효과. */}
+        {subtitle != null && (
+          <p className={cn('text-[14px] text-chrome-fg-muted mt-1.5 max-w-[680px]', lang === 'ko' && 'break-keep')}>
+            {tSubtitle}
+          </p>
+        )}
       </div>
       {right != null && <div className="flex items-center gap-3 shrink-0">{right}</div>}
     </header>
