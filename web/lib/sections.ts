@@ -126,6 +126,14 @@ export const SECTIONS: Section[] = [
   ], followUps: [
     'p50 대비 p99 격차가 큰 서비스를 짚어줘', 'ELB 5xx와 타깃 5xx를 구분해 원인을 좁혀줘', '트레이싱 계측(X-Ray/Tempo) 도입 우선순위를 제안해줘',
   ] },
+  { key: 'nfm-analyze', label: 'Network Flow', icon: '🌐', color: 'var(--sec-nfmanalyze)', active: true, presets: [
+    'NFM 재전송/타임아웃 원인 분석해줘',
+    '네트워크 플로우 이상 진단',
+    'AZ 간 트래픽 문제 플로우 찾아줘',
+    '타임아웃 유발 페어 분석 (NFM)',
+  ], followUps: [
+    '최다 재전송 페어의 pod 로그 확인 포인트를 짚어줘', 'AZ 간 전송 비용 절감 배치안을 제안해줘', '문제 페어의 후속 확인 명령을 만들어줘',
+  ] },
   { key: 'incident', label: 'Incident', icon: '🚨', color: 'var(--sec-incident)', active: true, presets: [
     '장애 원인 분석해줘 (알람+변경 이력)',
     '지금 발생 중인 알람과 근본 원인',

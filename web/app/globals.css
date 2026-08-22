@@ -50,7 +50,7 @@
      db-optimize(pine teal), msk-optimize(burgundy), trace-analyze(slate blue), incident(vermilion) */
   --sec-idlescan:#6B7F2C; --sec-eksoptimize:#4653A8;
   --sec-dboptimize:#0F766E; --sec-mskoptimize:#8E2F4A;
-  --sec-traceanalyze:#3F5E8C; --sec-incident:#C2410C;
+  --sec-traceanalyze:#3F5E8C; --sec-incident:#C2410C; --sec-nfmanalyze:#0B7285;
   /* near-black brand marks that must invert on dark (icon accents) */
   --integration-notion:#0F172A;
 
@@ -96,7 +96,7 @@
   --sec-awsdata:#E08BC7; /* magenta/plum lifted for dark surfaces (same hue as light) */
   --sec-idlescan:#B4C266; --sec-eksoptimize:#96A0EE; /* collectors lifted for dark (same hues) */
   --sec-dboptimize:#4FC2B8; --sec-mskoptimize:#E087A3;
-  --sec-traceanalyze:#8FAEDC; --sec-incident:#F0925C;
+  --sec-traceanalyze:#8FAEDC; --sec-incident:#F0925C; --sec-nfmanalyze:#3FB6CC;
   --integration-notion:#CBD5E1;
   /* neutrals — surfaces dark (low) → text light (high); 900 pinned for scrims */
   --ink-50:#1F262D; --ink-100:#29333B; --ink-200:#38444E; --ink-300:#586773;

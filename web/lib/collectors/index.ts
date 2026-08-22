@@ -20,6 +20,7 @@ import eksOptimize from './eks-optimize';
 import dbOptimize from './db-optimize';
 import mskOptimize from './msk-optimize';
 import traceAnalyze from './trace-analyze';
+import nfmAnalyze from './nfm-analyze';
 import incident from './incident';
 
 const REGION = process.env.AWS_REGION || 'ap-northeast-2';
@@ -64,7 +65,7 @@ export interface ChatCollector {
   analysisPrompt: string;
 }
 
-export const COLLECTORS: ChatCollector[] = [idleScan, eksOptimize, dbOptimize, mskOptimize, traceAnalyze, incident];
+export const COLLECTORS: ChatCollector[] = [idleScan, eksOptimize, dbOptimize, mskOptimize, traceAnalyze, nfmAnalyze, incident];
 
 export function collectorByKey(key: string): ChatCollector | undefined {
   return COLLECTORS.find((c) => c.key === key);

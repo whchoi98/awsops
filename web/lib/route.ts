@@ -32,6 +32,9 @@ const RULES: { key: string; re: RegExp }[] = [
   // trace-analyze: explicit trace/dependency/bottleneck intents only — a bare 'trace/트레이스' noun
   // stays with monitoring (where the Tempo connector lives); ambiguity goes to the classifier.
   { key: 'trace-analyze', re: /트레이스 ?분석|trace ?analy|분산 ?트레이싱|distributed ?trac|서비스 ?의존성|service ?dependenc|(지연 ?시간?|latency).{0,12}(병목|bottleneck)|병목.{0,8}(찾|분석)/i },
+  // nfm-analyze: explicit flow/retransmission/timeout-cause intents — a bare '네트워크' noun stays
+  // with the network gateway; NFM 명시 또는 재전송·타임아웃 "원인/분석" 의도만 잡는다.
+  { key: 'nfm-analyze', re: /\bnfm\b|network ?flow ?monitor|네트워크 ?플로우|(재전송|retransmi|타임아웃|timeout).{0,14}(원인|분석|진단|유발|analy|diagnos)|플로우.{0,8}(이상|진단|분석)/i },
   // incident: root-cause phrasings only — a plain '장애가 났어' report (no 원인/분석 ask) is left to
   // the classifier so monitoring/container keep their troubleshooting flows.
   { key: 'incident', re: /(장애|사고|인시던트|incident).{0,12}(원인|분석|analysis)|root ?cause|무슨 ?문제(가|는)? ?있/i },

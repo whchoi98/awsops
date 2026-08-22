@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { runQ, avail, clusterCI, nodesCI, rdsFleet, ecFleet, osFleet, mskNodes, mskBrokers, mskHealth, mskLags, albFleet, ctSend, cwSend } = vi.hoisted(() => ({
+const { runQ, avail, clusterCI, nodesCI, rdsFleet, ecFleet, osFleet, mskNodes, mskBrokers, mskHealth, mskLags, albFleet, ctSend, cwSend, nfmStat, nfmHealth, nfmCov, nfmTop } = vi.hoisted(() => ({
   runQ: vi.fn(), avail: vi.fn(), clusterCI: vi.fn(), nodesCI: vi.fn(),
   rdsFleet: vi.fn(), ecFleet: vi.fn(), osFleet: vi.fn(),
   mskNodes: vi.fn(), mskBrokers: vi.fn(), mskHealth: vi.fn(), mskLags: vi.fn(),
   albFleet: vi.fn(), ctSend: vi.fn(), cwSend: vi.fn(),
+  nfmStat: vi.fn(), nfmHealth: vi.fn(), nfmCov: vi.fn(), nfmTop: vi.fn(),
 }));
 
 vi.mock('../aws-data', () => ({
@@ -17,6 +18,9 @@ vi.mock('../metrics', () => ({
   rdsFleetLive: rdsFleet, elasticacheFleetLive: ecFleet, opensearchFleetLive: osFleet,
   mskListNodes: mskNodes, mskBrokerFleetLive: mskBrokers, mskClusterHealth: mskHealth, mskOffsetLags: mskLags,
   albFleetLive: albFleet,
+}));
+vi.mock('../nfm', () => ({
+  nfmStatus: nfmStat, nfmHealthSummary: nfmHealth, nfmMonitorCoverage: nfmCov, nfmTopContributors: nfmTop,
 }));
 vi.mock('@aws-sdk/client-cloudtrail', () => ({
   CloudTrailClient: class { send = ctSend },
@@ -40,15 +44,15 @@ const ctx = (steps: CollectStep[] = []) => ({
 });
 
 beforeEach(() => {
-  for (const m of [runQ, avail, clusterCI, nodesCI, rdsFleet, ecFleet, osFleet, mskNodes, mskBrokers, mskHealth, mskLags, albFleet, ctSend, cwSend]) m.mockReset();
+  for (const m of [runQ, avail, clusterCI, nodesCI, rdsFleet, ecFleet, osFleet, mskNodes, mskBrokers, mskHealth, mskLags, albFleet, ctSend, cwSend, nfmStat, nfmHealth, nfmCov, nfmTop]) m.mockReset();
 });
 
 // ── registry contract ────────────────────────────────────────────────────────
 
 describe('collector registry', () => {
-  it('registers all six v1 collectors; unknown keys return undefined', () => {
+  it('registers the six v1 collectors + nfm-analyze; unknown keys return undefined', () => {
     expect(COLLECTORS.map((c) => c.key)).toEqual([
-      'idle-scan', 'eks-optimize', 'db-optimize', 'msk-optimize', 'trace-analyze', 'incident',
+      'idle-scan', 'eks-optimize', 'db-optimize', 'msk-optimize', 'trace-analyze', 'nfm-analyze', 'incident',
     ]);
     for (const key of COLLECTORS.map((c) => c.key)) expect(collectorByKey(key)?.key).toBe(key);
     expect(collectorByKey('aws-data')).toBeUndefined(); // aws-data keeps its OWN branch
@@ -69,13 +73,18 @@ describe('collector registry', () => {
     expect(matchedSections('RDS 인스턴스 다운사이징 후보 찾아줘')).toContain('db-optimize');
     expect(matchedSections('MSK 브로커 rightsizing 분석')).toContain('msk-optimize');
     expect(matchedSections('서비스 의존성 분석해줘')).toContain('trace-analyze');
+    expect(matchedSections('NFM 재전송 원인 분석해줘')).toContain('nfm-analyze');
     expect(matchedSections('장애 원인 분석해줘')).toContain('incident');
   });
-  it('availability gates ride steampipeAvailable (pre-commit fail-open probe)', async () => {
+  it('availability gates: steampipeAvailable for the v1 six, NFM monitor presence for nfm-analyze', async () => {
     avail.mockResolvedValue(false);
-    for (const c of COLLECTORS) expect(await c.available()).toBe(false);
+    nfmStat.mockResolvedValue({ monitors: [], scopeCount: 0 });
+    for (const c of COLLECTORS) expect(await c.available(), c.key).toBe(false);
     avail.mockResolvedValue(true);
-    for (const c of COLLECTORS) expect(await c.available()).toBe(true);
+    nfmStat.mockResolvedValue({ monitors: [{ name: 'm1', status: 'ACTIVE', cluster: null, arn: 'arn:m1' }], scopeCount: 0 });
+    for (const c of COLLECTORS) expect(await c.available(), c.key).toBe(true);
+    nfmStat.mockRejectedValue(new Error('AccessDenied')); // NFM API 장애 → fail-open false (라우팅 폴백)
+    expect(await collectorByKey('nfm-analyze')!.available()).toBe(false);
   });
 });
 
@@ -415,5 +424,64 @@ describe('incident collect', () => {
     expect(out.collected).toBe(0);
     expect(out.tools).toEqual([]);
     expect(out.summary.some((s) => s.includes('CloudTrail') && s.includes('미가용'))).toBe(true);
+  });
+});
+
+// ── nfm-analyze collector ─────────────────────────────────────────────────────
+
+describe('nfm-analyze collect', () => {
+  const MON = (name: string) => ({ name, status: 'ACTIVE', cluster: null, arn: `arn:${name}` });
+  const HEALTH = (over: Record<string, unknown> = {}) => ({
+    available: true, degraded: false, timeouts: 10, retransmissions: 20, rttAvgUs: 45,
+    series: { rtt: [], retransmissions: [], timeouts: [], health: [] }, ...over,
+  });
+  const FLOW_ROW = {
+    local: { podName: 'payyo', podNamespace: 'demo', az: 'az2', subnetId: 's-1' },
+    remote: { ip: '10.0.0.9', az: 'az1' },
+    value: 1704, unit: 'Count', category: 'INTER_AZ',
+    targetPort: 3306, traversed: ['NAT'], traversedIds: ['NAT:n-1'],
+  };
+
+  it('ranks monitors worst-first, fans out flows for the top monitors, and compacts rows', async () => {
+    const steps: CollectStep[] = [];
+    nfmStat.mockResolvedValue({ monitors: [MON('calm'), MON('storm'), MON('third')], scopeCount: 1 });
+    nfmCov.mockResolvedValue({ storm: { local: [{ type: 'VPC', id: 'vpc-1' }], remote: [] } });
+    nfmHealth.mockImplementation(async (arn: string) =>
+      arn === 'arn:storm' ? HEALTH({ degraded: true, timeouts: 999 }) : HEALTH());
+    nfmTop.mockResolvedValue({ rows: [FLOW_ROW], unit: 'Count', tookMs: 5 });
+
+    const c = collectorByKey('nfm-analyze')!;
+    const out = await c.collect(ctx(steps));
+
+    expect(out.collected).toBe(3); // status + health + flows
+    expect(out.tools).toEqual(['nfm_status', 'cloudwatch_metrics', 'nfm_top_contributors']);
+    // 최악 모니터(storm)가 팬아웃 대상에 포함 — 2모니터 캡 × 3메트릭 × 2카테고리 = 12콜
+    expect(nfmTop).toHaveBeenCalledTimes(12);
+    expect(nfmTop.mock.calls.some((call) => call[0] === 'storm')).toBe(true);
+    expect(nfmTop.mock.calls.some((call) => call[0] === 'third')).toBe(false); // 캡 밖
+    // 컨텍스트: 건강 랭킹(storm 먼저) + 압축 플로우 행 + 미가용 disclose
+    expect(out.context.indexOf('"monitor":"storm"')).toBeLessThan(out.context.indexOf('"monitor":"calm"'));
+    expect(out.context).toContain('"local":"demo/payyo"');
+    expect(out.context).toContain('"port":3306');
+    expect(out.context).toContain('Container Insights');
+    expect(out.context).toContain('Categories not queried');
+  });
+
+  it('degrades to collected:0 when there are no monitors (no flow fan-out attempted)', async () => {
+    nfmStat.mockResolvedValue({ monitors: [], scopeCount: 0 });
+    const out = await collectorByKey('nfm-analyze')!.collect(ctx());
+    expect(out.collected).toBe(0);
+    expect(nfmTop).not.toHaveBeenCalled();
+    expect(out.context).toContain('No NFM data');
+  });
+
+  it('discloses failed flow combos instead of throwing', async () => {
+    nfmStat.mockResolvedValue({ monitors: [MON('m1')], scopeCount: 0 });
+    nfmCov.mockResolvedValue({});
+    nfmHealth.mockResolvedValue(HEALTH());
+    nfmTop.mockRejectedValue(new Error('query FAILED'));
+    const out = await collectorByKey('nfm-analyze')!.collect(ctx());
+    expect(out.collected).toBe(2); // status + health — flows 전부 실패해도 붕괴하지 않음
+    expect(out.summary.join('\n')).toContain('Failed flow queries');
   });
 });
