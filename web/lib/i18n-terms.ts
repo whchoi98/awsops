@@ -31,6 +31,17 @@ export const TERMS: Record<string, Pair> = {
   '표본 검사': { en: 'Sampled', zh: '抽样检查', ja: 'サンプリング検査' },
   '위험 신호 없음': { en: 'No risk signals', zh: '无风险信号', ja: 'リスク兆候なし' },
   '아래 위험 항목 확인': { en: 'Review the flagged items below', zh: '请检查下方风险项', ja: '下記のリスク項目を確認' },
+  // ---- NFM 상태 요약 밴드 (network-flow HealthBand) ----
+  '네트워크 상태': { en: 'Network health', zh: '网络状态', ja: 'ネットワーク状態' },
+  '수집 전': { en: 'No data yet', zh: '尚未采集', ja: '収集前' },
+  'AWS망 이슈': { en: 'AWS network issue', zh: 'AWS 网络问题', ja: 'AWS ネットワーク問題' },
+  '타임아웃': { en: 'Timeouts', zh: '超时', ja: 'タイムアウト' },
+  '재전송': { en: 'Retransmissions', zh: '重传', ja: '再送' },
+  'RTT (평균)': { en: 'RTT (avg)', zh: 'RTT（平均）', ja: 'RTT（平均）' },
+  '기간 내 연결 타임아웃 합계': { en: 'Total connection timeouts in range', zh: '时间范围内连接超时总数', ja: '期間内の接続タイムアウト合計' },
+  'EKS 외 VPC 전체 트래픽 커버 (nfm-vpc-all)': { en: 'Covers non-EKS VPC-wide traffic (nfm-vpc-all)', zh: '覆盖 EKS 之外的整个 VPC 流量（nfm-vpc-all）', ja: 'EKS 以外の VPC 全体トラフィックをカバー（nfm-vpc-all）' },
+  '계정 전체 트래픽 추이 조회 설정됨 (Workload Insights)': { en: 'Account-wide traffic trends enabled (Workload Insights)', zh: '已启用账号级流量趋势查询（Workload Insights）', ja: 'アカウント全体のトラフィック推移照会が有効（Workload Insights）' },
+  '미설정 — 계정 전체 트래픽 추이 조회 불가': { en: 'Not set up — account-wide traffic trends unavailable', zh: '未设置 — 无法查询账号级流量趋势', ja: '未設定 — アカウント全体のトラフィック推移は照会不可' },
   // ---- EKS diagnosis tier (EksDiagnosis) ----
   'EKS 진단 메트릭': { en: 'EKS diagnostic metrics', zh: 'EKS 诊断指标', ja: 'EKS 診断メトリクス' },
   '컨트롤 플레인(AWS/EKS) · Container Insights · 인-클러스터 API — 계층별 진단': { en: 'Control plane (AWS/EKS) · Container Insights · in-cluster API — layered diagnosis', zh: '控制平面(AWS/EKS) · Container Insights · 集群内 API — 分层诊断', ja: 'コントロールプレーン（AWS/EKS）· Container Insights · インクラスター API — 階層別診断' },
@@ -420,7 +431,7 @@ export const TERMS: Record<string, Pair> = {
   // ---- Network Flow Monitor (/network-flow + EKS Pod 전송량) ----
   'End to End 경로': { en: 'End-to-End path', zh: '端到端路径', ja: 'エンドツーエンド経路' },
   'Transfer/Day (NFM): 최근 1시간 실측 ×24 외삽 · 방향당 $0.01/GB 추정 — 정확한 청구 아님': { en: 'Transfer/Day (NFM): last-1h measurement extrapolated ×24 · estimated at $0.01/GB per direction — not exact billing', zh: 'Transfer/Day (NFM)：最近 1 小时实测 ×24 外推 · 按每方向 $0.01/GB 估算 — 非准确账单', ja: 'Transfer/Day (NFM)：直近1時間の実測を×24で外挿 · 方向あたり $0.01/GB の推定 — 正確な請求額ではありません' },
-  'CloudWatch Network Flow Monitor(NFM) 기반 플로우 조회 — 모니터·메트릭·카테고리·기간별 top-contributors 탐색': { en: 'Flow lookup powered by CloudWatch Network Flow Monitor (NFM) — explore top contributors by monitor, metric, category, and range', zh: '基于 CloudWatch Network Flow Monitor（NFM）的流量查询 — 按监控器、指标、类别和时间段浏览 top contributors', ja: 'CloudWatch Network Flow Monitor（NFM）ベースのフロー照会 — モニター・メトリクス・カテゴリ・期間別に top contributors を探索' },
+  'CloudWatch Network Flow Monitor(NFM) 플로우 조회 — 모니터·메트릭·카테고리·기간별 top-contributors': { en: 'CloudWatch Network Flow Monitor (NFM) flow lookup — top contributors by monitor, metric, category, and range', zh: 'CloudWatch Network Flow Monitor（NFM）流量查询 — 按监控器、指标、类别和时间段的 top contributors', ja: 'CloudWatch Network Flow Monitor（NFM）フロー照会 — モニター・メトリクス・カテゴリ・期間別 top contributors' },
   'NFM 상태 조회 실패': { en: 'NFM status check failed', zh: 'NFM 状态查询失败', ja: 'NFM ステータス取得失敗' },
   'ACTIVE 모니터': { en: 'ACTIVE monitors', zh: '活跃监控器（ACTIVE）', ja: 'ACTIVE モニター' },
   'EKS 클러스터 커버리지': { en: 'EKS cluster coverage', zh: 'EKS 集群覆盖', ja: 'EKS クラスターカバレッジ' },

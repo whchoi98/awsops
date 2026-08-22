@@ -1,3 +1,4 @@
+import { CloudWatchClient, GetMetricDataCommand } from '@aws-sdk/client-cloudwatch';
 import {
   NetworkFlowMonitorClient,
   ListMonitorsCommand,
@@ -19,6 +20,8 @@ import {
 const REGION = process.env.AWS_REGION || 'ap-northeast-2';
 let client: NetworkFlowMonitorClient | null = null;
 const nfm = () => (client ??= new NetworkFlowMonitorClient({ region: REGION }));
+let cwClient: CloudWatchClient | null = null;
+const cw = () => (cwClient ??= new CloudWatchClient({ region: REGION }));
 
 export const NFM_METRICS = ['DATA_TRANSFERRED', 'RETRANSMISSIONS', 'TIMEOUTS', 'ROUND_TRIP_TIME'] as const;
 export type NfmMetric = (typeof NFM_METRICS)[number];
@@ -35,7 +38,9 @@ export const BILLED_CATEGORIES: ReadonlySet<NfmCategory> = new Set<NfmCategory>(
 export const bytesToUsd = (bytes: number, category: NfmCategory): number =>
   BILLED_CATEGORIES.has(category) ? (bytes / 1e9) * AZ_TRANSFER_USD_PER_GB : 0;
 
-export interface NfmMonitorInfo { name: string; status: string; cluster: string | null }
+// arn: CW 메트릭 디멘션 `MonitorId`의 값은 모니터 ARN — ListMonitors 응답에서 그대로
+// 취한다 (조립 금지). 상태 요약 밴드가 CW GetMetricData 조회에 사용.
+export interface NfmMonitorInfo { name: string; status: string; cluster: string | null; arn: string }
 export interface NfmStatus { monitors: NfmMonitorInfo[]; scopeCount: number }
 
 export interface NfmEndpoint {
@@ -68,7 +73,7 @@ async function cached<T>(key: string, fn: () => Promise<T>): Promise<T> {
   inflight.set(key, p);
   return p;
 }
-export function _resetNfmCacheForTests() { cache.clear(); inflight.clear(); client = null; }
+export function _resetNfmCacheForTests() { cache.clear(); inflight.clear(); client = null; cwClient = null; }
 
 // ── Status (menu gate) ──────────────────────────────────────────────────────
 export async function nfmStatus(): Promise<NfmStatus> {
@@ -79,7 +84,12 @@ export async function nfmStatus(): Promise<NfmStatus> {
     ]);
     const monitors: NfmMonitorInfo[] = (mon.monitors ?? []).map((m) => {
       const name = m.monitorName ?? '';
-      return { name, status: m.monitorStatus ?? '', cluster: name.startsWith('nfm-eks-') ? name.slice('nfm-eks-'.length) : null };
+      return {
+        name,
+        status: m.monitorStatus ?? '',
+        cluster: name.startsWith('nfm-eks-') ? name.slice('nfm-eks-'.length) : null,
+        arn: m.monitorArn ?? '',
+      };
     });
     return { monitors, scopeCount: (sc.scopes ?? []).length };
   });
@@ -90,6 +100,64 @@ export async function nfmMonitorForCluster(cluster: string): Promise<string | nu
   const s = await nfmStatus();
   const m = s.monitors.find((x) => x.cluster === cluster && x.status === 'ACTIVE');
   return m ? m.name : null;
+}
+
+// ── Health summary (상태 요약 밴드) ─────────────────────────────────────────
+// NFM은 모니터별 5메트릭을 CW `AWS/NetworkFlowMonitor`에 발행한다 (디멘션
+// `MonitorId` = 모니터 ARN). monitor 쿼리(1h 한도)와 달리 CW 경로는 기간 제한이
+// 사실상 없다. RoundTripTime은 **µs**(monitor 쿼리 폴백 Milliseconds와 다름 —
+// 1000배 함정), HealthIndicator는 1=degraded(AWS망 이슈)/0=healthy.
+
+export interface NfmHealthPoint { t: number; v: number }
+export interface NfmHealthSummary {
+  available: boolean;
+  /** HealthIndicator 기간 최대 > 0 — AWS망 이슈. 데이터 없으면 null. */
+  degraded: boolean | null;
+  /** 기간 합계. 해당 메트릭 무데이터면 null (0과 구분 — UI는 "수집 전"). */
+  timeouts: number | null;
+  retransmissions: number | null;
+  /** 기간 평균 RTT (µs — CW 원단위 유지, 표시는 nfm-format.formatMicros). sparse 가능. */
+  rttAvgUs: number | null;
+  series: { rtt: NfmHealthPoint[]; retransmissions: NfmHealthPoint[]; timeouts: NfmHealthPoint[]; health: NfmHealthPoint[] };
+}
+
+/** 모니터 1개의 상태 요약 — GetMetricData 1콜 배치 (4 통계 + 스파크라인 시계열). */
+export async function nfmHealthSummary(monitorArn: string, rangeSec: number): Promise<NfmHealthSummary> {
+  return cached(`health|${monitorArn}|${rangeSec}`, async () => {
+    const end = new Date();
+    const start = new Date(end.getTime() - rangeSec * 1000);
+    // 스파크라인용 ≤ ~60 버킷. 4메트릭 × 60포인트라 GetMetricData 페이지네이션 불필요.
+    const period = Math.max(60, Math.ceil(rangeSec / 60 / 60) * 60);
+    const metric = (name: string) => ({
+      Namespace: 'AWS/NetworkFlowMonitor', MetricName: name,
+      Dimensions: [{ Name: 'MonitorId', Value: monitorArn }],
+    });
+    const res = await cw().send(new GetMetricDataCommand({
+      StartTime: start, EndTime: end, ScanBy: 'TimestampAscending',
+      MetricDataQueries: [
+        { Id: 'rtt', MetricStat: { Metric: metric('RoundTripTime'), Period: period, Stat: 'Average' } },
+        { Id: 'health', MetricStat: { Metric: metric('HealthIndicator'), Period: period, Stat: 'Maximum' } },
+        { Id: 'retx', MetricStat: { Metric: metric('Retransmissions'), Period: period, Stat: 'Sum' } },
+        { Id: 'tmo', MetricStat: { Metric: metric('Timeouts'), Period: period, Stat: 'Sum' } },
+      ],
+    }));
+    const series = (id: string): NfmHealthPoint[] => {
+      const r = (res.MetricDataResults ?? []).find((x) => x.Id === id);
+      return (r?.Timestamps ?? []).map((ts, i) => ({ t: new Date(ts).getTime(), v: r?.Values?.[i] ?? 0 }));
+    };
+    const rtt = series('rtt'); const health = series('health');
+    const retx = series('retx'); const tmo = series('tmo');
+    const sum = (pts: NfmHealthPoint[]) => pts.reduce((a, p) => a + p.v, 0);
+    const available = rtt.length + health.length + retx.length + tmo.length > 0;
+    return {
+      available,
+      degraded: health.length ? health.some((p) => p.v > 0) : null,
+      timeouts: tmo.length ? sum(tmo) : null,
+      retransmissions: retx.length ? sum(retx) : null,
+      rttAvgUs: rtt.length ? sum(rtt) / rtt.length : null,
+      series: { rtt, retransmissions: retx, timeouts: tmo, health },
+    };
+  });
 }
 
 // ── Monitor top-contributors query (start → poll → results) ────────────────

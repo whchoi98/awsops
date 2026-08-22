@@ -12,6 +12,8 @@ import { useI18n } from '@/components/shell/LanguageProvider';
 import type { NfmEndpoint, NfmFlowRow } from '@/lib/nfm';
 import type { InvType } from '@/lib/inventory-types';
 import FlowHopPath, { ResourceIcon, endpointKind } from '@/components/nfm/FlowHopPath';
+import HealthBand from '@/components/nfm/HealthBand';
+import { NFM_RANGE_PRESETS } from '@/lib/nfm-format';
 
 // /network-flow — nfm-dashboard 플로우 조회 이식 (CloudWatch Network Flow Monitor).
 // 데이터 계층은 lib/nfm.ts(비동기 쿼리 폴링 + TTL 캐시)가 담당하고, 이 페이지는
@@ -35,8 +37,8 @@ const CATEGORIES_FALLBACK = ['INTRA_AZ', 'INTER_AZ', 'INTER_VPC', 'INTER_REGION'
 /** 데이터 전송 요금이 발생할 수 있는 카테고리 (lib/nfm.ts BILLED_CATEGORIES 미러). */
 const BILLED = new Set(['INTER_AZ', 'INTER_VPC', 'INTER_REGION']);
 const VPC_MONITOR = 'nfm-vpc-all';
-// NFM 모니터 쿼리 한도: 최대 1시간 윈도우 → 프리셋을 15m/30m/1h로 제한.
-const NFM_RANGES = [['15m', 900], ['30m', 1800], ['1h', 3600]] as const;
+// NFM 모니터 쿼리 한도: 최대 1시간 윈도우 → 프리셋을 15m/30m/1h로 제한 (라우트와 공유).
+const NFM_RANGES = NFM_RANGE_PRESETS;
 
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
 function humanBytes(v: number): string {
@@ -223,7 +225,7 @@ export default function NetworkFlowPage() {
     <>
       <PageHeader
         title="Network Flow"
-        subtitle="CloudWatch Network Flow Monitor(NFM) 기반 플로우 조회 — 모니터·메트릭·카테고리·기간별 top-contributors 탐색"
+        subtitle="CloudWatch Network Flow Monitor(NFM) 플로우 조회 — 모니터·메트릭·카테고리·기간별 top-contributors"
       />
       <div className="px-4 lg:px-8 py-8 flex flex-col gap-6">
         {statusErr && (
@@ -252,11 +254,22 @@ export default function NetworkFlowPage() {
                 label="VPC 모니터"
                 value={hasVpcMonitor ? tt('있음') : tt('없음')}
                 variant={hasVpcMonitor ? 'default' : 'warn'}
-                hint={VPC_MONITOR}
+                hint={tt('EKS 외 VPC 전체 트래픽 커버 (nfm-vpc-all)')}
                 icon={<Globe size={16} />}
               />
-              <StatTile label="Scope" value={status.scopeCount} icon={<Activity size={16} />} />
+              <StatTile
+                label="Scope"
+                value={status.scopeCount}
+                variant={status.scopeCount > 0 ? 'default' : 'warn'}
+                hint={status.scopeCount > 0
+                  ? tt('계정 전체 트래픽 추이 조회 설정됨 (Workload Insights)')
+                  : tt('미설정 — 계정 전체 트래픽 추이 조회 불가')}
+                icon={<Activity size={16} />}
+              />
             </div>
+
+            {/* 상태 요약 밴드 — 선택 모니터의 CW 메트릭 요약 (모니터/기간 변경 시 재조회) */}
+            {onboarded && monitor && <HealthBand monitor={monitor} range={range} />}
 
             {/* NFM 미온보딩 — amber 안내로 degrade, 쿼리 패널 숨김 */}
             {!onboarded && (

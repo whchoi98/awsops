@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const nfmSend = vi.fn();
+const cwSend = vi.fn();
+vi.mock('@aws-sdk/client-cloudwatch', () => ({
+  CloudWatchClient: class { send = cwSend; },
+  GetMetricDataCommand: class { constructor(public input: Record<string, unknown>) {} },
+}));
 vi.mock('@aws-sdk/client-networkflowmonitor', () => ({
   NetworkFlowMonitorClient: class { send = nfmSend; },
   ListMonitorsCommand: class { constructor(public input: unknown) {} },
@@ -13,6 +18,7 @@ vi.mock('@aws-sdk/client-networkflowmonitor', () => ({
 
 beforeEach(async () => {
   nfmSend.mockReset();
+  cwSend.mockReset();
   const { _resetNfmCacheForTests } = await import('./nfm');
   _resetNfmCacheForTests();
 });
@@ -20,7 +26,10 @@ beforeEach(async () => {
 // Dispatch helper: the 7 pod-transfer query chains run in parallel, so responses
 // must be routed by command type (and queryId), not by call order.
 type Cmd = { constructor: { name: string }; input: Record<string, unknown> };
-const monitorsResponse = (monitors: { monitorName: string; monitorStatus: string }[]) => ({ monitors });
+// 라이브 ListMonitors는 monitorArn을 항상 포함한다 — 픽스처도 동일하게 생성.
+const arnOf = (name: string) => `arn:aws:networkflowmonitor:ap-northeast-2:111122223333:monitor/${name}`;
+const monitorsResponse = (monitors: { monitorName: string; monitorStatus: string }[]) =>
+  ({ monitors: monitors.map((m) => ({ monitorArn: arnOf(m.monitorName), ...m })) });
 
 describe('bytesToUsd', () => {
   it('charges $0.01/GB for INTER_AZ / INTER_VPC / INTER_REGION', async () => {
@@ -55,8 +64,8 @@ describe('nfmStatus', () => {
     const { nfmStatus } = await import('./nfm');
     const s = await nfmStatus();
     expect(s.monitors).toEqual([
-      { name: 'nfm-eks-prod', status: 'ACTIVE', cluster: 'prod' },
-      { name: 'nfm-vpc-all', status: 'ACTIVE', cluster: null },
+      { name: 'nfm-eks-prod', status: 'ACTIVE', cluster: 'prod', arn: arnOf('nfm-eks-prod') },
+      { name: 'nfm-vpc-all', status: 'ACTIVE', cluster: null, arn: arnOf('nfm-vpc-all') },
     ]);
     expect(s.scopeCount).toBe(3);
   });
@@ -168,6 +177,74 @@ describe('nfmTopContributors', () => {
     });
     const { nfmTopContributors } = await import('./nfm');
     await expect(nfmTopContributors('m', 'RETRANSMISSIONS', 'INTER_VPC', 3600)).rejects.toThrow('NFM query FAILED');
+  });
+});
+
+describe('nfmHealthSummary', () => {
+  const ARN = arnOf('nfm-eks-prod');
+  const T1 = new Date('2026-08-04T05:00:00Z');
+  const T2 = new Date('2026-08-04T05:01:00Z');
+  const cwResponse = (byId: Record<string, number[]>) => ({
+    MetricDataResults: Object.entries(byId).map(([Id, Values]) => ({
+      Id, Timestamps: Values.map((_, i) => (i === 0 ? T1 : T2)), Values,
+    })),
+  });
+
+  it('fetches all four metrics in ONE GetMetricData call scoped to the monitor ARN', async () => {
+    cwSend.mockResolvedValue(cwResponse({ rtt: [30, 50], health: [0, 1], retx: [3, 4], tmo: [0, 2] }));
+    const { nfmHealthSummary } = await import('./nfm');
+    const s = await nfmHealthSummary(ARN, 3600);
+
+    expect(cwSend).toHaveBeenCalledTimes(1); // 배치 1콜 — 모니터별/메트릭별 개별 콜 금지
+    const input = (cwSend.mock.calls[0][0] as Cmd).input as {
+      MetricDataQueries: { MetricStat: { Metric: { Namespace: string; Dimensions: { Name: string; Value: string }[] } } }[];
+    };
+    expect(input.MetricDataQueries).toHaveLength(4);
+    for (const q of input.MetricDataQueries) {
+      expect(q.MetricStat.Metric.Namespace).toBe('AWS/NetworkFlowMonitor');
+      expect(q.MetricStat.Metric.Dimensions).toEqual([{ Name: 'MonitorId', Value: ARN }]);
+    }
+
+    expect(s.available).toBe(true);
+    expect(s.degraded).toBe(true);        // HealthIndicator max > 0 → AWS망 이슈
+    expect(s.timeouts).toBe(2);           // Sum
+    expect(s.retransmissions).toBe(7);    // Sum
+    expect(s.rttAvgUs).toBe(40);          // µs 평균 (CW 원단위 유지)
+    expect(s.series.rtt).toEqual([{ t: T1.getTime(), v: 30 }, { t: T2.getTime(), v: 50 }]);
+    expect(s.series.timeouts).toEqual([{ t: T1.getTime(), v: 0 }, { t: T2.getTime(), v: 2 }]);
+  });
+
+  it('reports healthy when HealthIndicator stays 0', async () => {
+    cwSend.mockResolvedValue(cwResponse({ rtt: [30], health: [0, 0], retx: [0], tmo: [0] }));
+    const { nfmHealthSummary } = await import('./nfm');
+    const s = await nfmHealthSummary(ARN, 3600);
+    expect(s.degraded).toBe(false);
+    expect(s.timeouts).toBe(0);
+  });
+
+  it('degrades to available:false when no metric has datapoints', async () => {
+    cwSend.mockResolvedValue({ MetricDataResults: [{ Id: 'rtt', Timestamps: [], Values: [] }] });
+    const { nfmHealthSummary } = await import('./nfm');
+    const s = await nfmHealthSummary(ARN, 3600);
+    expect(s).toMatchObject({ available: false, degraded: null, timeouts: null, retransmissions: null, rttAvgUs: null });
+  });
+
+  it('keeps rttAvgUs null when RTT is sparse but other metrics exist', async () => {
+    cwSend.mockResolvedValue(cwResponse({ health: [0], retx: [1], tmo: [0] }));
+    const { nfmHealthSummary } = await import('./nfm');
+    const s = await nfmHealthSummary(ARN, 3600);
+    expect(s.available).toBe(true);
+    expect(s.rttAvgUs).toBeNull(); // RTT는 sparse 가능 — UI가 "수집 전"을 그린다
+  });
+
+  it('caches per (arn, range): second call sends nothing new', async () => {
+    cwSend.mockResolvedValue(cwResponse({ rtt: [30], health: [0], retx: [0], tmo: [0] }));
+    const { nfmHealthSummary } = await import('./nfm');
+    await nfmHealthSummary(ARN, 3600);
+    await nfmHealthSummary(ARN, 3600);
+    expect(cwSend).toHaveBeenCalledTimes(1);
+    await nfmHealthSummary(ARN, 900); // 다른 range는 별도 키
+    expect(cwSend).toHaveBeenCalledTimes(2);
   });
 });
 
