@@ -7,6 +7,8 @@ Istio 서비스 메시 MCP Lambda - Steampipe Kubernetes CRD 테이블 + EKS API
 """
 import json
 import os
+import re
+
 import pg8000
 
 from cross_account import resolve_tool_name
@@ -25,13 +27,16 @@ DB_CONFIG = {
 
 
 # Execute read-only SQL against Steampipe PostgreSQL / Steampipe PostgreSQL에 읽기 전용 SQL 실행
-def run_sql(sql):
+def run_sql(sql, params=None):
     """Execute SQL against Steampipe PostgreSQL. / Steampipe PostgreSQL에 SQL을 실행합니다."""
     try:
         # Connect via pg8000 (not psycopg2, for Lambda compatibility) / pg8000으로 연결 (Lambda 호환성을 위해 psycopg2 미사용)
         conn = pg8000.connect(**DB_CONFIG)
         cur = conn.cursor()
-        cur.execute(sql)
+        if params:
+            cur.execute(sql, params)  # caller values bind via %s — never interpolated / 호출자 값은 %s로 바인딩
+        else:
+            cur.execute(sql)
         columns = [desc[0] for desc in cur.description] if cur.description else []
         rows = cur.fetchmany(100)
         results = [dict(zip(columns, [str(v) if v is not None else None for v in row])) for row in rows]
@@ -63,8 +68,15 @@ def lambda_handler(event, context):
         args = params
 
     try:
-        namespace = args.get("namespace", "")
-        ns_filter = "WHERE namespace = '{}'".format(namespace) if namespace else ""
+        namespace = str(args.get("namespace", "") or "")
+        # RFC 1123 label allowlist — defense-in-depth in front of the %s binding below.
+        # RFC 1123 레이블 허용목록 — 아래 %s 바인딩 앞단의 심층 방어입니다.
+        if namespace and not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", namespace):
+            return err("invalid namespace: {}".format(namespace[:80]))
+        # The value itself reaches SQL only as a bound %s parameter, never by string interpolation.
+        # 값 자체는 %s 바인딩 파라미터로만 SQL에 전달되며 문자열 보간되지 않습니다.
+        ns_filter = "WHERE namespace = %s" if namespace else ""
+        ns_params = (namespace,) if namespace else None
 
         # Get Istio mesh overview: CRDs, injected namespaces, sidecar pods / Istio 메시 개요 조회: CRD, 주입된 네임스페이스, 사이드카 파드
         if t == "istio_overview":
@@ -82,37 +94,37 @@ def lambda_handler(event, context):
         elif t == "list_virtual_services":
             sql = "SELECT name, namespace, creation_timestamp, spec FROM kubernetes_virtualservice {}ORDER BY namespace, name".format(
                 ns_filter + " " if ns_filter else "")
-            return ok(run_sql(sql))
+            return ok(run_sql(sql, ns_params))
 
         # List Istio DestinationRule resources / Istio DestinationRule 리소스 목록 조회
         elif t == "list_destination_rules":
             sql = "SELECT name, namespace, creation_timestamp, spec FROM kubernetes_destinationrule {}ORDER BY namespace, name".format(
                 ns_filter + " " if ns_filter else "")
-            return ok(run_sql(sql))
+            return ok(run_sql(sql, ns_params))
 
         # List Istio Gateway resources (networking.istio.io API group) / Istio Gateway 리소스 목록 조회 (networking.istio.io API 그룹)
         elif t == "list_istio_gateways":
             sql = "SELECT name, namespace, creation_timestamp, spec FROM kubernetes_gateway WHERE api_version LIKE 'networking.istio.io%' {}ORDER BY namespace, name".format(
                 "AND " + ns_filter.replace("WHERE ", "") + " " if ns_filter else "")
-            return ok(run_sql(sql))
+            return ok(run_sql(sql, ns_params))
 
         # List Istio ServiceEntry resources (external service registration) / Istio ServiceEntry 리소스 목록 조회 (외부 서비스 등록)
         elif t == "list_service_entries":
             sql = "SELECT name, namespace, creation_timestamp, spec FROM kubernetes_serviceentry {}ORDER BY namespace, name".format(
                 ns_filter + " " if ns_filter else "")
-            return ok(run_sql(sql))
+            return ok(run_sql(sql, ns_params))
 
         # List Istio AuthorizationPolicy resources / Istio AuthorizationPolicy 리소스 목록 조회
         elif t == "list_authorization_policies":
             sql = "SELECT name, namespace, creation_timestamp, spec FROM kubernetes_authorizationpolicy {}ORDER BY namespace, name".format(
                 ns_filter + " " if ns_filter else "")
-            return ok(run_sql(sql))
+            return ok(run_sql(sql, ns_params))
 
         # List Istio PeerAuthentication resources (mTLS config) / Istio PeerAuthentication 리소스 목록 조회 (mTLS 설정)
         elif t == "list_peer_authentications":
             sql = "SELECT name, namespace, creation_timestamp, spec FROM kubernetes_peerauthentication {}ORDER BY namespace, name".format(
                 ns_filter + " " if ns_filter else "")
-            return ok(run_sql(sql))
+            return ok(run_sql(sql, ns_params))
 
         # Check sidecar injection status: injected namespaces, pods with/without sidecar
         # 사이드카 주입 상태 확인: 주입된 네임스페이스, 사이드카가 있는/없는 파드
@@ -122,14 +134,14 @@ def lambda_handler(event, context):
                     "SELECT name, labels FROM kubernetes_namespace WHERE labels::text LIKE '%istio-injection\":\"enabled%'"),
                 "podsWithSidecar": run_sql(
                     "SELECT name, namespace, phase FROM kubernetes_pod WHERE containers::text LIKE '%istio-proxy%' {}LIMIT 30".format(
-                        "AND " + ns_filter.replace("WHERE ", "") + " " if ns_filter else "")),
+                        "AND " + ns_filter.replace("WHERE ", "") + " " if ns_filter else ""), ns_params),
                 "podsWithoutSidecar": run_sql(
                     "SELECT p.name, p.namespace, p.phase FROM kubernetes_pod p "
                     "JOIN kubernetes_namespace n ON p.namespace = n.name "
                     "WHERE n.labels::text LIKE '%istio-injection\":\"enabled%' "
                     "AND p.containers::text NOT LIKE '%istio-proxy%' "
                     "{}LIMIT 20".format(
-                        "AND " + ns_filter.replace("WHERE ", "p.") + " " if ns_filter else "")),
+                        "AND " + ns_filter.replace("WHERE ", "p.") + " " if ns_filter else ""), ns_params),
             }
             return ok(results)
 
@@ -144,7 +156,7 @@ def lambda_handler(event, context):
         elif t == "list_envoy_filters":
             sql = "SELECT name, namespace, creation_timestamp, spec FROM kubernetes_envoyfilter {}ORDER BY namespace, name".format(
                 ns_filter + " " if ns_filter else "")
-            return ok(run_sql(sql))
+            return ok(run_sql(sql, ns_params))
 
         # Return Istio troubleshooting guidance by issue type (general, 503, connection_refused, mtls)
         # 문제 유형별 Istio 트러블슈팅 가이드 반환 (일반, 503, 연결 거부, mTLS)
