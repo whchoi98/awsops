@@ -1,5 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useI18n } from '@/components/shell/LanguageProvider';
+import { localeOf } from '@/lib/i18n';
 
 // Per-user scheduled auto-diagnosis (v1 report-scheduler parity). Reads/writes /api/diagnosis/schedule;
 // the EventBridge dispatcher (worker tier) does the actual enqueueing — this panel only edits the row.
@@ -12,16 +14,18 @@ interface Schedule {
   lastRunAt: string | null;
 }
 
-function fmtKst(iso: string | null): string {
+function fmtKst(iso: string | null, locale: string): string {
   if (!iso) return '—';
   try {
-    return new Date(iso).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', dateStyle: 'medium', timeStyle: 'short' });
+    return new Date(iso).toLocaleString(locale, { timeZone: 'Asia/Seoul', dateStyle: 'medium', timeStyle: 'short' });
   } catch {
     return iso;
   }
 }
 
 export default function SchedulePanel() {
+  const { lang } = useI18n();
+  const locale = localeOf(lang);
   const [sched, setSched] = useState<Schedule | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -84,7 +88,7 @@ export default function SchedulePanel() {
           {saving ? '저장 중…' : '저장'}
         </button>
       </div>
-      {sched.enabled && <p className="mt-1 text-[11px] text-ink-400">다음 실행: {fmtKst(sched.nextRunAt)} (KST)</p>}
+      {sched.enabled && <p className="mt-1 text-[11px] text-ink-400">다음 실행: {fmtKst(sched.nextRunAt, locale)} (KST)</p>}
       {saved && <p className="mt-1 text-[11px] text-green-600">저장됨</p>}
     </fieldset>
   );

@@ -7,6 +7,8 @@ import RefreshButton from '@/components/ui/RefreshButton';
 import Badge from '@/components/ui/Badge';
 import ChatOpsStatsCard from '@/components/chat/ChatOpsStatsCard';
 import type { AgentCoreStatus } from '@/lib/agentcore-status';
+import { useI18n } from '@/components/shell/LanguageProvider';
+import { localeOf } from '@/lib/i18n';
 
 // v1-parity AgentCore console (v1 /agentcore): control-plane status (runtime / gateways / memory /
 // code interpreter) + the chat-invoke ops stats (reused ChatOpsStatsCard). Read-only.
@@ -26,6 +28,7 @@ function badgeTone(status: string): 'positive' | 'negative' | 'neutral' {
 }
 
 export default function AgentCorePage() {
+  const { lang } = useI18n();
   const [d, setD] = useState<AgentCoreStatus | null>(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -85,8 +88,8 @@ export default function AgentCorePage() {
                   <div><span className="text-ink-400">Endpoint</span> <span className={tone(d.runtime.endpointStatus) === 'positive' ? 'text-positive-text' : 'text-warning-text'}>{d.runtime.endpointStatus ?? '—'}</span></div>
                   <div><span className="text-ink-400">Version</span> <span className="text-ink-700">{d.runtime.version ?? '—'}</span></div>
                   <div><span className="text-ink-400">Region</span> <span className="text-ink-700">{d.region}</span></div>
-                  <div><span className="text-ink-400">Created</span> <span className="text-ink-600">{d.runtime.createdAt ? new Date(d.runtime.createdAt).toLocaleString('ko-KR') : '—'}</span></div>
-                  <div><span className="text-ink-400">Updated</span> <span className="text-ink-600">{d.runtime.lastUpdatedAt ? new Date(d.runtime.lastUpdatedAt).toLocaleString('ko-KR') : '—'}</span></div>
+                  <div><span className="text-ink-400">Created</span> <span className="text-ink-600">{d.runtime.createdAt ? new Date(d.runtime.createdAt).toLocaleString(localeOf(lang)) : '—'}</span></div>
+                  <div><span className="text-ink-400">Updated</span> <span className="text-ink-600">{d.runtime.lastUpdatedAt ? new Date(d.runtime.lastUpdatedAt).toLocaleString(localeOf(lang)) : '—'}</span></div>
                 </div>
               </section>
             )}
