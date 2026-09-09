@@ -10,6 +10,8 @@ import DataTable from '@/components/ui/DataTable';
 import AreaTrend from '@/components/charts/AreaTrend';
 import HBarList from '@/components/charts/HBarList';
 import DonutBreakdown from '@/components/charts/DonutBreakdown';
+import { useI18n } from '@/components/shell/LanguageProvider';
+import { localeOf } from '@/lib/i18n';
 import {
   momChangePctDaily, projectMonthEnd, trendPill,
   PERIOD_MONTHS, PERIOD_OPTIONS, allServiceNames, filterMonthlyTotals, filterDailyTotals,
@@ -73,6 +75,7 @@ async function loadAllAccountsCost(months: number): Promise<Cost> {
 }
 
 export default function CostPage() {
+  const { lang } = useI18n();
   const [d, setD] = useState<Cost | null>(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -241,7 +244,7 @@ export default function CostPage() {
         )}
         {d?.cached && (
           <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-[12px] text-amber-700">
-            <span>캐시된 데이터 표시 중 — Cost Explorer 호출 실패로 마지막 성공 응답({d.cachedAt ? new Date(d.cachedAt).toLocaleString('ko-KR') : ''})을 보여줍니다.</span>
+            <span>캐시된 데이터 표시 중 — Cost Explorer 호출 실패로 마지막 성공 응답({d.cachedAt ? new Date(d.cachedAt).toLocaleString(localeOf(lang)) : ''})을 보여줍니다.</span>
             <button onClick={load} className="rounded-md border border-amber-300 bg-card px-2 py-0.5 font-medium hover:bg-amber-100">라이브 재시도</button>
           </div>
         )}

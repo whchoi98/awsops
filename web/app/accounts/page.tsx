@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
+import { useI18n } from '@/components/shell/LanguageProvider';
+import { localeOf } from '@/lib/i18n';
 
 // Admin-only multi-account registration. The /api/accounts route is the real admin gate
 // (403 → denied here). Cross-account reads assume AWSopsReadOnlyRole in each target using its
@@ -18,6 +20,7 @@ const statusTone = (s: string): 'positive' | 'negative' | 'neutral' =>
   s === 'verified' ? 'positive' : s === 'error' ? 'negative' : 'neutral';
 
 export default function AccountsPage() {
+  const { lang } = useI18n();
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [regions, setRegions] = useState<AccountRegion[]>([]);
   const [denied, setDenied] = useState(false);
@@ -130,7 +133,7 @@ export default function AccountsPage() {
                       ))}
                     </div>
                   </td>
-                  <td title={a.lastVerifiedAt ? `마지막 검증: ${new Date(a.lastVerifiedAt).toLocaleString('ko-KR')}` : '검증 이력 없음'}>
+                  <td title={a.lastVerifiedAt ? `마지막 검증: ${new Date(a.lastVerifiedAt).toLocaleString(localeOf(lang))}` : '검증 이력 없음'}>
                     <Badge tone={statusTone(a.status)} variant="soft">{a.status}</Badge>
                   </td>
                   <td className="text-right">

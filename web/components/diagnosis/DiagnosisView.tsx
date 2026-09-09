@@ -4,6 +4,8 @@ import SchedulePanel from './SchedulePanel';
 import SubscribersPanel from './SubscribersPanel';
 import ReportMarkdown from './ReportMarkdown';
 import IntentPanel from './IntentPanel';
+import { useI18n } from '@/components/shell/LanguageProvider';
+import { localeOf } from '@/lib/i18n';
 
 interface DiagnosisProgress {
   current?: number;
@@ -47,18 +49,20 @@ const SEV_CLASS: Record<string, string> = {
 };
 
 // Safe date formatting — tests (and legacy rows) may carry an unparseable value; fall back to raw.
-function fmtDate(ds?: string) {
+function fmtDate(ds: string | undefined, locale: string) {
   if (!ds) return '';
   const d = new Date(ds);
-  return isNaN(d.getTime()) ? ds : d.toLocaleString('ko-KR');
+  return isNaN(d.getTime()) ? ds : d.toLocaleString(locale);
 }
-function fmtDay(ds?: string) {
+function fmtDay(ds: string | undefined, locale: string) {
   if (!ds) return '';
   const d = new Date(ds);
-  return isNaN(d.getTime()) ? ds : d.toLocaleDateString('ko-KR');
+  return isNaN(d.getTime()) ? ds : d.toLocaleDateString(locale);
 }
 
 export default function DiagnosisView() {
+  const { lang } = useI18n();
+  const locale = localeOf(lang);
   const [tier, setTier] = useState<'light' | 'mid' | 'deep'>('mid');
   const [model, setModel] = useState<'sonnet' | 'opus'>('sonnet'); // deep-tier model choice
 
@@ -255,7 +259,7 @@ export default function DiagnosisView() {
                       ? `running ${r.progress.current ?? 0}/${r.progress.total}`
                       : r.status}
                   </span>
-                  {r.created_at ? ` · ${fmtDay(r.created_at)}` : ''}
+                  {r.created_at ? ` · ${fmtDay(r.created_at, locale)}` : ''}
                 </div>
               </button>
               {r.can_edit ? (
@@ -338,7 +342,7 @@ export default function DiagnosisView() {
             </div>
             <div className="mb-3 flex items-center justify-between gap-2">
               {createdAt ? (
-                <span className="text-[12px] text-ink-400">생성 일시: {fmtDate(createdAt)}</span>
+                <span className="text-[12px] text-ink-400">생성 일시: {fmtDate(createdAt, locale)}</span>
               ) : <span />}
               <div className="flex gap-2">
                 {(['md', 'docx', 'pdf'] as const).map((f) => (

@@ -1,4 +1,6 @@
 'use client';
+import { useI18n } from '@/components/shell/LanguageProvider';
+import { localeOf } from '@/lib/i18n';
 
 // v1 노드 상세 3분할 카드 (CPU / Memory / Pod Info) — 스택 바는 Capacity 기준
 // [Requested | Available(=Allocatable-Requested) | Reserved(=Capacity-Allocatable)] 3분할.
@@ -41,6 +43,7 @@ const Row = ({ label, value }: { label: string; value: string }) => (
 );
 
 export default function NodeCapacityCards(raw: Props) {
+  const { lang } = useI18n();
   // 방어적 정규화 — 노드 API가 일부 값을 안 주는 경우(테스트 픽스처 포함) 0으로 강제.
   const n = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
   const p = {
@@ -75,7 +78,7 @@ export default function NodeCapacityCards(raw: Props) {
         <Row label="Pod CIDR" value={p.podCIDR ?? '—'} />
         <Row label="Total Pods" value={String(p.podCount)} />
         <Row label="Running / Pending / Failed" value={`${p.podRunning} / ${p.podPending} / ${p.podFailed}`} />
-        <Row label="Created" value={p.createdAt ? new Date(p.createdAt).toLocaleString('ko-KR') : '—'} />
+        <Row label="Created" value={p.createdAt ? new Date(p.createdAt).toLocaleString(localeOf(lang)) : '—'} />
       </div>
     </div>
   );

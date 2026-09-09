@@ -1,6 +1,7 @@
 'use client';
 import { RotateCw } from 'lucide-react';
 import { useI18n } from '@/components/shell/LanguageProvider';
+import { localeOf } from '@/lib/i18n';
 import Button from './Button';
 import { cn } from '@/lib/cn';
 
@@ -13,8 +14,8 @@ export default function RefreshButton({
   onClick: () => void;
   capturedAt?: string | null;
 }) {
-  const { tt } = useI18n();
-  const age = capturedAt ? `${tt('업데이트')}: ${new Date(capturedAt).toLocaleString('ko-KR')}` : tt('미수집');
+  const { tt, lang } = useI18n();
+  const age = capturedAt ? `${tt('업데이트')}: ${new Date(capturedAt).toLocaleString(localeOf(lang))}` : tt('미수집');
   const stale = capturedAt ? Date.now() - new Date(capturedAt).getTime() > 30 * 60 * 1000 : false;
   return (
     <div className="flex items-center gap-2.5">

@@ -10,6 +10,8 @@ import DataTable from '@/components/ui/DataTable';
 import DetailPanel from '@/components/ui/DetailPanel';
 import DonutBreakdown from '@/components/charts/DonutBreakdown';
 import { useActiveAccount } from '@/lib/account-context';
+import { useI18n } from '@/components/shell/LanguageProvider';
+import { localeOf } from '@/lib/i18n';
 
 interface Benchmark { id: string; name: string; description: string }
 interface Run {
@@ -32,6 +34,7 @@ const RESULT_COLS = [
 ];
 
 export default function CompliancePage() {
+  const { lang } = useI18n();
   const [benchmarks, setBenchmarks] = useState<Benchmark[]>([]);
   const [benchmark, setBenchmark] = useState('cis_v300');
   const [run, setRun] = useState<Run | null>(null);
@@ -284,7 +287,7 @@ export default function CompliancePage() {
                       <span className="rounded bg-ink-100 px-1.5 py-0.5 font-mono text-[10.5px] text-ink-500">{h.account}</span>
                     )}
                     {/* execution time distinguishes repeated runs of the same benchmark (v1 parity) */}
-                    <span className="tabular-nums truncate text-ink-400">{h.started_at ? new Date(h.started_at).toLocaleString('ko-KR') : ''}</span>
+                    <span className="tabular-nums truncate text-ink-400">{h.started_at ? new Date(h.started_at).toLocaleString(localeOf(lang)) : ''}</span>
                   </span>
                   <span className="flex items-center gap-3 text-ink-500">
                     <span>{h.status}</span>
@@ -304,8 +307,8 @@ export default function CompliancePage() {
               <span className="font-semibold text-ink-800">{run.benchmark}</span>
               {run.started_at && (
                 <span className="tabular-nums text-ink-500">
-                  실행 {new Date(run.started_at).toLocaleString('ko-KR')}
-                  {run.finished_at ? ` · 완료 ${new Date(run.finished_at).toLocaleString('ko-KR')}` : ''}
+                  실행 {new Date(run.started_at).toLocaleString(localeOf(lang))}
+                  {run.finished_at ? ` · 완료 ${new Date(run.finished_at).toLocaleString(localeOf(lang))}` : ''}
                 </span>
               )}
               <span className="text-ink-400">#{run.id}</span>

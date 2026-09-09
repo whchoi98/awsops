@@ -20,6 +20,7 @@ import SegmentedControl from '@/components/ui/SegmentedControl';
 import AiOps from '@/components/overview/AiOps';
 import { useActiveScope, scopeParams } from '@/lib/account-context';
 import { useI18n } from '@/components/shell/LanguageProvider';
+import { localeOf } from '@/lib/i18n';
 
 interface Overview {
   jobs: { queued: number; running: number; succeeded: number; failed: number };
@@ -66,7 +67,7 @@ function typeIcon(type: string): ReactNode {
 }
 
 export default function Home() {
-  const { tt } = useI18n();
+  const { tt, lang } = useI18n();
   const [ov, setOv] = useState<Overview | null>(null);
   const [ovErr, setOvErr] = useState('');
   const [sum, setSum] = useState<Summary | null>(null);
@@ -321,7 +322,7 @@ export default function Home() {
               hint={
                 compliancePassRate != null
                   ? `Alarm ${ov?.compliance?.alarm ?? 0}건 · 완료 ${
-                      ov?.compliance?.finished_at ? new Date(ov.compliance.finished_at).toLocaleString('ko-KR') : DASH
+                      ov?.compliance?.finished_at ? new Date(ov.compliance.finished_at).toLocaleString(localeOf(lang)) : DASH
                     }`
                   : '벤치마크 실행 →'
               }

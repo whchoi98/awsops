@@ -11,6 +11,12 @@ export type Lang = (typeof SUPPORTED_LANGS)[number];
 export function isLang(v: unknown): v is Lang {
   return typeof v === 'string' && (SUPPORTED_LANGS as readonly string[]).includes(v);
 }
+
+/** BCP-47 locale for Date#toLocaleString/toLocaleDateString — keyed off the active UI language. */
+const LOCALES: Record<Lang, string> = { ko: 'ko-KR', en: 'en-US', zh: 'zh-CN', ja: 'ja-JP' };
+export function localeOf(lang: Lang): string {
+  return LOCALES[lang];
+}
 type Dict = Record<string, string>;
 
 const MESSAGES: Record<Lang, Dict> = {
