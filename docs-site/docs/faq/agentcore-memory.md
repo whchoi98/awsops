@@ -188,7 +188,7 @@ docker push $ECR_URI:latest
 
 ## agent.py를 수정하면 어떻게 재배포하나요?
 
-`make agentcore`가 arm64 이미지를 빌드/푸시하고 멱등 provisioner를 실행합니다.
+`make agentcore`가 arm64 이미지를 빌드/푸시하고 멱등 provisioner를 실행합니다. **`make migrate` 를 먼저 실행해야 합니다** — `awsops_sql_reader` 롤 생성 + 비밀번호 동기화는 migrate 가 하고 agentcore 는 하지 않으므로, 생략하면 `execute_sql`·`inventory-read` 가 Data API auth 실패로 떨어집니다(`docs/runbooks/agent-sql-reader.md`).
 
 ```mermaid
 flowchart LR

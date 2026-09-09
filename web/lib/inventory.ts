@@ -1,9 +1,30 @@
 import { getPool } from '@/lib/db';
 import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
+import { isAdmin } from '@/lib/admin';
+import { INVENTORY_TYPES } from '@/lib/inventory-types';
+import type { User } from '@/lib/auth';
 
 const REGION = process.env.AWS_REGION || 'ap-northeast-2';
 let lambda: LambdaClient | null = null;
 function lambdaClient(): LambdaClient { if (!lambda) lambda = new LambdaClient({ region: REGION }); return lambda; }
+
+// v1 parity: IAM inventories are admin-only (identity data is sensitive). Single source of truth —
+// GET /api/inventory/[type] and POST /api/inventory/[type]/refresh both call this instead of each
+// re-declaring their own ADMIN_ONLY_TYPES set (pentest-remediation P2-2: the refresh route had no
+// gate at all and returned the same IAM rows the GET route 403s a non-admin for).
+const ADMIN_ONLY_TYPES = new Set(['iam_user', 'iam_role']);
+
+/** Returns an error message if `type` is unknown or the caller lacks the type's required role; null if allowed. */
+export async function assertInventoryTypeAllowed(
+  type: string,
+  user: Pick<User, 'email' | 'sub' | 'groups'>,
+): Promise<{ status: number; message: string } | null> {
+  if (!Object.hasOwn(INVENTORY_TYPES, type)) return { status: 404, message: 'unknown type' };
+  if (ADMIN_ONLY_TYPES.has(type) && !(await isAdmin(user))) {
+    return { status: 403, message: '관리자 전용 메뉴입니다 (IAM)' };
+  }
+  return null;
+}
 
 export interface SyncRun { status: string; finished_at: string | null; row_count: number | null; error?: string | null }
 export interface InventoryPage { rows: Record<string, unknown>[]; run: SyncRun | null }

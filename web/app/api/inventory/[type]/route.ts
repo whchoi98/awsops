@@ -1,25 +1,16 @@
 import { verifyUser } from '@/lib/auth';
-import { isAdmin } from '@/lib/admin';
-import { readResources } from '@/lib/inventory';
-import { INVENTORY_TYPES } from '@/lib/inventory-types';
+import { readResources, assertInventoryTypeAllowed } from '@/lib/inventory';
 import { getEcsClusterCosts } from '@/lib/aws';
 
 export const dynamic = 'force-dynamic';
-
-// v1 parity: IAM inventories are admin-only (identity data is sensitive).
-const ADMIN_ONLY_TYPES = new Set(['iam_user', 'iam_role']);
 
 export async function GET(request: Request, { params }: { params: { type: string } }) {
   const user = await verifyUser(request.headers.get('cookie'));
   if (!user) {
     return Response.json({ status: 'error', message: 'unauthenticated' }, { status: 401 });
   }
-  if (!(params.type in INVENTORY_TYPES)) {
-    return Response.json({ status: 'error', message: 'unknown type' }, { status: 404 });
-  }
-  if (ADMIN_ONLY_TYPES.has(params.type) && !(await isAdmin(user))) {
-    return Response.json({ status: 'error', message: '관리자 전용 메뉴입니다 (IAM)' }, { status: 403 });
-  }
+  const gate = await assertInventoryTypeAllowed(params.type, user);
+  if (gate) return Response.json({ status: 'error', message: gate.message }, { status: gate.status });
   const url = new URL(request.url);
   const limit = Math.min(Number(url.searchParams.get('limit')) || 100, 500);
   const offset = Number(url.searchParams.get('offset')) || 0;

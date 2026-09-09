@@ -1,0 +1,49 @@
+-- since: 2.0.0
+-- One report per worker job — enforced by the DATABASE, because application logic cannot do it.
+--
+-- Two concurrent POST /api/diagnosis with the same idempotency key both create a diagnosis_reports
+-- row (the pre-check joins through worker_job_id, which is NULL until the link happens, so neither
+-- sees the other), then both try to link to the same deduped job_id. Whoever loses must retire its
+-- own row: the worker executes the LEDGER payload, which names exactly one report_id, so the other
+-- row would sit `running` until the reaper failed it.
+--
+-- The previous attempt decided that race in the application, with
+--   UPDATE ... WHERE id = $2 AND NOT EXISTS (SELECT 1 FROM diagnosis_reports WHERE worker_job_id = $1 ...)
+-- and treated rowCount = 0 as "I lost". That does not serialize (PR #195 review MAJOR, 2 models,
+-- both lenses): worker_job_id had only a FK, no UNIQUE index, so the two statements UPDATE
+-- DIFFERENT rows and never contend on a row lock — and under READ COMMITTED each statement's
+-- snapshot can miss the other's uncommitted write. Both can therefore report rowCount > 0 and both
+-- believe they won, leaving two reports linked to one job: the opposite of the intended invariant.
+--
+-- A partial unique index makes the second link fail with 23505 deterministically, at the only layer
+-- that sees both transactions. The application's job is then just to recognise that error, not to
+-- referee the race.
+--
+-- Partial (WHERE worker_job_id IS NOT NULL) because a report is deliberately created with
+-- worker_job_id = NULL and linked afterwards (the FK cannot be satisfied before enqueueJob inserts
+-- worker_jobs) — many NULLs must stay legal. Postgres treats NULLs as distinct anyway, so the
+-- predicate is about intent and index size, not correctness.
+--
+-- CONCURRENTLY is deliberately NOT used: migrate.mjs runs statements inside a transaction (advisory
+-- locked), and CREATE INDEX CONCURRENTLY cannot run in one. diagnosis_reports is small (one row per
+-- diagnosis run) so the brief write lock is not a concern.
+--
+-- Pre-existing duplicates would make this fail. There should be none — the application only ever
+-- linked one report per job on the happy path, and the race window has been narrow — but if a
+-- deployment does hit it, resolve by soft-deleting the extra rows (they are the stranded `running`
+-- ones) and re-running. NOTE the predicate DOES exclude soft-deleted rows (added in review), so
+-- soft-deleting the extras is itself enough to satisfy the index — pick the row the worker
+-- actually wrote results into.
+
+-- deleted_at IS NULL is part of the predicate (PR #203 review): the race LOSER is soft-deleted, and
+-- without this it would keep occupying the job's unique slot — a later legitimate retry for the same
+-- job could never link. Soft-deleted rows are not the live report and must not reserve it.
+--
+-- So what this enforces is precisely ONE LIVE LINK per job, not "one report per job" for all time
+-- (codex stop-gate on the file name and the surrounding prose). Over a job's life several reports may
+-- each have held the link, as long as every earlier one is soft-deleted by then, and a report whose
+-- link lost the race is NOT deleted — it stays unlinked, because the worker renders the report the
+-- payload names. The link is a convenience for lookups and lineage; the payload is the ledger.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_diagnosis_reports_worker_job_id
+  ON diagnosis_reports (worker_job_id)
+  WHERE worker_job_id IS NOT NULL AND deleted_at IS NULL;

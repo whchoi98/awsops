@@ -4,6 +4,42 @@ resource "aws_cognito_user_pool" "main" {
   username_attributes      = ["email"]
   mfa_configuration        = "OFF"
 
+  # Third half of the self-service-email fix (PR #203 review MAJOR, 2 models). Narrowing
+  # write_attributes stops an EXISTING account from changing its email, but the pool allowed public
+  # SignUp, so whoever holds a departed colleague's reassigned mailbox could just create a NEW account
+  # on that address and self-verify it via the emailed code (auto_verified_attributes = email) —
+  # inheriting that person's legacy email-keyed rows for as long as legacy_email_owner_match is on.
+  # This is an internal ops dashboard: accounts are provisioned, never self-registered.
+  #
+  # It only closes FUTURE signups — an account that already self-registered keeps working, with a
+  # verified email it chose (codex stop-gate). Applying this is therefore step 1 of 2; step 2 is the
+  # one-time roster reconciliation in docs/runbooks/v1-decommission.md (list the pool, disable anything
+  # that is not a known operator). Terraform cannot do that part: Cognito records no "created by"
+  # provenance, so deciding which existing accounts are legitimate is a human judgement.
+  admin_create_user_config {
+    allow_admin_create_user_only = true
+  }
+
+  # And the other half of the same threat: self-service RECOVERY. `ForgotPassword` /
+  # `ConfirmForgotPassword` are unsigned public APIs and the code goes to the account's email, so whoever
+  # holds a departed colleague's reassigned mailbox could reset that account's password and take it over
+  # — inheriting the sub-keyed rows too, not just the email-keyed ones. Blocking signup does nothing about
+  # accounts that already exist, and MFA only helps for accounts already ENROLLED (an unenrolled one lets
+  # the attacker finish MFA_SETUP themselves). `admin_only` removes the self-service path outright, which
+  # is the control that actually closes it (PR #203 review; previously recorded as accepted residual risk).
+  #
+  # The cost: users cannot reset their own password. That matches how this pool already works — accounts
+  # are admin-created (above) and the self-hosted /login does not implement Cognito challenges anyway, so
+  # a forgotten password is already an operator task: `admin-set-user-password --permanent`, per
+  # docs/runbooks/v1-decommission.md. An operator with AWS credentials can always recover any account,
+  # including the last admin.
+  account_recovery_setting {
+    recovery_mechanism {
+      name     = "admin_only"
+      priority = 1
+    }
+  }
+
   password_policy {
     minimum_length    = 8
     require_uppercase = true
@@ -33,7 +69,21 @@ resource "aws_cognito_user_pool_client" "main" {
   # authorization-code (PKCE) flow above coexists as the edge dark fallback. No ALLOW_REFRESH_TOKEN_AUTH:
   # the refresh flow is not implemented (least privilege — the BFF discards the RefreshToken immediately).
   # Token lifetimes are declared explicitly to match the live deployment (id/access = 12h).
-  explicit_auth_flows   = ["ALLOW_USER_PASSWORD_AUTH"]
+  explicit_auth_flows = ["ALLOW_USER_PASSWORD_AUTH"]
+
+  # Second half of the self-service-email fix (PR #203 review MAJOR, 2 models). The legacy ownership
+  # branch authorizes reads on the token's `email` claim, and by default this client can write EVERY
+  # standard attribute — so an ordinary user could UpdateUserAttributes their own email to a departed
+  # colleague's address and inherit that person's legacy rows. Narrowing write_attributes to the
+  # harmless ones removes the ability entirely. Note this also drops `email_verified` from the
+  # writable set, which is the part that makes verifyUser()'s email_verified check meaningful — by
+  # default a client can write that flag too, so a user could have self-verified whatever address
+  # they had just set and the token check would have passed. read_attributes must stay broad: the BFF
+  # needs `email` on READ; only WRITING it is the escalation. Admin APIs (AdminCreateUser, used by
+  # aws_cognito_user.admin below) are NOT constrained by client attribute lists.
+  read_attributes  = ["email", "email_verified", "name"]
+  write_attributes = ["name"]
+
   id_token_validity     = 12
   access_token_validity = 12
   token_validity_units {

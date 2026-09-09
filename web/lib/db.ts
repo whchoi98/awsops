@@ -1,7 +1,16 @@
-import { Pool } from 'pg';
+import { Pool, types as pgTypes } from 'pg';
 import { Signer } from '@aws-sdk/rds-signer';
 
 let pool: Pool | null = null;
+
+// node-pg hands int8 (OID 20) back as a STRING, because a bigint can exceed Number.MAX_SAFE_INTEGER.
+// Every BIGSERIAL id in this app is typed `number` in TS and treated as one at runtime — and one place
+// checked `typeof x === 'number'` on an id that had travelled through a JSON payload, so a "42" made
+// the check fail silently and two reports raced onto one job (PR #203 review MAJOR). Our int8 columns
+// are surrogate ids and byte counts, none of which come near 2^53, so parsing them as numbers here is
+// the honest boundary. Registered once, module-scope: pg's parser registry is global, and doing it
+// inside getPool() would leave anything that ran before the first pool call reading strings.
+pgTypes.setTypeParser(pgTypes.builtins.INT8, (v) => Number(v));
 
 // Single shared pg Pool for all API routes (Aurora PostgreSQL). Authenticates via RDS IAM DB auth
 // (rds-db:connect on the task role) as the dedicated `awsops_web` role, not the Aurora master

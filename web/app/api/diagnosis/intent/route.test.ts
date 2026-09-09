@@ -7,7 +7,7 @@ const proposeCandidates = vi.fn();
 const promoteIntent = vi.fn();
 const rejectIntent = vi.fn();
 
-vi.mock('@/lib/auth', () => ({ verifyUser: (...a: unknown[]) => verifyUser(...a) }));
+vi.mock('@/lib/auth', () => ({ verifyUser: (...a: unknown[]) => verifyUser(...a), identity: (u: any) => u.email || u.sub }));
 vi.mock('@/lib/admin', () => ({ isAdmin: (...a: unknown[]) => isAdmin(...a) }));
 vi.mock('@/lib/intent', () => ({
   listIntents: (...a: unknown[]) => listIntents(...a),
@@ -31,7 +31,7 @@ beforeEach(() => {
   vi.resetModules();
   verifyUser.mockReset(); isAdmin.mockReset(); listIntents.mockReset();
   proposeCandidates.mockReset(); promoteIntent.mockReset(); rejectIntent.mockReset();
-  verifyUser.mockResolvedValue({ sub: 'a', email: 'admin@x', groups: ['admins'] });
+  verifyUser.mockResolvedValue({ sub: 'a', email: 'a', groups: ['admins'] });
   isAdmin.mockResolvedValue(true);
   listIntents.mockResolvedValue([{ id: 1, kind: 'private_only', status: 'draft' }]);
   proposeCandidates.mockResolvedValue([{ kind: 'private_only', target: 'rds' }]);
@@ -72,7 +72,7 @@ describe('POST /api/diagnosis/intent (admin-gated)', () => {
     const { POST } = await import('./route');
     const res = await POST(post({ action: 'propose' }));
     expect(res.status).toBe(200);
-    expect(proposeCandidates).toHaveBeenCalledWith('admin@x');
+    expect(proposeCandidates).toHaveBeenCalledWith('a');
     expect((await res.json()).candidates.length).toBe(1);
   });
 
@@ -80,7 +80,7 @@ describe('POST /api/diagnosis/intent (admin-gated)', () => {
     const { POST } = await import('./route');
     const res = await POST(post({ action: 'promote', id: 7, edits: { kind: 'private_only', target: 'rds', severity: 'warning' } }));
     expect(res.status).toBe(200);
-    expect(promoteIntent).toHaveBeenCalledWith(7, expect.objectContaining({ kind: 'private_only' }), 'admin@x');
+    expect(promoteIntent).toHaveBeenCalledWith(7, expect.objectContaining({ kind: 'private_only' }), 'a');
     expect((await res.json()).id).toBe(7);
   });
 
@@ -109,7 +109,7 @@ describe('POST /api/diagnosis/intent (admin-gated)', () => {
     const { POST } = await import('./route');
     const res = await POST(post({ action: 'promote', id: 5, edits: { kind: 'private_only', target: 'rds', severity: 'critical' } }));
     expect(res.status).toBe(200);
-    expect(promoteIntent).toHaveBeenCalledWith(5, expect.objectContaining({ severity: 'critical' }), 'admin@x');
+    expect(promoteIntent).toHaveBeenCalledWith(5, expect.objectContaining({ severity: 'critical' }), 'a');
   });
 
   it('unknown action → 400', async () => {

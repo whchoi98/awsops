@@ -14,8 +14,10 @@ Operational playbooks organized by scenario. Each follows symptoms → diagnosis
 | [alert-pipeline-troubleshoot.md](alert-pipeline-troubleshoot.md) | 알림 파이프라인 장애 대응 (ADR-008/013) |
 | [cache-warmer-issues.md](cache-warmer-issues.md) | 캐시 워머 stale / 에러 대응 |
 | [cognito-auth-issues.md](cognito-auth-issues.md) | 로그인 실패, Lambda@Edge 검증 오류 |
+| [user-offboarding.md](user-offboarding.md) | 퇴사자 Cognito 계정 처리 — 계정 인수 경로 차단 (ADR-002/009) |
 | [v1-to-v2-aurora-backfill.md](v1-to-v2-aurora-backfill.md) | v1→v2 Aurora 이력 백필 |
 | [v1-decommission.md](v1-decommission.md) | v1 레거시 폐기 5단계 절차 (ADR-016) |
+| [agent-sql-reader.md](agent-sql-reader.md) | `execute_sql`/`inventory-read` Data API auth 실패 — `awsops_sql_reader` 롤·비밀번호 동기화 (`apply → make migrate → make agentcore`) |
 
 ## 규칙 / Conventions
 - 파일명: `kebab-case.md`, 도메인-주제 순서

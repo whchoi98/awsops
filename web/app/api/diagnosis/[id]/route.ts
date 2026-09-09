@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyUser } from '@/lib/auth';
 import { getReport, canMutateReport, updateReportMeta, softDeleteReport } from '@/lib/diagnosis';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { readJsonBounded, BodyTooLargeError } from '@/lib/http-body';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,12 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   if (!Number.isInteger(id)) return NextResponse.json({ message: 'invalid report id' }, { status: 400 });
   const report = await getReport(id);
   if (!report) return NextResponse.json({ message: 'not found' }, { status: 404 });
+  // pentest-remediation P2-1: canMutateReport() was only ever used to compute the can_edit display
+  // flag — the read itself was never gated, so any authenticated user could fetch any report
+  // (including its full markdown body) by iterating sequential ids. Reuse the same owner-or-admin
+  // check to gate the response, not just the flag.
+  const can_edit = await canMutateReport(user, report);
+  if (!can_edit) return NextResponse.json({ message: 'forbidden' }, { status: 403 });
   let markdown: string | null = null;
   if (report.artifact_uri) {
     try {
@@ -35,7 +42,6 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       markdown = null;
     }
   }
-  const can_edit = await canMutateReport(user, report);
   return NextResponse.json({ report: { ...report, can_edit }, markdown });
 }
 
@@ -82,8 +88,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (g.err) return g.err;
   let body: any = {};
   try {
-    body = await req.json();
-  } catch {
+    // pentest-remediation P0-2: raw req.json() buffers the whole body into the heap before any size
+    // check runs; middleware.ts only rejects on a present, honest Content-Length, so a chunked
+    // request with no Content-Length sailed through unbounded (Finding 8). Bound before parse.
+    body = await readJsonBounded(req, 65_536);
+  } catch (e) {
+    if (e instanceof BodyTooLargeError) return NextResponse.json({ message: 'request body too large' }, { status: 413 });
     return NextResponse.json({ message: 'invalid body' }, { status: 400 });
   }
   const meta = sanitizeMeta(body);

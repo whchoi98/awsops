@@ -12,7 +12,7 @@
 //   - Operator-supplied `edits` text is stored as DATA via the parameterized CRUD; it is never
 //     echoed into any prompt as instructions.
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyUser } from '@/lib/auth';
+import { verifyUser, identity } from '@/lib/auth';
 import { isAdmin } from '@/lib/admin';
 import { listIntents, proposeCandidates, promoteIntent, rejectIntent } from '@/lib/intent';
 import { readJsonBounded, BodyTooLargeError } from '@/lib/http-body';
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   }
 
   const action = String(body?.action ?? '');
-  const createdBy = user.email || user.sub;
+  const createdBy = user.sub;   // immutable ownership key — see the note in app/api/jobs/route.ts
 
   if (action === 'propose') {
     const candidates = await proposeCandidates(createdBy);

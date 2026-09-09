@@ -105,6 +105,9 @@ make configure   # 대화형 TUI → terraform.tfvars + backend.hcl (deps 자동
 terraform -chdir=terraform/v2/foundation init -backend-config=backend.hcl
 terraform -chdir=terraform/v2/foundation plan -out tfplan   # 컨트롤러가 apply tfplan (공유 인프라)
 make deploy      # web: arm64 빌드→ECR push→ECS 롤링→stable 대기→smoke /api/health
+make migrate     # DB 마이그레이션 + `awsops_sql_reader` 비밀번호 동기화. **agentcore 전에 필수**
+                 # (make agentcore는 migrate를 하지 않음 → 생략하면 execute_sql·inventory-read가
+                 #  Data API auth 실패. docs/runbooks/agent-sql-reader.md)
 make agentcore   # arm64 agent 이미지 + 멱등 AgentCore provisioner (--smoke로 호출 검증). apply 후 실행
 make workers     # arm64 worker 이미지 push (workers_enabled=true로 apply 후)
 ```
@@ -249,6 +252,9 @@ make configure   # interactive TUI → terraform.tfvars + backend.hcl (auto-inst
 terraform -chdir=terraform/v2/foundation init -backend-config=backend.hcl
 terraform -chdir=terraform/v2/foundation plan -out tfplan   # controller runs apply tfplan (shared infra)
 make deploy      # web: arm64 build→ECR push→ECS rolling→wait stable→smoke /api/health
+make migrate     # DB migrations + `awsops_sql_reader` password sync. **Required BEFORE agentcore**
+                 # (make agentcore does not migrate → skipping it makes execute_sql and
+                 #  inventory-read fail Data API auth. docs/runbooks/agent-sql-reader.md)
 make agentcore   # arm64 agent image + idempotent AgentCore provisioner (--smoke to invoke). Run after apply
 make workers     # arm64 worker image push (after apply with workers_enabled=true)
 ```

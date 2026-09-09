@@ -40,7 +40,12 @@ export async function POST(req: NextRequest) {
   // dry-run is a contract echo (the live dry-run runs in the SFN DryRunFirst state at execute time).
   const dryRun = { mode: 'plan', action: action.name, inputs, mutates: false };
   const rollbackPlan = { action: action.name, captured_at: new Date().toISOString(), inputs };
-  const plan = await createPlan({ action: action.name, inputs, createdBy: user.email ?? user.sub, dryRun, rollbackPlan });
+  // user.sub, NOT the email: created_by is read back by the 4-eyes gate, and an email is mutable, so
+  // recording one meant the same human could hold two spellings — create under emailA, later approve
+  // with verified emailB, and a key-set comparison still finds no match (codex stop-gate). The sub is
+  // the one identifier that cannot change. Attribution for humans stays in the audit trail, which
+  // records `principal` separately.
+  const plan = await createPlan({ action: action.name, inputs, createdBy: user.sub, dryRun, rollbackPlan });
   await recordAudit({ planId: plan.planId, actionName: action.name, phase: 'plan', principal: user.email ?? user.sub, detail: { inputs } });
   return NextResponse.json({ ...plan, dryRun, rollbackPlan, status: 'planned' }, { status: 201 });
 }

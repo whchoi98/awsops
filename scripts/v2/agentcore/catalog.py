@@ -175,7 +175,7 @@ TARGETS = {
             {"name": "list_db_clusters", "description": "List Aurora clusters", "inputSchema": {"type": "object", "properties": {}}},
             {"name": "describe_db_instance", "description": "Describe instance", "inputSchema": {"type": "object", "properties": {"db_instance_identifier": _p("string", "ID")}, "required": ["db_instance_identifier"]}},
             {"name": "describe_db_cluster", "description": "Describe cluster", "inputSchema": {"type": "object", "properties": {"db_cluster_identifier": _p("string", "ID")}, "required": ["db_cluster_identifier"]}},
-            {"name": "execute_sql", "description": "SQL via Data API (SELECT only)", "inputSchema": {"type": "object", "properties": {"sql": _p("string", "SQL"), "resource_arn": _p("string", "ARN"), "secret_arn": _p("string", "Secret")}, "required": ["sql", "resource_arn", "secret_arn"]}},
+            {"name": "execute_sql", "description": "SQL via Data API (SELECT only; the host's own foundation Aurora PostgreSQL cluster only — MySQL/MariaDB and cross-account unsupported)", "inputSchema": {"type": "object", "properties": {"sql": _p("string", "SQL"), "resource_arn": _p("string", "Foundation Aurora cluster ARN or bare identifier (the discovery tools return identifiers)")}, "required": ["sql", "resource_arn"]}},
             {"name": "list_snapshots", "description": "List snapshots", "inputSchema": {"type": "object", "properties": {}}},
         ],
     },

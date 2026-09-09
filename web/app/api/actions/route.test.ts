@@ -83,7 +83,8 @@ describe('POST /api/actions (plan; admin-gated; NEVER mutates)', () => {
     expect(j.idempotencyToken).toBe('tok');
     expect(j.expiresAt).toBe('2026-06-10T00:05:00Z');
     expect(j.status).toBe('planned');
-    expect(createPlan).toHaveBeenCalledWith(expect.objectContaining({ action: 'ec2-create-tags', createdBy: 'admin@x' }));
+    // the SUB, not the email: created_by feeds the 4-eyes comparison and an email is mutable
+    expect(createPlan).toHaveBeenCalledWith(expect.objectContaining({ action: 'ec2-create-tags', createdBy: 'a' }));
     expect(recordAudit).toHaveBeenCalledWith(expect.objectContaining({ phase: 'plan' }));
   });
   it('400 external action: channel allowlist fail-closed (no allowlist → deny-all), no plan created', async () => {

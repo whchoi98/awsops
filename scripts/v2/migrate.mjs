@@ -31,6 +31,7 @@ const PKG_JSON = (() => { try { return readFileSync(join(ROOT, 'web', 'package.j
 const APP_VERSION = resolveAppVersion(process.env.APP_VERSION, PKG_JSON);
 
 const tf = (out) => execSync(`terraform -chdir=${TF} output -raw ${out}`, { cwd: ROOT, encoding: 'utf8' }).trim();
+const tfOptional = (out) => { try { return tf(out); } catch { return ''; } };
 const die = (msg) => { console.error(`\n✗ ${msg}`); process.exit(1); };
 
 // 1. Load migration files + fail-loud duplicate-id precheck (before connecting).
@@ -74,8 +75,33 @@ function loadCreds() {
   return { host: endpoint, user: secret.username, password: secret.password, database: 'awsops', port: 5432, ssl: { rejectUnauthorized: false } };
 }
 
+// Sync the Terraform-generated password for the least-privilege `awsops_sql_reader` role (see the
+// `agent_sql_reader_role` migration) onto the DB role. The RDS Data API requires a Secrets Manager
+// secretArn (no IAM DB auth on that path), so this one role needs a password — Terraform owns it,
+// the secret is the source of truth, and this makes the DB converge to it on every `make migrate`
+// (including after a Terraform-side rotation). No-ops when agentcore is disabled (no such output/
+// secret) or before the migration that creates the role has been applied.
+async function syncSqlReaderPassword(client) {
+  const arn = tfOptional('agent_sql_reader_secret_arn');
+  if (!arn) return; // agentcore_enabled=false → no secret, nothing to sync
+  const { rowCount } = await client.query(`SELECT 1 FROM pg_roles WHERE rolname='awsops_sql_reader'`);
+  if (!rowCount) { console.log('sql-reader: role not present yet — skipping password sync'); return; }
+  const secret = JSON.parse(execSync(
+    `aws secretsmanager get-secret-value --region ${REGION} --secret-id ${arn} --query SecretString --output text`,
+    { cwd: ROOT, encoding: 'utf8' },
+  ));
+  if (!secret.password) die('sql-reader secret has no password field');
+  // ALTER ROLE ... PASSWORD takes no bind parameters — escape via pg's own literal escaper.
+  await client.query(`ALTER ROLE awsops_sql_reader WITH PASSWORD ${client.escapeLiteral(secret.password)}`);
+  console.log('sql-reader: password synced from Secrets Manager');
+}
+
 async function main() {
   const client = new pg.Client({ ...loadCreds(), statement_timeout: 300_000, lock_timeout: 30_000 });
+  // Surface server-side notices. A migration that decides something irreversibly (e.g. which duplicate
+  // row to disable) can only leave an audit trail through RAISE NOTICE, and without a listener node-pg
+  // drops those silently — the record existed only in the migration author's imagination (review).
+  client.on('notice', (n) => console.log(`  [db] ${n.message ?? n}`));
   await client.connect();
   let locked = false;
   try {
@@ -131,7 +157,11 @@ async function main() {
       }
     }
 
-    if (pending.length === 0) { console.log('✅ up to date — no pending migrations'); return; }
+    if (pending.length === 0) {
+      console.log('✅ up to date — no pending migrations');
+      if (!DRY) await syncSqlReaderPassword(client);
+      return;
+    }
     console.log(`pending (${pending.length}): ${pending.join(', ')}`);
 
     for (const id of pending) {
@@ -156,6 +186,7 @@ async function main() {
         die(`migration ${m.file} failed (rolled back): ${e instanceof Error ? e.message : e}`);
       }
     }
+    if (!DRY) await syncSqlReaderPassword(client);
     console.log(DRY
       ? `\n■ preview only — ${pending.length} migration(s) pending, nothing applied`
       : `\n✅ applied ${pending.length} migration(s)`);

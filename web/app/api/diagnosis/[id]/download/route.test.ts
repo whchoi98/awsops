@@ -6,11 +6,11 @@ vi.mock('@aws-sdk/client-s3', () => ({
   GetObjectCommand: vi.fn((args) => args),
 }));
 vi.mock('@/lib/auth', () => ({ verifyUser: vi.fn() }));
-vi.mock('@/lib/diagnosis', () => ({ getReport: vi.fn() }));
+vi.mock('@/lib/diagnosis', () => ({ getReport: vi.fn(), canMutateReport: vi.fn() }));
 
 import { GET } from './route';
 import { verifyUser } from '@/lib/auth';
-import { getReport } from '@/lib/diagnosis';
+import { getReport, canMutateReport } from '@/lib/diagnosis';
 
 const req = (id: string, format?: string) =>
   new Request(`http://x/api/diagnosis/${id}/download${format ? `?format=${format}` : ''}`);
@@ -20,6 +20,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   (verifyUser as any).mockResolvedValue({ sub: 'u', email: 'u@x.io' });
   (getReport as any).mockResolvedValue({ id: 7, artifact_uri: 's3://b/diagnosis/7.md' });
+  (canMutateReport as any).mockResolvedValue(true);
   mockSend.mockResolvedValue({ Body: { transformToByteArray: async () => new Uint8Array([1, 2, 3]) } });
 });
 
@@ -40,6 +41,14 @@ describe('GET /api/diagnosis/[id]/download', () => {
   it('404 when the report or artifact_uri is missing', async () => {
     (getReport as any).mockResolvedValue(null);
     expect((await GET(req('7', 'pdf'), ctx('7'))).status).toBe(404);
+  });
+
+  // pentest-remediation P2-1 (Finding 5): this route had NO ownership check — any authenticated
+  // user could download any report's full artifact by id.
+  it('403 for a non-owner, non-admin', async () => {
+    (canMutateReport as any).mockResolvedValue(false);
+    expect((await GET(req('7', 'pdf'), ctx('7'))).status).toBe(403);
+    expect(mockSend).not.toHaveBeenCalled();
   });
 
   it('serves DOCX with the right content-type + attachment filename', async () => {

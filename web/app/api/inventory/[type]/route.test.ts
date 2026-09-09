@@ -1,13 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 const verifyUser = vi.fn();
 const readResources = vi.fn();
+const assertInventoryTypeAllowed = vi.fn();
 vi.mock('@/lib/auth', () => ({ verifyUser: (...a: unknown[]) => verifyUser(...a) }));
-vi.mock('@/lib/inventory', () => ({ readResources: (...a: unknown[]) => readResources(...a) }));
+vi.mock('@/lib/inventory', () => ({
+  readResources: (...a: unknown[]) => readResources(...a),
+  assertInventoryTypeAllowed: (...a: unknown[]) => assertInventoryTypeAllowed(...a),
+}));
 const req = (url = 'http://x/api/inventory/ec2', cookie = 'awsops_token=t') => new Request(url, { headers: { cookie } });
 const ctx = { params: { type: 'ec2' } };
 beforeEach(() => {
-  verifyUser.mockReset(); readResources.mockReset();
+  verifyUser.mockReset(); readResources.mockReset(); assertInventoryTypeAllowed.mockReset();
   verifyUser.mockResolvedValue({ sub: 'u' });
+  assertInventoryTypeAllowed.mockResolvedValue(null);
   readResources.mockResolvedValue({ rows: [{ resource_id: 'i-1' }], run: { status: 'succeeded' } });
 });
 
@@ -22,6 +27,15 @@ describe('GET /api/inventory/[type]', () => {
     const res = await GET(req(), ctx);
     expect(res.status).toBe(200);
     expect((await res.json()).rows[0].resource_id).toBe('i-1');
+  });
+  // pentest-remediation P2-2: the admin/type gate now lives in one place (assertInventoryTypeAllowed)
+  // shared with the refresh route — this just proves GET delegates to it and honors its verdict.
+  it('403 when assertInventoryTypeAllowed rejects (e.g. non-admin on iam_user)', async () => {
+    assertInventoryTypeAllowed.mockResolvedValue({ status: 403, message: '관리자 전용 메뉴입니다 (IAM)' });
+    const { GET } = await import('./route');
+    const res = await GET(req('http://x/api/inventory/iam_user'), { params: { type: 'iam_user' } });
+    expect(res.status).toBe(403);
+    expect(readResources).not.toHaveBeenCalled();
   });
 
   describe('scope query params', () => {

@@ -132,3 +132,9 @@ graphify-out/
 .kiro/settings/
 tfplan*
 terraform/v2/foundation/tfplan*
+
+# ADR-009 Amendment step 2 artifacts: the plan carries every user email -> Cognito sub mapping and
+# the affected row ids; the journal carries the same. Never commit either.
+# One glob, matching the script's own requireIgnoredArtifactName() check exactly. Two narrower
+# patterns let `backfill-owner-sub-review.json` (and any --apply-derived journal) slip through.
+backfill-owner-sub-*.json

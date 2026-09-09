@@ -42,7 +42,7 @@ Stats: 21 pages, 65 API routes, 72 components (`web/`), 16 consolidated ADRs, Te
 - **AI assistant** -- Bedrock AgentCore Runtime (Strands agent) routes each question to 1-3 of 9 section gateways in parallel and synthesizes the result, with SSE streaming, AgentCore Memory (conversation history), and a Python Code Interpreter.
 - **CIS compliance** -- Powerpipe benchmark runs with history (`compliance_runs`/`compliance_results`), flag-gated.
 - **Cost and FinOps** -- Cost Explorer, Bedrock usage/spend tracking, and 14-day resource-trend charts on the dashboard.
-- **Async diagnosis and jobs** -- long-running work (AI diagnosis reports, compliance scans) is enqueued via `POST /api/jobs` to an SQS + Step Functions + Lambda/Fargate worker tier — the web tier never blocks on OOM-risk work.
+- **Async diagnosis and jobs** -- long-running work (AI diagnosis reports via `POST /api/diagnosis`, compliance scans via `POST /api/compliance/run`) is enqueued to the same SQS + Step Functions + Lambda/Fargate worker tier as the generic `POST /api/jobs` route — the web tier never blocks on OOM-risk work. `/api/jobs` itself only accepts `noop`/`noop-heavy` job types (diagnosis/compliance compute `requestedBy` server-side and reject attacker-controlled report/run ids); `GET /api/jobs` and `GET /api/jobs/[id]` enforce owner-or-admin visibility.
 - **EKS onboarding** -- interactive `configure.mjs` flow grants the web task role an EKS Access Entry with view access, per cluster.
 
 ### AI Gateways (Amazon Bedrock AgentCore)
@@ -89,7 +89,11 @@ terraform -chdir=terraform/v2/foundation apply tfplan
 # Build + push the web image, roll ECS, wait for /api/health
 make deploy
 
-# After apply: build/push the agent image, run the idempotent AgentCore provisioner
+# After apply: apply DB migrations FIRST (creates the awsops_sql_reader role and syncs its
+# password — make agentcore does neither, and skipping it leaves execute_sql and inventory-read
+# failing Data API auth). See docs/runbooks/agent-sql-reader.md.
+make migrate
+# then build/push the agent image and run the idempotent AgentCore provisioner
 make agentcore
 
 # After apply with workers_enabled=true: build/push the worker image
@@ -101,13 +105,18 @@ make workers
 ```bash
 make help              # list all available targets
 make migrate-status    # offline: app version + each pending migration's release
+make backfill-owner-sub # PLAN the legacy email-keyed requested_by -> Cognito sub rewrite (changes
+                        # nothing). Review the plan, delete entries you cannot vouch for, then
+                        # `node scripts/v2/backfill-owner-sub.mjs --apply <plan.json>`. Quiesce the
+                        # schedule dispatcher first — the plan output prints the exact commands. Step 2
+                        # of ADR-009's Ownership Amendment; step 3 is legacy_email_owner_match=false.
 DRY_RUN=1 make migrate  # preview pending DB migrations before applying
 make upgrade            # safe release upgrade: RDS snapshot -> migrate -> deploy
 ```
 
 ## Configuration
 
-Runtime configuration is **flag-gated in Terraform** (`variables.tf`), all default `false` so a fresh `plan` is a no-op:
+Runtime configuration is **flag-gated in Terraform** (`variables.tf`). The feature gates below all default `false`, so a fresh `plan` is a no-op. Three operational switches deliberately do NOT: `legacy_email_owner_match` (default **true** — accepts the legacy email-keyed ownership match at every `matchesIdentity()` gate — reads *and* report PATCH/DELETE via `canMutateReport()`, not reads alone; flip to `false` only after a successful `--apply` leaves zero legacy email-keyed rows, or a plan that finds none at all — a clean *plan* over rows that still need rewriting is not enough, `make backfill-owner-sub` only plans; see ADR-009's Ownership Amendment) and the pre-existing `create_network` / `allow_vpc_db_access`:
 
 | Flag | Gates |
 |------|-------|
@@ -189,7 +198,7 @@ Internet -> CloudFront (TLS, Lambda@Edge Cognito 인증) -> VPC Origin (https-on
 - **AI 어시스턴트** -- Bedrock AgentCore Runtime(Strands 에이전트)이 각 질문을 9개 섹션 게이트웨이 중 1~3개로 병렬 라우팅한 뒤 결과를 통합하며, SSE 스트리밍·AgentCore Memory(대화 히스토리)·Python Code Interpreter를 지원합니다.
 - **CIS 컴플라이언스** -- Powerpipe 벤치마크 실행 이력 관리(`compliance_runs`/`compliance_results`), flag-gated.
 - **비용 및 FinOps** -- Cost Explorer, Bedrock 사용량/비용 추적, 대시보드의 14일 리소스 트렌드 차트.
-- **비동기 진단·작업** -- AI 진단 리포트, 컴플라이언스 스캔 등 장시간 작업은 `POST /api/jobs`로 SQS + Step Functions + Lambda/Fargate 워커 계층에 큐잉 — 웹 티어는 OOM 위험 작업을 절대 직접 실행하지 않습니다.
+- **비동기 진단·작업** -- AI 진단 리포트(`POST /api/diagnosis`)·컴플라이언스 스캔(`POST /api/compliance/run`) 등 장시간 작업은 범용 `POST /api/jobs`와 동일한 SQS + Step Functions + Lambda/Fargate 워커 계층에 큐잉 — 웹 티어는 OOM 위험 작업을 절대 직접 실행하지 않습니다. `/api/jobs` 자체는 `noop`/`noop-heavy` 타입만 허용하며(진단/컴플라이언스는 `requestedBy`를 서버 측에서 계산해 report/run id 위조를 막음), `GET /api/jobs`·`GET /api/jobs/[id]`는 소유자-또는-관리자 가시성을 강제합니다.
 - **EKS 온보딩** -- 대화형 `configure.mjs` 플로우로 클러스터별 웹 태스크 역할에 view 권한 EKS Access Entry를 부여합니다.
 
 ### AI 게이트웨이 (Amazon Bedrock AgentCore)
@@ -236,7 +245,11 @@ terraform -chdir=terraform/v2/foundation apply tfplan
 # web 이미지 빌드+푸시, ECS 롤링, /api/health 대기
 make deploy
 
-# apply 이후: agent 이미지 빌드+푸시, 멱등 AgentCore provisioner 실행
+# apply 이후: 먼저 DB 마이그레이션 (awsops_sql_reader 롤 생성 + 비밀번호 동기화 —
+# make agentcore는 둘 다 하지 않으므로 생략하면 execute_sql·inventory-read가 Data API auth 실패).
+# docs/runbooks/agent-sql-reader.md 참조.
+make migrate
+# 그 다음 agent 이미지 빌드+푸시, 멱등 AgentCore provisioner 실행
 make agentcore
 
 # workers_enabled=true로 apply 이후: worker 이미지 빌드+푸시
@@ -248,13 +261,18 @@ make workers
 ```bash
 make help               # 사용 가능한 전체 타겟 목록
 make migrate-status     # 오프라인: 앱 버전 + 각 미적용 마이그레이션의 release
+make backfill-owner-sub # legacy email-keyed requested_by -> Cognito sub 재작성 '계획'만 생성(변경 없음).
+                        # 계획을 검토해 확신 못 하는 항목을 지운 뒤
+                        # `node scripts/v2/backfill-owner-sub.mjs --apply <plan.json>`.
+                        # apply 전에 schedule dispatcher 를 정지한다(명령은 plan 출력에 있음).
+                        # ADR-009 소유권 Amendment 2단계; 3단계는 legacy_email_owner_match=false.
 DRY_RUN=1 make migrate  # DB 마이그레이션 적용 전 미리보기
 make upgrade             # 안전한 릴리스 업그레이드: RDS 스냅샷 -> migrate -> deploy
 ```
 
 ## 환경 설정
 
-런타임 설정은 **Terraform에서 flag-gated**(`variables.tf`)이며, 모두 기본값 `false`라 갓 받은 상태에서 `plan`은 no-op입니다:
+런타임 설정은 **Terraform에서 flag-gated**(`variables.tf`)입니다. 아래 표의 feature gate 는 모두 기본값 `false`라 갓 받은 상태에서 `plan`은 no-op입니다. 다만 **의도적으로 그렇지 않은 운영 스위치가 셋** 있습니다: `legacy_email_owner_match`(기본 **true** — legacy email-keyed 소유권 매칭을 `matchesIdentity()` 를 거치는 **모든 게이트**에서 계속 수용합니다 — 읽기뿐 아니라 `canMutateReport()`(리포트 PATCH/DELETE)도 포함입니다. `make backfill-owner-sub` 는 **계획만** 만들므로 재작성이 남은 상태의 clean plan 만으로는 부족합니다 — `--apply` 가 성공하고 잔여 legacy row 가 0 인 것을 확인한 뒤(또는 애초에 legacy 행이 없어 plan 이 zero-row 인 경우)에만 `false` 로 내리세요. ADR-009 소유권 Amendment 참조)와, 기존부터 있던 `create_network` / `allow_vpc_db_access`:
 
 | Flag | 게이트 대상 |
 |------|-------------|

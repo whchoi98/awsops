@@ -234,36 +234,140 @@ resource "aws_iam_role_policy" "agent_lambda_integrations_secret" {
 }
 
 # inventory-read MCP (inventory_read_mcp.py) — reads the synced Aurora inventory via the RDS Data
-# API (read-only SELECT). Scoped to ExecuteStatement on the cluster + GetSecretValue on the
-# RDS-managed master secret + Decrypt on the secret's CMK. Additive (own resource) so a targeted
-# apply leaves the runtime policy untouched.
-resource "aws_iam_role_policy" "agent_lambda_inventory" {
+# API (read-only SELECT). Scoped to ExecuteStatement + BeginTransaction + RollbackTransaction on
+# the cluster + GetSecretValue on the RDS-managed master secret + Decrypt on the secret's CMK.
+# Additive (own resource) so a targeted apply leaves the runtime policy untouched.
+# pentest-remediation round 3: aws_rds_mcp.py's execute_sql wraps every Postgres query in a
+# DB-level READ ONLY transaction (BeginTransaction -> SET TRANSACTION READ ONLY -> user SQL ->
+# RollbackTransaction) as a structural backstop to the lexical guard — a denylist can't enumerate
+# every write-capable string function, but the engine itself can refuse any write inside a
+# read-only transaction (round 6: MySQL/MariaDB targets are now fail-closed in aws_rds_mcp.py's
+# execute_sql before any rds-data call is made — no dedicated low-privilege MySQL credential exists,
+# and `SET TRANSACTION READ ONLY` is invalid mid-transaction on MySQL anyway, so there was no
+# DB-level backstop achievable for it). Begin/Rollback are
+# separate IAM actions from ExecuteStatement; added here on the SAME resource (the cluster this
+# role could already ExecuteStatement against) — this tightens how the role is forced to interact
+# with what it could already reach, it does not expand what the role can reach, so it's not a new
+# ADR-005 capability grant. CommitTransaction is deliberately NOT granted (round-4 least-privilege
+# fix) — the tool always rollsback, even on success (nothing to persist from a read-only query), so
+# it never calls CommitTransaction and granting it would be an unused privilege.
+#
+# pentest-remediation round 8 (STRUCTURAL): this role no longer reads the Aurora MASTER secret at
+# all. Rounds 3-7 each found a new lexical bypass of aws_rds_mcp.py's execute_sql guard, and every
+# one of them mattered only because the tool held superuser-equivalent credentials — a core function
+# taking SQL as a string (`query_to_xml('...pg_cancel_backend...')`) is invisible to a filter that
+# strips string literals, and `SET TRANSACTION READ ONLY` does not block control-plane calls. The
+# boundary is now the database: both Data API consumers authenticate as the dedicated least-privilege
+# `awsops_sql_reader` Postgres role (NOSUPERUSER, SELECT-only, default_transaction_read_only=on —
+# see the `agent_sql_reader_role` migration), whose password lives in its own secret below. The
+# master secret ARN and its CMK Decrypt grant are gone from this policy, so a future bypass lands in
+# an unprivileged session. Removing a privilege — not an ADR-005 capability grant.
+# PR #197 review MAJOR (codex-L3 + kiro-gpt-L3, 2-model convergence): this policy used to attach to
+# the SHARED `agent_lambda` role — the same role all 19 agent-Lambda slices run under (network, iam,
+# cost, clickhouse, notion, ...). That handed the reader-secret credential and rds-data execute
+# permission to every slice, not just the two that call the RDS Data API, which is exactly the
+# least-privilege regression this PR's own DB-role hardening was supposed to be moving away from.
+#
+# Dedicated role for the two RDS Data API consumers (rds-mcp, inventory-read) instead. It carries
+# ONLY what those two Lambdas' code actually calls (verified: neither imports any boto3 client but
+# `rds`/`rds-data`/`sts` — grep confirmed, no ec2/dynamodb/cloudwatch/etc.), not the full
+# network+container+cost+monitoring+iac+security grant bundle the other 17 slices need. The 17
+# other slices are unaffected — `agent_lambda_read` (their combined grant) is untouched, and this
+# role is additive.
+resource "aws_iam_role" "agent_lambda_reader" {
+  count              = local.ac_count
+  name               = "${var.project}-agent-lambda-reader"
+  assume_role_policy = data.aws_iam_policy_document.agent_lambda_assume.json
+}
+
+resource "aws_iam_role_policy_attachment" "agent_lambda_reader_logs" {
+  count      = local.ac_count
+  role       = aws_iam_role.agent_lambda_reader[0].name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_iam_role_policy" "agent_lambda_reader_scoped" {
   count = local.ac_count
-  name  = "${var.project}-agent-lambda-inventory"
-  role  = aws_iam_role.agent_lambda[0].id
+  name  = "${var.project}-agent-lambda-reader-scoped"
+  role  = aws_iam_role.agent_lambda_reader[0].id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Sid      = "AuroraDataApiRead"
-        Effect   = "Allow"
-        Action   = ["rds-data:ExecuteStatement"]
+        Sid    = "AuroraDataApiRead"
+        Effect = "Allow"
+        Action = [
+          "rds-data:ExecuteStatement",
+          "rds-data:BeginTransaction",
+          "rds-data:RollbackTransaction",
+        ]
         Resource = aws_rds_cluster.aurora.arn
       },
       {
-        Sid      = "AuroraMasterSecretRead"
+        # The dedicated low-privilege role's own secret — NOT the master secret. Default
+        # aws/secretsmanager key, so no kms:Decrypt statement is needed (same as `integrations`).
+        Sid      = "AuroraSqlReaderSecretRead"
         Effect   = "Allow"
         Action   = "secretsmanager:GetSecretValue"
-        Resource = aws_rds_cluster.aurora.master_user_secret[0].secret_arn
+        Resource = aws_secretsmanager_secret.agent_sql_reader[0].arn
       },
       {
-        Sid      = "AuroraSecretKmsDecrypt"
+        # rds-mcp's other 5 tools (list/describe) — carried over from the shared role's DataRead
+        # statement so moving rds-mcp off that role does not remove capability, only narrow it.
+        Sid      = "RdsDescribeRead"
         Effect   = "Allow"
-        Action   = "kms:Decrypt"
-        Resource = aws_kms_key.aurora.arn
+        Action   = ["rds:Describe*", "rds:ListTagsForResource"]
+        Resource = "*"
+      },
+      {
+        # Cross-account describe/list for rds-mcp's non-execute_sql tools (execute_sql itself
+        # rejects a foreign target_account_id before this could even be reached — see
+        # aws_rds_mcp.py's lambda_handler top-of-function guard). Carried over unchanged from the
+        # shared role's CrossAccountAssumeReadOnly statement.
+        Sid      = "CrossAccountAssumeReadOnly"
+        Effect   = "Allow"
+        Action   = ["sts:AssumeRole"]
+        Resource = "arn:aws:iam::*:role/AWSopsReadOnlyRole"
       },
     ]
   })
+}
+
+# ---- Credentials for the least-privilege `awsops_sql_reader` Postgres role. -----------------------
+# The RDS Data API REQUIRES a Secrets Manager secretArn on every ExecuteStatement/BeginTransaction/
+# RollbackTransaction call (secretArn is a required member of all three in botocore's rds-data
+# model) and sends that username/password to the engine — so IAM database auth (rds_iam, used by
+# awsops_web / awsops_worker / steampipe_reader) is NOT reachable on this path, and a password
+# secret is unavoidable. Terraform owns the password; `make migrate` pushes it into the DB role
+# (scripts/v2/migrate.mjs), so this secret stays the single source of truth.
+resource "random_password" "agent_sql_reader" {
+  count   = local.ac_count
+  length  = 40
+  special = false # avoids quoting/escaping hazards in the ALTER ROLE ... PASSWORD sync
+}
+resource "aws_secretsmanager_secret" "agent_sql_reader" {
+  count       = local.ac_count
+  name        = "ops/${var.project}/agent/sql-reader"
+  description = "awsops_sql_reader (least-privilege Aurora role) credentials for the agent Data API tools"
+}
+resource "aws_secretsmanager_secret_version" "agent_sql_reader" {
+  count     = local.ac_count
+  secret_id = aws_secretsmanager_secret.agent_sql_reader[0].id
+  secret_string = jsonencode({
+    username = "awsops_sql_reader"
+    password = random_password.agent_sql_reader[0].result
+    engine   = "postgres"
+    host     = aws_rds_cluster.aurora.endpoint
+    port     = 5432
+    dbname   = aws_rds_cluster.aurora.database_name
+  })
+}
+
+# Consumed by scripts/v2/migrate.mjs to sync the generated password onto the DB role after applying
+# migrations. Empty string when agentcore is disabled → migrate.mjs skips the sync.
+output "agent_sql_reader_secret_arn" {
+  description = "Secret holding the awsops_sql_reader Aurora credentials ('' when agentcore_enabled=false)."
+  value       = local.ac_count > 0 ? aws_secretsmanager_secret.agent_sql_reader[0].arn : ""
 }
 
 # OpenSearch read connector (opensearch_mcp.py) — AWS-native, read-only. NOTE: Amazon OpenSearch
@@ -659,12 +763,25 @@ data "archive_file" "agent" {
       filename = "datasource_http.py"
     }
   }
+  # pentest-remediation P2-4: clickhouse_mcp.py and aws_rds_mcp.py share the read-only SQL guard in
+  # `sql_readonly_guard.py` (strip comments/strings, require a read-verb-leading single statement,
+  # reject write/admin keywords). Bundle it into ONLY those two ZIPs — same ImportModuleError risk as
+  # datasource_http above.
+  dynamic "source" {
+    for_each = contains(["clickhouse_mcp.py", "aws_rds_mcp.py"], each.value.file) ? [1] : []
+    content {
+      content  = file("${path.module}/../../../agent/lambda/sql_readonly_guard.py")
+      filename = "sql_readonly_guard.py"
+    }
+  }
 }
 
 resource "aws_lambda_function" "agent" {
-  for_each         = local.agent_lambdas
-  function_name    = "${var.project}-agent-${each.key}"
-  role             = aws_iam_role.agent_lambda[0].arn
+  for_each      = local.agent_lambdas
+  function_name = "${var.project}-agent-${each.key}"
+  # rds-mcp/inventory-read run under the dedicated reader role (agent_lambda_reader) — see the
+  # PR #197 review comment above that role's definition. Every other slice is unaffected.
+  role             = contains(["rds-mcp", "inventory-read"], each.key) ? aws_iam_role.agent_lambda_reader[0].arn : aws_iam_role.agent_lambda[0].arn
   runtime          = "python3.11"
   handler          = each.value.handler
   filename         = data.archive_file.agent[each.key].output_path
@@ -689,11 +806,23 @@ resource "aws_lambda_function" "agent" {
         each.key == "notion-mcp" ? { INTEGRATION_SLUG = "notion" } : {}
       ) : {},
       # inventory-read reads the synced Aurora inventory via the RDS Data API (no VPC, no pg8000) —
-      # needs the cluster ARN, the RDS-managed master secret ARN, and the DB name.
+      # needs the cluster ARN, a credential secret, and the DB name. Round 8: that credential is the
+      # least-privilege `awsops_sql_reader` secret, NOT the RDS-managed master secret (both this
+      # connector and rds-mcp's execute_sql are pure SELECT paths).
       each.key == "inventory-read" ? {
         AURORA_CLUSTER_ARN = aws_rds_cluster.aurora.arn
-        AURORA_SECRET_ARN  = aws_rds_cluster.aurora.master_user_secret[0].secret_arn
+        AURORA_SECRET_ARN  = aws_secretsmanager_secret.agent_sql_reader[0].arn
         AURORA_DATABASE    = aws_rds_cluster.aurora.database_name
+      } : {},
+      # rds-mcp's execute_sql resolves its Data API credential and database from env ONLY — the
+      # caller-supplied secret_arn/database arguments are ignored (and removed from the tool schema).
+      # Unset => the tool fails closed rather than falling back to anything more privileged.
+      # AURORA_CLUSTER_ARN is the cluster that reader secret belongs to: round 10 MAJOR — execute_sql
+      # refuses any other resource_arn instead of letting the Data API raise an unhandled 500.
+      each.key == "rds-mcp" ? {
+        AURORA_SQL_READER_SECRET_ARN = aws_secretsmanager_secret.agent_sql_reader[0].arn
+        AURORA_CLUSTER_ARN           = aws_rds_cluster.aurora.arn
+        AURORA_DATABASE              = aws_rds_cluster.aurora.database_name
       } : {}
     )
   }

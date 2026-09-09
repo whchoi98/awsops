@@ -13,13 +13,17 @@ export async function GET() {
     );
     return NextResponse.json({
       status: 'ok',
-      database: process.env.AURORA_DATABASE || 'awsops',
       public_tables: r.rows[0].public_tables,
     });
   } catch (e) {
-    return NextResponse.json(
-      { status: 'error', message: e instanceof Error ? e.message : String(e) },
-      { status: 500 },
+    // This route is in the edge `is_public()` allowlist, so it answers unauthenticated callers.
+    // Returning the raw driver message leaked host/database/schema detail from connection and
+    // query errors, and the database name was echoed on the success path — ADR-002 §2-4 documented
+    // that as "non-sensitive", which is a weaker claim than it should be for an unauthenticated
+    // route. Log the detail, return a generic message (kiro review, PR #199).
+    console.warn(
+      JSON.stringify({ evt: 'db_ping_failed', err: e instanceof Error ? e.message : String(e) }),
     );
+    return NextResponse.json({ status: 'error' }, { status: 500 });
   }
 }

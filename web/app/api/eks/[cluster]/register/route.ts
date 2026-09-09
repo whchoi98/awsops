@@ -3,6 +3,7 @@ import { isAdmin } from '@/lib/admin';
 import { registerCluster, unregisterCluster, isEnvCluster, setClusterAuth, type EksAuth } from '@/lib/eks-registry';
 import { hasAccessEntry, onboardingGuide } from '@/lib/eks-access';
 import { listClusters } from '@/lib/aws';
+import { readJsonBounded, BodyTooLargeError } from '@/lib/http-body';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,7 +49,17 @@ export async function POST(request: Request, { params }: { params: { cluster: st
   // Cluster must actually exist (spec §3.2 ①) — never emit a guide for arbitrary input.
   const known = (await listClusters()).some((c) => c.name === params.cluster);
   if (!known) return json({ status: 'error', message: 'unknown cluster' }, 404);
-  const auth = parseAuth(await request.json().catch(() => null));
+  // pentest-remediation P0-2: raw request.json() had no size cap (allowlisted here because it's
+  // admin-only, but still an unbounded heap buffer). 32KB comfortably covers the 16384-char
+  // sa-token cap above plus JSON overhead.
+  let rawBody: unknown = null;
+  try {
+    rawBody = await readJsonBounded(request, 32_768);
+  } catch (e) {
+    if (e instanceof BodyTooLargeError) return json({ status: 'error', message: 'request body too large' }, 413);
+    /* empty/invalid body OK — auth defaults to null (no Aurora-stored auth) */
+  }
+  const auth = parseAuth(rawBody);
   if (auth === 'invalid') return json({ status: 'error', message: 'invalid auth payload' }, 400);
   // Aurora-stored auth needs NO access entry — register + store in one step.
   if (auth) {

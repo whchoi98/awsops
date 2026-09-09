@@ -66,7 +66,7 @@ flowchart TD
 
 ### 단계별 동작
 
-1. **enqueue** — web `POST /api/jobs`가 `worker_jobs`에 `queued`로 행을 쓰고 SQS에 메시지를 넣습니다.
+1. **enqueue** — web 이 `worker_jobs`에 `queued`로 행을 쓰고 SQS에 메시지를 넣습니다. 범용 `POST /api/jobs`는 `noop` 계열만 받고, 도메인 작업은 소유권-스코프 라우트(`POST /api/diagnosis`·`POST /api/compliance/run`)로, 나머지는 내부 전용 경로로 들어갑니다(ADR-009).
 2. **ESM(킬스위치)** — Event Source Mapping이 SQS → dispatcher Lambda를 연결합니다. ESM은 비활성화로 즉시 처리를 멈출 수 있는 **킬스위치** 역할을 합니다.
 3. **dispatcher (멱등)** — `job_id`를 기준으로 멱등합니다. Step Functions 실행 이름을 `job_id`로 설정하므로 중복 enqueue가 같은 실행으로 수렴합니다.
 4. **Step Functions `$.runtime` Choice** — 입력의 `runtime` 값으로 분기합니다:

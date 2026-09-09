@@ -19,6 +19,24 @@ class FakeConn:
         return self._returns.pop(0) if self._returns else []
 
 
+class TestInsertJob:
+    """requested_by (round-2 pentest fix): defaults to NULL for internal-only enqueues, but a
+    caller acting on behalf of a specific user (schedule_dispatcher.py) must be able to pass it
+    through so GET /api/jobs[/id]'s ownership filter doesn't hide the row from its own owner."""
+
+    def test_defaults_requested_by_to_none(self):
+        c = FakeConn()
+        db.insert_job(c, "j1", "noop", {"a": 1})
+        sql, p = c.calls[0]
+        assert "requested_by" in sql and p["rb"] is None
+
+    def test_forwards_requested_by(self):
+        c = FakeConn()
+        db.insert_job(c, "j2", "report", {"a": 1}, requested_by="owner@x.io")
+        _sql, p = c.calls[0]
+        assert p["rb"] == "owner@x.io"
+
+
 READY = {"signal_key": "oom_kills", "title": "OOM Kill", "status": "ready",
          "query": {"tool": "prometheus_query", "queries": [{"label": "x", "expr": "up"}]},
          "missing_metrics": None, "meta": {"pillar": "reliability", "threshold": 0}}

@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { verifyUser } from '@/lib/auth';
 import { getPool } from '@/lib/db';
-import { enqueueJob, EnqueueDeliveryError } from '@/lib/jobs';
+import { enqueueJob, EnqueueDeliveryError, IdempotencyKeyCollisionError } from '@/lib/jobs';
+import { readJsonBounded, BodyTooLargeError } from '@/lib/http-body';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,15 +18,18 @@ export async function POST(req: Request) {
   }
   let body: any;
   try {
-    body = await req.json();
-  } catch {
+    // pentest-remediation P0-2 (Finding 8): raw req.json() had no size cap — a chunked request
+    // with no Content-Length bypassed middleware.ts's header-only check entirely.
+    body = await readJsonBounded(req, 65_536);
+  } catch (e) {
+    if (e instanceof BodyTooLargeError) return NextResponse.json({ message: 'request body too large' }, { status: 413 });
     return NextResponse.json({ message: 'invalid JSON body' }, { status: 400 });
   }
   const benchmark = body?.benchmark;
   if (typeof benchmark !== 'string' || !ALLOWED.has(benchmark)) {
     return NextResponse.json({ message: `unknown benchmark; allowed: ${[...ALLOWED].join(', ')}` }, { status: 400 });
   }
-  const requestedBy = (user as { email?: string; sub?: string }).email || (user as { sub?: string }).sub || 'unknown';
+  const requestedBy = user.sub;   // immutable ownership key — see the note in app/api/jobs/route.ts
 
   // Account scoping (diagnosis-route precedent): absent/'' → 'all' (aggregator — every account
   // merged, the previous implicit behavior); a 12-digit id must be a known ENABLED account (host
@@ -47,7 +51,7 @@ export async function POST(req: Request) {
   const runId = ins.rows[0].id;
 
   try {
-    const { job_id } = await enqueueJob('compliance', { benchmark, run_id: runId, requested_by: requestedBy, scope }, {});
+    const { job_id } = await enqueueJob('compliance', { benchmark, run_id: runId, requested_by: requestedBy, scope }, { requestedBy });
     // Link the run 1:1 to its worker job (migration documents worker_job_id → worker_jobs).
     await getPool().query(`UPDATE compliance_runs SET worker_job_id = $1 WHERE id = $2`, [job_id, runId]);
     return NextResponse.json({ run_id: runId, job_id }, { status: 202 });
@@ -55,6 +59,10 @@ export async function POST(req: Request) {
     if (e instanceof EnqueueDeliveryError) {
       await getPool().query(`UPDATE compliance_runs SET worker_job_id = $1 WHERE id = $2`, [e.job_id, runId]).catch(() => {});
       return NextResponse.json({ run_id: runId, job_id: e.job_id, enqueue: 'failed' }, { status: 202 });
+    }
+    // round-6 review MAJOR: clean 409 for a cross-requester idempotency_key collision, not a raw 500.
+    if (e instanceof IdempotencyKeyCollisionError) {
+      return NextResponse.json({ status: 'error', message: e.message }, { status: 409 });
     }
     return NextResponse.json({ status: 'error', message: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }

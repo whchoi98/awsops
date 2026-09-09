@@ -3,7 +3,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { verifyUser, readSchedule, upsertSchedule } = vi.hoisted(() => ({
   verifyUser: vi.fn(), readSchedule: vi.fn(), upsertSchedule: vi.fn(),
 }));
-vi.mock('@/lib/auth', () => ({ verifyUser: (...a: unknown[]) => verifyUser(...a) }));
+vi.mock('@/lib/auth', () => ({
+  verifyUser: (...a: unknown[]) => verifyUser(...a),
+}));
 vi.mock('@/lib/diagnosis-schedule', () => ({
   readSchedule: (...a: unknown[]) => readSchedule(...a),
   upsertSchedule: (...a: unknown[]) => upsertSchedule(...a),
@@ -32,7 +34,7 @@ describe('GET /api/diagnosis/schedule', () => {
     readSchedule.mockResolvedValue(null);
     const body = await (await GET(req())).json();
     expect(body.schedule.enabled).toBe(false);
-    expect(readSchedule).toHaveBeenCalledWith('u1'); // scoped to the caller's sub
+    expect(readSchedule).toHaveBeenCalledWith('u1'); // scoped to the caller's immutable sub
   });
 
   it('returns the stored schedule', async () => {
@@ -69,5 +71,21 @@ describe('PUT /api/diagnosis/schedule', () => {
     upsertSchedule.mockResolvedValue({ scheduleType: 'weekly', enabled: false, tier: 'mid', model: null, nextRunAt: 'n', lastRunAt: null });
     await PUT(req({ scheduleType: 'weekly', enabled: false, user_sub: 'victim', userSub: 'victim' }));
     expect(upsertSchedule).toHaveBeenCalledWith('u1', expect.anything()); // authed sub, not the body's
+  });
+});
+
+describe('GET/PUT /api/diagnosis/schedule scope by immutable Cognito sub', () => {
+  it('GET reads the schedule under the sub, not the mutable email, when both claims are present', async () => {
+    verifyUser.mockResolvedValue({ sub: 'u1', email: 'u1@x.io' });
+    readSchedule.mockResolvedValue(null);
+    await GET(req());
+    expect(readSchedule).toHaveBeenCalledWith('u1');
+  });
+
+  it('PUT upserts the schedule under the sub, not the mutable email, when both claims are present', async () => {
+    verifyUser.mockResolvedValue({ sub: 'u1', email: 'u1@x.io' });
+    upsertSchedule.mockResolvedValue({ scheduleType: 'weekly', enabled: true, tier: 'mid', model: null, nextRunAt: 'n', lastRunAt: null });
+    await PUT(req({ scheduleType: 'weekly', enabled: true }));
+    expect(upsertSchedule).toHaveBeenCalledWith('u1', expect.anything());
   });
 });

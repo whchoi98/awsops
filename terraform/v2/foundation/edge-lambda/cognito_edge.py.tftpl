@@ -12,11 +12,15 @@ CONFIG = {
 def is_public(uri):
     # Public (Cognito-everywhere exceptions), tightly bounded — both carve-outs combined on merge:
     # - /api/auth/signout: an expired token would otherwise trap the user in a 302→Cognito re-auth loop
-    #   so they could never reach the route that clears the stale cookie. It only clears the cookie +
-    #   returns a logout redirect URL (no state mutation), so leaving it open is safe.
+    #   so they could never reach the route that clears the stale cookie. It clears the cookie +
+    #   returns a logout redirect URL, AND (pentest-remediation P1-1) best-effort writes a per-sub
+    #   revocation row to Aurora `session_revocations` — that write is safe to leave public because
+    #   it's signature-verified (verifyUserForSignout still fully checks RS256/iss/aud/token_use, it
+    #   only relaxes clockTolerance), the cutoff is bounded to that token's own iat (can't be replayed
+    #   to roll-DoS newer sessions), and the upsert is idempotent.
     # - /login (self-hosted login page), /api/auth/login (BFF InitiateAuth endpoint), and /icon.svg
     #   (favicon, served by web/app/icon.svg) must be reachable while unauthenticated.
-    # - /api/incidents/webhook (ADR-022/ADR-039 ingress carve-out): external alarm sources cannot carry
+    # - /api/incidents/webhook (ADR-013 ingress carve-out): external alarm sources cannot carry
     #   a Cognito cookie, so this exact path skips edge auth. The route itself verifies HMAC-SHA256 /
     #   SNS-subscription and is flag-gated on INCIDENT_LIFECYCLE_ENABLED (503 when off).
     # PWA(홈 화면 설치) 자산: iOS는 manifest와 아이콘을 인증 쿠키 없이 fetch한다 —

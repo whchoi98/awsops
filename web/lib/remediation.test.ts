@@ -44,10 +44,10 @@ describe('remediation data layer', () => {
   it('setApprovedAndExecuting SQL enforces 4-eyes + not-expired + planned status', async () => {
     query.mockResolvedValue({ rowCount: 1 });
     const { setApprovedAndExecuting } = await import('./remediation');
-    const ok = await setApprovedAndExecuting('p', 'approver@x', 'job1');
+    const ok = await setApprovedAndExecuting('p', 'approver@x', 'job1', ['sub-a', 'approver@x']);
     const sql = String(query.mock.calls[0][0]);
     expect(sql).toMatch(/status='executing'/);
-    expect(sql).toMatch(/created_by <> \$2/);   // 4-eyes
+    expect(sql).toMatch(/created_by <> ALL\(\$4::text\[\]\)/);   // 4-eyes against EVERY approver key
     expect(sql).toMatch(/expires_at > NOW\(\)/); // not expired
     expect(sql).toMatch(/status='planned'/);     // only from planned
     expect(ok).toBe(true);

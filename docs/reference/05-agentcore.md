@@ -39,7 +39,10 @@ gateway). The **full Lambda fleet is P3.**
 the 9 gateway names + the target tool schemas; `provision.py` does boto3 `list →
 create/update` for Runtime, the 9 gateways, the target slices, Memory, and the Code
 Interpreter, then writes ARNs to SSM and prints a per-resource diff report
-(CREATED/EXISTS/UPDATED/ERR). `make agentcore` (via `scripts/v2/agentcore.mjs`) builds +
+(CREATED/EXISTS/UPDATED/ERR). `make migrate` must run FIRST — it creates the `awsops_sql_reader` role and syncs its password, and
+`make agentcore` does neither; skipping it leaves `execute_sql` and `inventory-read` failing Data API
+auth (see `docs/runbooks/agent-sql-reader.md`). Then `make agentcore` (via
+`scripts/v2/agentcore.mjs`) builds +
 pushes the **arm64** agent image, then runs the provisioner; `make agentcore SMOKE=1`
 also invokes the runtime end-to-end. **Everything is gated by `agentcore_enabled`**
 (default `false` → `count`/`for_each` = 0, a no-op).

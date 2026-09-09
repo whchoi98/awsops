@@ -94,7 +94,7 @@ CREATE INDEX IF NOT EXISTS dds_instance_idx ON datasource_diag_signals (account_
 6. bounded·idempotent·never-raise (기존 워커 컨벤션).
 
 **트리거**
-- **추가/갱신(즉시)**: datasource 추가/스키마-refresh BFF 라우트가 해당 instance에 `datasource_index` job enqueue (`POST /api/jobs`). UI는 완료까지 "indexing…" 표시(폴링) 후 버튼 노출.
+- **추가/갱신(즉시)**: datasource 추가/스키마-refresh BFF 라우트가 해당 instance에 `datasource_index` job 을 **서버측에서** enqueue 한다(`enqueueDatasourceIndex()`, admin 전용 `POST /api/integrations/schema`·`POST /api/datasources/manage` 경유). **범용 `POST /api/jobs` 로는 제출할 수 없다** — 그 라우트의 allowlist 는 `noop` 계열만 허용하므로 이 문서를 그대로 따르면 400 이 난다(ADR-009, PR #195 리뷰 MAJOR). UI는 완료까지 "indexing…" 표시(폴링) 후 버튼 노출.
 - **주기(능동)**: 일일 EventBridge → **`datasource_index_dispatcher`**(신규, 기존 `schedule_dispatcher` 패턴)가 enabled prom/mimir instance를 조회해 각각 `datasource_index` job enqueue. (EventBridge 단독으론 DB 조회·per-instance enqueue 불가 → dispatcher 필수.) Explore 방문 없이도 캐시 변경 반영.
 
 **게이트**: 파이프라인(빌드 + 진단 시 connector egress)은 기존 `datasource_diagnosis_enabled`(workers_enabled 필요, ADR-039/041 egress IAM 동반) 하에 둔다. 기본 OFF → $0, 신호 테이블 비어 Explore 버튼도 미노출. (버튼 전용 별도 게이트는 후속.)

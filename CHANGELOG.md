@@ -52,6 +52,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `opencost_config` — read-only OpenCost install config (cluster-scoped helm version/values)
+- `prevention_insights` — ADR-032 Phase 4 cross-incident proactive-prevention tier
+- `eks_registrations` — EKS runtime registration (in-app query onboarding; EventBridge auto-register)
+- `worker_jobs.requested_by` — server-derived requester identity on every enqueue, used to scope
+  `GET /api/jobs`(`/[id]`) to the caller's own jobs (2026-07-22 pentest report remediation)
+- `worker_jobs` idempotency-per-requester — adds two partial unique indexes (per-requester, plus a
+  NULL-requester bucket for internal enqueues) **alongside** the existing global
+  `UNIQUE(idempotency_key)` (that column-level constraint is NOT dropped in this PR). This is
+  Phase 1 of a two-phase rollout — dropping the old global constraint is deliberately deferred to
+  a separate, later PR once this deploy is confirmed stable (round-5 review: shipping both phases
+  in one PR would race `make deploy`'s migrate-then-roll-out ordering and cause a guaranteed
+  enqueue outage)
+
+### Security
+
+- Ownership is now enforced on the diagnosis and compliance read paths too, not just jobs:
+  `GET /api/diagnosis` (list), `GET /api/diagnosis/[id]`, `GET /api/diagnosis/[id]/download`, and
+  `GET /api/compliance/runs` (list) + `GET /api/compliance/runs/[id]` all gate on owner-or-admin.
+  Before this, any authenticated user could read or download another user's diagnosis report and
+  read another user's CIS compliance run (kiro review: the security changelog omitted these)
+- `POST /api/jobs` now requires auth and enforces ownership on `GET /api/jobs`(`/[id]`); the
+  generic `report`/`compliance` job types were removed from its allowlist entirely — those job
+  types trust client-supplied `report_id`/`run_id`/`requested_by` with no ownership check, so
+  reaching them via the generic route was a cross-user IDOR write. They're only enqueueable via
+  `/api/diagnosis` and `/api/compliance/run`, which compute `requestedBy` server-side
+- Idempotency-key conflict lookup (`lib/jobs.ts`) is now scoped to the requesting user — a
+  guessable, deterministic key (e.g. a diagnosis report key derived from the victim's email) could
+  otherwise return another user's `job_id`/status and attach the attacker's payload to it
+- `enqueueJob` now catches a `23505` unique_violation raised by the legacy global
+  `UNIQUE(idempotency_key)` constraint above (it isn't the `ON CONFLICT` arbiter, so Postgres
+  still enforces it independently) and falls back to the same requester-scoped lookup: a
+  same-requester retry still dedupes cleanly, and a genuine cross-requester key collision now
+  fails with a clean `409` (`IdempotencyKeyCollisionError`) instead of an opaque `500`. This
+  **mitigates** the cross-user idempotency-key collision as an interim measure — full closure
+  still requires the follow-up PR that drops the legacy global constraint (see the Phase 1/Phase 2
+  note above; PR #195 round-6 review)
+- `POST /api/jobs` now namespaces a caller-supplied `idempotency_key` as `u:<requester>:<key>`
+  before it reaches the ledger. Because the legacy global `UNIQUE(idempotency_key)` is still
+  enforced during Phase 1, an authenticated attacker could otherwise POST a victim's deterministic
+  diagnosis key (`report:<email>:<tier>:<model>:<scope>:<hour>` — guessable from the email) to squat
+  it, making the victim's own `POST /api/diagnosis` hit `23505`, fail its requester-scoped recovery
+  lookup, and `409` + `markReportFailed` for that whole hour bucket. Namespacing makes squatting
+  structurally impossible (a caller can only collide with their own keys) and closes the DoS
+  **within this PR**, independent of the Phase 2 constraint drop. Server-minted keys (diagnosis,
+  compliance) are unchanged — they already derive from the requester's own identity (PR #195
+  round-7 review)
+- `GET /api/compliance/runs/[id]` now uses the same dual-key (`identity()` + raw `sub`) ownership
+  check as the list route and `GET /api/jobs/[id]`, instead of a direct `requested_by !==`
+  comparison — a legacy sub-keyed run was visible in the list but 403'd on this detail route
+  (PR #195 round-6 review)
+- `/api/eks/[cluster]/register` now returns 413 (not a silent default-registration fallback) when
+  the request body exceeds the size cap
+- Request-body size caps (`readJsonBounded`) on several routes that previously read unbounded JSON
 - Stabilize the aws-data route (4 fixes): raise the Steampipe statement timeout to 35s (cold multi-region wide scans exceeded the previous 15s) and the chat route `maxDuration` to 180s (a cold scan plus one self-correction plus a long analysis stream overran 60s); read all text blocks from the codegen response (a leading thinking block made the SQL parser return empty) and raise codegen `max_tokens` to 1024 and analysis `maxTokens` to 8192 (full listings were truncated); drop assistant turns starting with the fallback marker from codegen history (poisoned history); log SQL-generation and per-attempt failure reasons so fail-open never hides the cause.
 - Stop aws-data answers claiming rows are missing and restore natural streaming: move the analysis context from a 2k-char JSON slice to compact TSV under a 24k-char budget with an explicit shown/total note, and drain SSE deltas through an adaptive typewriter buffer.
 - Restore the eks-optimize collector: the curated Steampipe read policy had no EKS actions, so `aws_eks_cluster` got AccessDenied and collection returned zero rows — grant read-only `eks:Describe*`/`eks:List*` and log the per-leg collection summary on total failure.
@@ -546,6 +599,50 @@ First release of the **v2 line** (versioned independently from the v1 1.x line, 
 - container·iac 챗 섹션 활성화: EKS/ECS/Istio 및 CFN/CDK/Terraform 질문이 비활성 안내 대신 해당 게이트웨이로 라우팅(9개 게이트웨이 전부 READY MCP 타겟 보유).
 - EKS 플릿 노드 드릴다운 추가: `/eks/nodes` 행에서 개요와 동일한 리치 드릴다운(CPU/Memory 3분할, 노드 내 파드, ENI) 오픈 — 공유 `NodeDrilldownPanel`로 추출(개요도 동일 컴포넌트 재사용).
 
+- `opencost_config` — read-only OpenCost 설치 설정(클러스터별 helm 버전/values)
+- `prevention_insights` — ADR-032 Phase 4 교차-인시던트 사전예방 티어
+- `eks_registrations` — EKS 런타임 등록(인앱 조회 온보딩; EventBridge 자동등록)
+- `worker_jobs.requested_by` — 모든 enqueue에 서버 측에서 유도한 요청자 identity 기록. `GET /api/jobs`(`/[id]`)를
+  호출자 본인 작업으로 범위 제한하는 데 사용(2026-07-22 pentest 리포트 후속 조치)
+- `worker_jobs` 요청자별 idempotency — 기존 단일 글로벌 `UNIQUE(idempotency_key)`는 그대로 유지한 채,
+  그 **옆에** 부분 유니크 인덱스 2개(요청자별 + 내부 enqueue용 NULL-요청자 버킷)를 **추가**(이 PR에서는
+  기존 컬럼 제약을 삭제하지 않음). 이번 PR은 2단계 롤아웃 중 Phase 1이며, 옛 글로벌 제약 삭제는 이번
+  배포가 안정적으로 확인된 뒤 별도 후속 PR로 의도적으로 미룸(round-5 리뷰: 두 단계를 한 PR에 같이
+  실으면 `make deploy`의 migrate-then-roll-out 순서와 경합해 enqueue 장애가 확정적으로 발생)
+
+### 보안
+
+- 소유권 검증이 jobs 뿐 아니라 **진단·컴플라이언스 read 경로**에도 적용된다: `GET /api/diagnosis`(목록),
+  `GET /api/diagnosis/[id]`, `GET /api/diagnosis/[id]/download`, `GET /api/compliance/runs`(목록),
+  `GET /api/compliance/runs/[id]` 전부 owner-or-admin 게이트를 통과해야 한다. 이전에는 인증된 사용자
+  누구나 **다른 사용자의 진단 리포트를 열람·다운로드**하고 다른 사용자의 CIS 컴플라이언스 실행 결과를
+  읽을 수 있었다 (EN 섹션에만 있던 항목 — KO/EN 대칭 규약 위반이라 보충)
+- `POST /api/jobs`에 인증 요구 + `GET /api/jobs`(`/[id]`)에 소유권 검증 추가. 범용 `report`/`compliance`
+  잡 타입은 허용 목록에서 완전히 제거 — 해당 타입은 클라이언트가 넘긴 `report_id`/`run_id`/`requested_by`를
+  소유권 검증 없이 신뢰하므로, 범용 라우트로 도달 가능한 상태는 cross-user IDOR 쓰기였음. 이제
+  `requestedBy`를 서버에서 계산하는 `/api/diagnosis`, `/api/compliance/run`을 통해서만 enqueue 가능
+- idempotency-key 충돌 조회(`lib/jobs.ts`)를 요청자 기준으로 범위 제한 — 예측 가능한 idempotency key(예:
+  피해자 이메일에서 파생된 진단 리포트 키)를 알면 다른 사용자의 `job_id`/status를 조회하고 공격자의
+  payload를 그 작업에 붙일 수 있었음
+- `enqueueJob`이 위의 옛 글로벌 `UNIQUE(idempotency_key)` 제약이 던지는 `23505` unique_violation을
+  이제 catch — 이 제약은 `ON CONFLICT`의 arbiter가 아니라서 Postgres가 별도로 계속 강제하며, catch 시
+  동일한 요청자 범위 조회로 fallback한다: 동일 요청자의 재시도는 여전히 깨끗하게 dedupe되고, 진짜
+  다른 요청자 간의 key 충돌은 opaque `500` 대신 깨끗한 `409`(`IdempotencyKeyCollisionError`)로 실패.
+  이는 cross-user idempotency-key 충돌을 **완화**하는 중간 조치이며, 완전한 해결은 위 Phase 1/Phase 2
+  노트에 언급된 옛 글로벌 제약 삭제 후속 PR이 나가야 함(PR #195 round-6 리뷰)
+- `POST /api/jobs`가 클라이언트가 준 `idempotency_key`를 ledger에 쓰기 전에 `u:<요청자>:<key>`로
+  네임스페이싱. Phase 1 동안에는 옛 글로벌 `UNIQUE(idempotency_key)`가 여전히 강제되므로, 그렇지
+  않으면 인증된 공격자가 피해자의 결정적 진단 키(`report:<email>:<tier>:<model>:<scope>:<hour>` —
+  이메일만 알면 추측 가능)를 이 라우트로 선점할 수 있었고, 그 결과 피해자 본인의
+  `POST /api/diagnosis`가 `23505` → 요청자 범위 복구 조회 무소득 → `409` + `markReportFailed`로
+  해당 hour 버킷 내내 진단 불가 상태가 됨. 네임스페이싱으로 선점이 구조적으로 불가능해지고(자기 키와만
+  충돌 가능) Phase 2 제약 삭제와 무관하게 **이 PR 안에서** DoS가 닫힘. 서버에서 생성되는 키(진단,
+  컴플라이언스)는 이미 요청자 신원에서 파생되므로 변경 없음(PR #195 round-7 리뷰)
+- `GET /api/compliance/runs/[id]`가 목록 라우트·`GET /api/jobs/[id]`와 동일한 dual-key(`identity()` +
+  raw `sub`) 소유권 검증을 쓰도록 변경 — 기존에는 `requested_by !==` 직접 비교라서, 레거시 sub-키 run이
+  목록에는 보였지만 상세 라우트에서는 403이 나는 불일치가 있었음(PR #195 round-6 리뷰)
+- `/api/eks/[cluster]/register`가 요청 본문이 크기 상한을 넘을 때 조용히 기본값으로 등록하지 않고 413을 반환
+- 이전에는 무제한 JSON을 읽던 여러 라우트에 요청 본문 크기 상한(`readJsonBounded`) 적용
 ### Fixed
 
 - aws-data 라우트 안정화(fix 4건): Steampipe statement timeout 35초 상향(콜드 멀티 리전 광역 스캔이 기존 15초 초과) + 챗 라우트 `maxDuration` 180초 상향(콜드 스캔 + 자기수정 1회 + 장문 분석 스트림이 60초 초과); codegen 응답의 모든 text 블록 읽기(선행 thinking 블록으로 SQL 파서가 빈 문자열 반환) + codegen `max_tokens` 1024·분석 `maxTokens` 8192 상향(전량 목록 답변 절단 해결); fallback 마커로 시작하는 assistant 턴을 codegen 히스토리에서 제외(오염된 히스토리); SQL 생성·시도별 실패 사유 로깅으로 fail-open이 원인을 숨기지 않도록 수정.

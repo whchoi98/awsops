@@ -4,21 +4,30 @@
 
 **EN** — A managed async backbone that lifts heavy, long-running, or OOM-prone work off the
 web request path. The web tier stays a thin BFF; a worker can OOM, hang, or crash without
-affecting web availability. P2 ships the backbone + a synthetic proof workload — real heavy
-ops (reports, AI synthesis, large scans, mutating actions) land on top of it in P3+.
+affecting web availability. P2 shipped the backbone with a synthetic proof workload (`noop`/
+`noop-heavy`); it now also carries real read/compute-only workloads — diagnosis report
+rendering (`report`) and CIS compliance scans (`compliance`) — enqueued through their own
+ownership-scoped routes (`POST /api/diagnosis`, `POST /api/compliance/run`). Every job type on
+this backbone is read-only / computation-only and never mutates AWS resources; AWS-resource
+mutation stays FROZEN per ADR-005 (do-not-enable) — any future async work stays within this
+same read-only substrate, not an escalation path for mutating actions.
 
 **KO** — 무겁거나 오래 걸리거나 OOM 위험이 있는 작업을 web 요청 경로에서 떼어내는 관리형 비동기
 백본. web은 thin BFF로 유지되고, 워커가 OOM·행·크래시로 죽어도 web 가용성은 무영향. P2는 백본 +
-합성 증명 워크로드만 제공하고, 실제 무거운 ops(리포트·AI 합성·대용량 스캔·mutate 작업)는 P3+에서
-이 위에 올린다.
+합성 증명 워크로드(`noop`/`noop-heavy`)로 시작했고, 현재는 실제 read/compute-only 작업도 이 위에서
+돈다 — 진단 리포트 렌더링(`report`)과 CIS 컴플라이언스 스캔(`compliance`)이 각자의 소유권-스코프
+전용 라우트(`POST /api/diagnosis`, `POST /api/compliance/run`)로 enqueue된다. 이 백본의 모든 job
+타입은 read-only/계산 전용이며 AWS 리소스를 변경하지 않는다 — AWS 리소스 변경은 ADR-005에 따라
+영구 동결(FROZEN, do-not-enable)이며, 향후 추가되는 비동기 작업도 같은 read-only substrate 안에
+머문다(mutate 작업으로 가는 확장 경로가 아니다).
 
 ## Current design / 현행 설계
 
 **Flow / 흐름**
 
 ```
-web POST /api/jobs
-  → INSERT worker_jobs (status=queued) + SQS SendMessage {job_id, type, payload, dry_run}
+web POST /api/jobs (noop/noop-heavy only), POST /api/diagnosis, POST /api/compliance/run
+  → lib/jobs.ts enqueueJob() → INSERT worker_jobs (status=queued) + SQS SendMessage {job_id, type, payload, dry_run}
   → SQS Event Source Mapping  ← THE KILL-SWITCH (enable/disable this ESM to pause/resume all dispatch)
   → dispatcher Lambda (no VPC; idempotent on job_id; type-guard: registry-only, mutate/unknown rejected)
   → Step Functions (STANDARD)
@@ -31,7 +40,12 @@ web POST /api/jobs
   reaper Lambda (EventBridge rate(5 min)) reconciles stale rows (running→failed; queued→failed when ESM enabled)
 ```
 
-**EN** — `POST /api/jobs` writes the durable ledger row first (source of truth), then best-effort
+**EN** — `POST /api/jobs` accepts only `noop`/`noop-heavy` (the generic route rejects `report`/
+`compliance`: those trust a client-supplied `report_id`/`run_id`/`requested_by` with no ownership
+check — pentest-remediation, PR #195). Diagnosis reports go through `POST /api/diagnosis` and
+compliance scans through `POST /api/compliance/run`, both of which call the same `lib/jobs.ts`
+`enqueueJob()` used by `/api/jobs`, computing `requestedBy` server-side. Whichever route calls it,
+`enqueueJob()` writes the durable ledger row first (source of truth), then best-effort
 SQS send. The dispatcher Lambda runs outside the VPC (reaches SQS/SFN APIs directly), validates
 the job type against the `handlers.py` registry (read/compute only — mutate/unknown rejected per
 ADR-005), and calls `StartExecution(name=job_id)` — the execution name gives transport-level
@@ -43,8 +57,12 @@ VPC-only Aurora (RDS Data API not adopted), the `Catch` path invokes a VPC-attac
 rows. **Everything is gated by `workers_enabled` (default false → `terraform plan` = No changes,
 $0 idle).**
 
-**KO** — `POST /api/jobs`는 내구성 있는 ledger 행을 먼저 쓰고(권위), 그 다음 best-effort SQS send.
-디스패처 Lambda는 VPC 밖에서 동작(SQS/SFN API 직접 접근)하고 `handlers.py` 레지스트리로 타입을
+**KO** — `POST /api/jobs`는 `noop`/`noop-heavy`만 허용(범용 라우트는 `report`/`compliance`를 거부 —
+클라이언트가 넘긴 `report_id`/`run_id`/`requested_by`를 소유권 검증 없이 신뢰하게 되므로,
+pentest-remediation PR #195). 진단 리포트는 `POST /api/diagnosis`, 컴플라이언스 스캔은
+`POST /api/compliance/run`을 통하며, 둘 다 `/api/jobs`와 동일한 `lib/jobs.ts`의 `enqueueJob()`을
+호출하고 `requestedBy`는 서버 측에서 계산한다. 어느 라우트를 거치든 `enqueueJob()`이 내구성 있는
+ledger 행을 먼저 쓰고(권위), 그 다음 best-effort SQS send. 디스패처 Lambda는 VPC 밖에서 동작(SQS/SFN API 직접 접근)하고 `handlers.py` 레지스트리로 타입을
 검증(read/compute만 — mutate/unknown 거부, ADR-005)한 뒤 `StartExecution(name=job_id)` 호출 —
 실행명이 transport 멱등을 제공(`ExecutionAlreadyExists`는 성공 처리). Step Functions Standard가
 `$.runtime`으로 라우팅: 짧은 잡은 `RunLambda`, 길거나 OOM 위험인 잡은 `ecs:runTask.sync` Fargate.
@@ -55,12 +73,17 @@ $0 idle).**
 
 ## Decisions (ADRs) / 결정
 
-- **[ADR-005 — AWS mutation & autonomy (FROZEN)](../../decisions/005-aws-mutation-autonomy-frozen.md)** — workers
-  are the execution surface for the gated mutating operations. P2 implements the *safety hooks* only
-  (idempotency token, kill-switch, mutate/unknown-type guard, dry-run pass-through); approval workflow,
-  first-class rollback, and the mutate-action registry are deferred to P3+ (no mutate ops exist yet).
-  / 워커는 게이트된 mutate 작업의 실행 표면. P2는 안전 훅(멱등 토큰·킬스위치·mutate/unknown 타입
-  가드·dry-run 통과)만 구현; 승인 워크플로·1급 롤백·mutate-action 레지스트리는 P3+로 연기.
+- **[ADR-005 — AWS mutation & autonomy (FROZEN)](../../decisions/005-aws-mutation-autonomy-frozen.md)** — P2
+  implements the *safety hooks* (idempotency token, kill-switch, mutate/unknown-type guard, dry-run
+  pass-through) as a dark/inactive substrate for a potential future mutate-action registry — this is
+  architecturally reserved, not an implicit escalation path. AWS-resource mutation stays FROZEN per
+  ADR-005; turning any of this into live mutating operations (approval workflow, first-class rollback,
+  the mutate-action registry itself) requires a new ADR decision, not just implementation work.
+  / P2가 구현한 안전 훅(멱등 토큰·킬스위치·mutate/unknown 타입 가드·dry-run 통과)은 향후 있을 수 있는
+  mutate-action 레지스트리를 위해 architecturally 예약된 dark/inactive substrate일 뿐, 암묵적 확장
+  경로가 아니다. AWS 리소스 변경은 ADR-005에 따라 계속 FROZEN이며, 이를 실제 mutate 작업(승인
+  워크플로·1급 롤백·mutate-action 레지스트리 자체)으로 전환하려면 구현이 아니라 새 ADR 결정이
+  필요하다.
 - **[ADR-001 — v2 foundation (ECS/Fargate + Aurora split)](../../decisions/001-v2-foundation.md)** — the job
   ledger is the Aurora `worker_jobs` table (an infra table orthogonal to the 7 app-state tables); the
   worker_jobs row, not the SFN execution status, is the source of truth.
@@ -80,8 +103,9 @@ $0 idle).**
 | `scripts/v2/workers/reaper.py` | EventBridge-scheduled stale-job reconciliation (running→failed; queued→failed when ESM enabled) |
 | `scripts/v2/workers/fargate_worker.py` | Fargate entrypoint `--job-id [--oom]`; long task / OOM demo |
 | `scripts/v2/workers/sfn.asl.json` | Step Functions ASL (Choice lambda/fargate, Retry, Catch→status_updater); Terraform `templatefile` vars |
-| `web/app/api/jobs/route.ts` | `POST` enqueue (ledger insert + SQS send; `ON CONFLICT` idempotency dedup) |
-| `web/app/api/jobs/[id]/route.ts` | `GET` job status/result by id |
+| `web/app/api/jobs/route.ts` | `POST` enqueue for `noop`/`noop-heavy` only; `GET` lists the caller's own jobs (admins see all) |
+| `web/app/api/jobs/[id]/route.ts` | `GET` job status/result by id, owner-or-admin only |
+| `web/lib/jobs.ts` | Shared `enqueueJob()` (ledger insert + SQS send; `ON CONFLICT` idempotency dedup) — used by `/api/jobs`, `/api/diagnosis`, `/api/compliance/run` |
 | `web/lib/db.ts` | Shared `getPool()` (node-postgres) used by jobs routes |
 | `scripts/v2/workers.mjs` | `make workers`: build+push the arm64 Fargate worker image |
 

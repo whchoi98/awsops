@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyUser } from '@/lib/auth';
-import { getReport } from '@/lib/diagnosis';
+import { getReport, canMutateReport } from '@/lib/diagnosis';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 
 export const dynamic = 'force-dynamic';
@@ -30,6 +30,11 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   const report = await getReport(id);
   if (!report || !report.artifact_uri) {
     return NextResponse.json({ message: 'not found' }, { status: 404 });
+  }
+  // pentest-remediation P2-1 (Finding 5): no ownership check existed here — any authenticated user
+  // could download any report's full artifact by id.
+  if (!(await canMutateReport(user, report))) {
+    return NextResponse.json({ message: 'forbidden' }, { status: 403 });
   }
   // artifact_uri = s3://<bucket>/diagnosis/<id>.md → derive the sibling key for the requested format.
   const m = report.artifact_uri.match(/^s3:\/\/([^/]+)\/(diagnosis\/.+)\.md$/);

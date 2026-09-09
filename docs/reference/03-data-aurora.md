@@ -54,7 +54,7 @@ loads inventory into Aurora — not a Service-Connect live-query daemon. (See AD
 | `agentcore_stats` | `data/agentcore-stats.json` | append-only event log; token columns |
 | `alert_diagnosis` | `data/alert-diagnosis/*.json` | GIN indexes on `services`/`resources` arrays |
 | `event_scaling_plans` | `data/event-scaling/*.json` | `status` CHECK mirrors `EventStatus` (ADR-010) |
-| `report_schedules` | `data/report-schedule.json` | singleton per `(user, schedule_type)` |
+| `report_schedules` | `data/report-schedule.json` | unique per `(user_sub, schedule_type)`, **and at most one ENABLED row per user** — `uq_schedule_one_active`, a partial unique index `(user_sub) WHERE enabled` (migration 01KZ3C7Q). The dispatcher fires every enabled row, so two would double the diagnosis; `upsertSchedule()` disables the other frequencies in the same transaction |
 | `worker_jobs` (P2) | — | async worker job ledger; orthogonal to the 7 app-state tables |
 
 `updated_at` auto-touch triggers cover `cost_snapshots`, `event_scaling_plans`,

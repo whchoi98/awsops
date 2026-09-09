@@ -289,3 +289,15 @@ variable "eks_auto_register_enabled" {
     error_message = "eks_auto_register_enabled requires workers_enabled=true (pg8000 layer + VPC plumbing)."
   }
 }
+
+# ADR-009 — see workload.tf's LEGACY_EMAIL_OWNER_MATCH env. Default true keeps legacy email-keyed rows
+# accessible to their owners — through EVERY matchesIdentity() gate, which is reads AND report
+# PATCH/DELETE (canMutateReport), not reads alone. `make backfill-owner-sub` only PLANS, so a clean plan
+# is not the condition: set false only once a `--apply` has succeeded and no legacy email-keyed rows
+# remain (a zero-row plan also satisfies this — there was nothing to rewrite). Flipping it early makes
+# those rows inaccessible to everyone but an admin.
+variable "legacy_email_owner_match" {
+  type        = bool
+  default     = true
+  description = "Accept the legacy email-keyed ownership match on read. Set false only after the owner-sub backfill reports a clean run."
+}

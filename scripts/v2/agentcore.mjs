@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 // AWSops v2 P1f: build arm64 agent image -> push ECR -> run idempotent boto3 provisioner.
-// Run AFTER `terraform apply` (with agentcore_enabled=true). Pass --smoke to invoke after provisioning.
+// Run AFTER `terraform apply` (with agentcore_enabled=true) AND AFTER `make migrate`.
+// `make migrate` is what creates the awsops_sql_reader DB role and syncs its password from Secrets
+// Manager; this script does neither. Skipping it leaves execute_sql and inventory-read failing Data
+// API auth, which looks like a credential problem rather than a missing migration
+// (docs/runbooks/agent-sql-reader.md). Pass --smoke to invoke after provisioning.
 import { execSync } from 'node:child_process';
 
 const REGION = process.env.AWS_REGION || 'ap-northeast-2';

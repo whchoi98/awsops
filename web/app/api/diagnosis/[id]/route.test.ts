@@ -14,8 +14,15 @@ import { verifyUser } from '@/lib/auth';
 import { canMutateReport, updateReportMeta, softDeleteReport } from '@/lib/diagnosis';
 import { GET, PATCH, DELETE } from './route';
 
+// PATCH now reads the body via readJsonBounded (pentest-remediation P0-2), which streams
+// request.body directly — a real Request (not a hand-rolled { json: ... } stub) so that stream
+// actually exists, matching the undici/App-Router runtime readJsonBounded's doc comment assumes.
 const req = (body?: unknown) =>
-  ({ headers: { get: () => 'cookie' }, json: async () => body } as unknown as Request);
+  new Request('http://x/api/diagnosis/1', {
+    method: 'PATCH',
+    headers: { cookie: 'awsops_token=t' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
 beforeEach(() => {
   vi.clearAllMocks();
   (verifyUser as any).mockResolvedValue({ sub: 'u', email: 'u@x.io' });
@@ -39,6 +46,12 @@ describe('GET /api/diagnosis/[id]', () => {
     const j = await r.json();
     expect(j.report.id).toBe(1);
     expect(j.report.can_edit).toBe(true);
+  });
+  // pentest-remediation P2-1 (Finding 5): canMutateReport() used to gate only the can_edit display
+  // flag — the read itself was never gated, so any authenticated user could fetch any report.
+  it('403 for a non-owner, non-admin (read path is now gated, not just can_edit)', async () => {
+    (canMutateReport as any).mockResolvedValue(false);
+    expect((await GET(req(), { params: { id: '1' } })).status).toBe(403);
   });
 });
 

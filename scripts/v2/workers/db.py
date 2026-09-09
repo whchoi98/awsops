@@ -40,11 +40,15 @@ def connect():
     )
 
 
-def insert_job(conn, job_id, type_, payload, dry_run=False, idempotency_key=None):
+def insert_job(conn, job_id, type_, payload, dry_run=False, idempotency_key=None, requested_by=None):
+    """requested_by defaults to NULL (internal-only enqueue — reaper/generic dispatchers with no
+    end-user principal; treated admin-only on read, see app/api/jobs/route.ts GET). Callers that
+    enqueue on behalf of a specific user MUST pass their domain row's ownership key; for example,
+    schedule_dispatcher.py passes report_schedules.user_sub (the immutable Cognito sub)."""
     conn.run(
-        "INSERT INTO worker_jobs (job_id, type, payload, dry_run, idempotency_key) "
-        "VALUES (:id, :t, :p::jsonb, :d, :k)",
-        id=job_id, t=type_, p=json.dumps(payload), d=dry_run, k=idempotency_key,
+        "INSERT INTO worker_jobs (job_id, type, payload, dry_run, idempotency_key, requested_by) "
+        "VALUES (:id, :t, :p::jsonb, :d, :k, :rb)",
+        id=job_id, t=type_, p=json.dumps(payload), d=dry_run, k=idempotency_key, rb=requested_by,
     )
 
 

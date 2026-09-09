@@ -45,11 +45,18 @@ export async function getPlan(planId: string) {
   return rows[0] ?? null;
 }
 
-export async function setApprovedAndExecuting(planId: string, approvedBy: string, jobId: string): Promise<boolean> {
+// approverKeys, not just approvedBy: created_by may hold the approver's EMAIL (that is what
+// /api/actions writes) while their current token only yields a sub — so a single-string `<>` compares
+// two different spellings of one human and lets them approve their own plan. The SQL guard has to
+// reject every key the approver could have been recorded under (PR #203 review MAJOR).
+export async function setApprovedAndExecuting(
+  planId: string, approvedBy: string, jobId: string, approverKeys: string[] = [approvedBy],
+): Promise<boolean> {
   const { rowCount } = await getPool().query(
     `UPDATE action_plans SET status='executing', approved_by=$2, job_id=$3
-     WHERE plan_id=$1 AND status='planned' AND expires_at > NOW() AND created_by <> $2`, // 4-eyes + not expired
-    [planId, approvedBy, jobId]);
+     WHERE plan_id=$1 AND status='planned' AND expires_at > NOW()
+       AND created_by <> ALL($4::text[])`, // 4-eyes + not expired
+    [planId, approvedBy, jobId, approverKeys]);
   return (rowCount ?? 0) > 0;
 }
 

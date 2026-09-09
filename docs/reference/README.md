@@ -63,8 +63,10 @@ is `data/schema.sql` + ULID migrations tracked in `schema_migrations`. App state
 not `data/*.json`. node-pg로 접근하는 Aurora 영속 상태.
 
 **Web thin-BFF — [`04-web-bff.md`](04-web-bff.md).** **Next.js 14 thin-BFF** (`web/`, standalone
-**arm64**, served at the **root path** — no basePath). Heavy/long/OOM-risk work is enqueued via
-`POST /api/jobs` rather than run inline. The BFF backs the dashboard pages and per-domain API
+**arm64**, served at the **root path** — no basePath). Heavy/long/OOM-risk work is enqueued rather
+than run inline — the generic `POST /api/jobs` accepts `noop` types ONLY; domain work goes through its
+own ownership-scoped route (`POST /api/diagnosis`, `POST /api/compliance/run`) and the rest is
+internal-only (ADR-009). The BFF backs the dashboard pages and per-domain API
 routes. 무거운 작업은 워커 큐로 enqueue하는 thin-BFF.
 
 **AgentCore Agents — [`05-agentcore.md`](05-agentcore.md).** Strands agent on **AgentCore Runtime**
@@ -73,7 +75,8 @@ provisioned by an idempotent boto3 provisioner with config delivered through SSM
 provisioned; `agent.py` routes across the 8 section gateways** (external observability is the
 ADR-039 Integrations axis, not a routed section). 9개 프로비저닝 / 8 섹션 에이전트 라우트.
 
-**Async Worker Backbone — [`06-workers.md`](06-workers.md).** `POST /api/jobs` → `worker_jobs` +
+**Async Worker Backbone — [`06-workers.md`](06-workers.md).** an enqueue (generic `POST /api/jobs`
+for `noop`; ownership-scoped `/api/diagnosis` · `/api/compliance/run` for domain work) → `worker_jobs` +
 SQS → ESM (kill-switch) → idempotent dispatcher Lambda → **Step Functions** `$.runtime` Choice →
 RunLambda (short) **or** `ecs:runTask.sync` Fargate (long/OOM). A reaper reconciles stale jobs.
 OOM-안전 비동기 워커 티어.

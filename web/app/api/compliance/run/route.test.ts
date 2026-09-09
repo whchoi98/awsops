@@ -7,6 +7,10 @@ vi.mock('@/lib/db', () => ({ getPool: () => ({ query: (...a: unknown[]) => query
 vi.mock('@/lib/jobs', () => ({
   enqueueJob: (...a: unknown[]) => enqueueJob(...a),
   EnqueueDeliveryError: class extends Error {},
+  // The route imports this too (the 409 path). The two other test files that mock @/lib/jobs got
+  // the shim; this one was missed, and vitest throws on a missing named export — every test in this
+  // file would fail (PR #195 review MAJOR).
+  IdempotencyKeyCollisionError: class extends Error {},
 }));
 const req = (body: unknown) =>
   new Request('http://x/api/compliance/run', {
@@ -53,5 +57,18 @@ describe('POST /api/compliance/run', () => {
     delete process.env.JOBS_QUEUE_URL;
     const { POST } = await import('./route');
     expect((await POST(req({ benchmark: 'cis_v300' }))).status).toBe(503);
+  });
+  // pentest-remediation P0-2 (Finding 8): raw req.json() had no size cap, bypassable via chunked
+  // transfer encoding (no Content-Length for middleware.ts to reject on).
+  it('413 when the body exceeds the bound cap', async () => {
+    verifyUser.mockResolvedValue({ sub: 'u', email: 'a@b' });
+    const big = new Request('http://x/api/compliance/run', {
+      method: 'POST',
+      headers: { cookie: 'awsops_token=t', 'content-type': 'application/json' },
+      body: JSON.stringify({ benchmark: 'cis_v300', pad: 'x'.repeat(70_000) }),
+    });
+    const { POST } = await import('./route');
+    expect((await POST(big)).status).toBe(413);
+    expect(enqueueJob).not.toHaveBeenCalled();
   });
 });

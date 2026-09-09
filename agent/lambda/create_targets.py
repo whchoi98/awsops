@@ -189,7 +189,7 @@ if gw:
             ('list_db_clusters', 'List Aurora clusters', {'type': 'object', 'properties': {}}),
             ('describe_db_instance', 'Describe instance', {'type': 'object', 'properties': {'db_instance_identifier': prop('string', 'ID')}, 'required': ['db_instance_identifier']}),
             ('describe_db_cluster', 'Describe cluster', {'type': 'object', 'properties': {'db_cluster_identifier': prop('string', 'ID')}, 'required': ['db_cluster_identifier']}),
-            ('execute_sql', 'SQL via Data API (SELECT only)', {'type': 'object', 'properties': {'sql': prop('string', 'SQL'), 'resource_arn': prop('string', 'ARN'), 'secret_arn': prop('string', 'Secret')}, 'required': ['sql', 'resource_arn', 'secret_arn']}),
+            ('execute_sql', 'SQL via Data API (SELECT only; host-account PostgreSQL only — MySQL/MariaDB and cross-account unsupported)', {'type': 'object', 'properties': {'sql': prop('string', 'SQL'), 'resource_arn': prop('string', 'ARN')}, 'required': ['sql', 'resource_arn']}),
             ('list_snapshots', 'List snapshots', {'type': 'object', 'properties': {}}),
         ]])
     create_target(gw, 'valkey-mcp-target', 'awsops-valkey-mcp',

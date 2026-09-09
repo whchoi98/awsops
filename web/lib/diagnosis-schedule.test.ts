@@ -1,11 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }));
-vi.mock('@/lib/db', () => ({ getPool: () => ({ query: queryMock }) }));
+const { queryMock, releaseMock } = vi.hoisted(() => ({ queryMock: vi.fn(), releaseMock: vi.fn() }));
+// upsertSchedule takes a CLIENT now (the disable + upsert pair has to be one transaction), so the mock
+// pool hands back a client backed by the same query mock: BEGIN/COMMIT show up in the call log.
+vi.mock('@/lib/db', () => ({
+  getPool: () => ({
+    query: queryMock,
+    connect: async () => ({ query: queryMock, release: releaseMock }),
+  }),
+}));
 
 import { computeNextRun, readSchedule, upsertSchedule } from './diagnosis-schedule';
 
-beforeEach(() => queryMock.mockReset());
+beforeEach(() => { queryMock.mockReset(); releaseMock.mockReset(); });
 
 describe('computeNextRun', () => {
   const from = '2026-06-18T00:00:00.000Z';
@@ -28,6 +35,7 @@ describe('readSchedule', () => {
     const s = await readSchedule('u1');
     expect(s).toMatchObject({ scheduleType: 'weekly', enabled: true, tier: 'deep', model: 'opus', nextRunAt: '2026-06-25T00:00:00.000Z', lastRunAt: null });
   });
+
 });
 
 describe('upsertSchedule', () => {
@@ -62,9 +70,26 @@ describe('upsertSchedule', () => {
     expect(insert[3]).toBe('2026-07-18T00:00:00.000Z'); // next_run_at present even when disabled
   });
 
+  it('runs the disable + upsert as ONE transaction on ONE client', async () => {
+    // Two pool queries meant two autocommit transactions: between them the user has no enabled
+    // schedule at all (a dispatcher tick in that gap skips them), and two concurrent saves could
+    // interleave disable/disable/insert/insert — which uq_schedule_one_active turns into a hard 23505
+    // (PR #203 review MAJOR).
+    queryMock.mockResolvedValue({ rows: [{ schedule_type: 'weekly', enabled: true,
+      next_run_at: '2026-06-25T00:00:00.000Z', last_run_at: null, config: {} }] });
+    await upsertSchedule('u1', { scheduleType: 'weekly', enabled: true, nowISO: '2026-06-18T00:00:00.000Z' });
+    const sqls = queryMock.mock.calls.map((c) => String(c[0]).trim());
+    expect(sqls[0]).toBe('BEGIN');
+    expect(sqls[1]).toContain('SET enabled = false');
+    expect(sqls[2]).toContain('INSERT INTO report_schedules');
+    expect(sqls[3]).toBe('COMMIT');
+    expect(releaseMock).toHaveBeenCalled();
+  });
+
   it('disables other-frequency rows even when the target is the only one (idempotent)', async () => {
     queryMock.mockResolvedValue({ rows: [{ schedule_type: 'weekly', enabled: true, next_run_at: '2026-06-25T00:00:00.000Z', last_run_at: null, config: {} }] });
     await upsertSchedule('u1', { scheduleType: 'weekly', enabled: true });
     expect(queryMock.mock.calls.some((c) => /UPDATE report_schedules SET enabled = false/.test(c[0] as string) && (c[1] as unknown[])[1] === 'weekly')).toBe(true);
   });
+
 });

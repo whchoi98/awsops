@@ -95,6 +95,15 @@ class TestReadOnlyGuard(unittest.TestCase):
         # 'set'/'drop' inside a string literal must not trigger (literals are stripped before scan)
         self._ok("SELECT 'please set the drop value' AS note")
 
+    def test_non_nested_comment_still_reveals_table_function(self):
+        # PR-review round 6: ClickHouse does NOT nest block comments — it terminates at the FIRST
+        # */, same as MySQL. An earlier version of the shared guard defaulted to Postgres-style
+        # nesting unconditionally, which would have let this exact adjacent-comments shape swallow
+        # the real `url(...)` table-function call as "still inside one big comment". With the
+        # dialect-correct non-nested scan, the two comments resolve separately and url(...) stays
+        # visible for _TABLE_FN to catch.
+        self._bad("SELECT 1 /* a /* */ FROM url('http://169.254.169.254/latest/meta-data/') /* */")
+
 
 class TestTools(unittest.TestCase):
     def setUp(self):

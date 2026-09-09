@@ -107,6 +107,31 @@ def _inject_account(tools):
     return out
 
 
+def tool_fingerprint(tools):
+    """Stable serialization of the tool fields THIS code manages (name + description +
+    inputSchema), for drift detection.
+
+    PR-review round 9 MAJOR: drift used to be the tool-NAME set only, so an in-place edit that
+    kept the name (round 8 removed `secret_arn` from execute_sql's inputSchema) was never
+    detected and the deployed gateway kept advertising the old contract.
+
+    Stability matters more than completeness here: the tools are sorted by name and every dict is
+    dumped with sort_keys, so an unchanged catalog produces a byte-identical string run after run
+    (no spurious drift, no gateway thrash). Only the three fields this provisioner actually sends
+    are projected out, so any field the GetGatewayTarget response echoes back that we never set
+    (defaults, nulls) is ignored.
+    # ponytail: exact compare INSIDE inputSchema. If AgentCore ever starts injecting extra keys
+    # into inputSchema itself, this would report drift on every run — idempotent and harmless
+    # (update_gateway_target rewrites the same config) but noisy; narrow the projection then.
+    """
+    return json.dumps(
+        sorted(({"name": t.get("name"),
+                 "description": t.get("description"),
+                 "inputSchema": t.get("inputSchema")} for t in tools),
+               key=lambda t: t["name"] or ""),
+        sort_keys=True, separators=(",", ":"))
+
+
 def ensure_targets(ctrl, ac, gw_ids):
     """Slice targets, idempotent by name. update_gateway_target on tool-schema drift."""
     for tname, spec in catalog.TARGETS.items():
@@ -129,9 +154,9 @@ def ensure_targets(ctrl, ac, gw_ids):
                 tid = existing[tname]["targetId"]
                 cur = ctrl.get_gateway_target(gatewayIdentifier=gw_id, targetId=tid)
                 cur_tools = cur.get("targetConfiguration", {}).get("mcp", {}).get("lambda", {}).get("toolSchema", {}).get("inlinePayload", [])
-                # Drift = tool-NAME set only; intra-tool schema edits (description/inputSchema/required)
-                # are NOT detected. Adding/removing a tool re-syncs; editing one in place needs a rename.
-                if {t["name"] for t in cur_tools} == {t["name"] for t in tools}:
+                # Drift = the full managed tool definition (name + description + inputSchema), not
+                # just the name set — an in-place schema edit keeping the same name re-syncs too.
+                if tool_fingerprint(cur_tools) == tool_fingerprint(tools):
                     log(f"target:{tname}", "EXISTS", f"{len(tools)} tools")
                 else:
                     ctrl.update_gateway_target(gatewayIdentifier=gw_id, targetId=tid, name=tname,

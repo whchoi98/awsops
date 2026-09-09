@@ -26,91 +26,23 @@ from datasource_http import (
     load_datasource,
     set_request_conn,
 )
+from sql_readonly_guard import assert_read_only as _shared_assert_read_only
 
 SLUG = "clickhouse"
 DEFAULT_MAX_ROWS = 100
 MAX_ROWS_CAP = 1000
 
-_READ_VERBS = ("SELECT", "WITH", "SHOW", "DESCRIBE", "DESC", "EXISTS")
-_DANGER = re.compile(
-    # SYSTEM blocked for ALL user queries — the admin command AND every system.* read. system.tables/.*
-    # expose create_table_query/engine_full (plaintext creds for MySQL/Kafka/S3 engine tables) and
-    # users/grants/query_log, so the general clickhouse_query tool must never reach system.*. Cross-DB
-    # schema introspection reads system.tables via _run_sql(trusted=True), which bypasses this guard.
-    r"\b(INSERT|ALTER|DROP|CREATE|DELETE|TRUNCATE|OPTIMIZE|ATTACH|DETACH|SET|SYSTEM|GRANT|REVOKE|KILL|MOVE|RENAME)\b",
-    re.IGNORECASE,
-)
 # ClickHouse table functions = server-side SSRF / cross-datastore reads / script exec (readonly=1 does
 # NOT block them). Suffix-tolerant `\w*` so siblings like urlCluster/s3Cluster/remoteSecure/executablePool/
 # clusterAllReplicas/hdfsCluster are ALSO blocked (a name-anchored `\s*\(` would let urlCluster( through).
+# This is ClickHouse-specific (not shared with aws_rds_mcp.py's Postgres/MySQL guard) — RDS Data API
+# has no equivalent table-function SSRF surface.
 _TABLE_FN = re.compile(
     r"\b(url|file|remote|hdfs|s3|gcs|iceberg|hudi|deltaLake|azureBlobStorage|mongodb|mysql|postgresql|"
     r"redis|sqlite|jdbc|odbc|input|cluster|executable)\w*\s*\(",
     re.IGNORECASE,
 )
 _IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$")  # db.table or table
-
-
-def _strip(sql):
-    """Single left-to-right tokenizer (NOT sequential regexes — those desync on a quote inside an
-    identifier and can eat a url( token → SSRF). Drops string literals + comments; for IDENTIFIER
-    quotes (` and ") keeps the inner name but removes the quote chars so `url`(…) / "url"(…) still
-    hit _TABLE_FN. Each context is consumed by its own closing rule, so a ' inside `…`/"…" or a
-    --/;/* inside a '…' can never cross-contaminate."""
-    out = []
-    n = len(sql)
-    idx = 0
-    while idx < n:
-        c = sql[idx]
-        two = sql[idx:idx + 2]
-        if two == "/*":                       # block comment
-            j = sql.find("*/", idx + 2)
-            idx = (j + 2) if j != -1 else n
-            out.append(" ")
-        elif two == "--" or c == "#":         # line comment (-- and ClickHouse #)
-            j = sql.find("\n", idx)
-            idx = j if j != -1 else n
-            out.append(" ")
-        elif c == "'":                        # STRING literal → drop contents
-            idx += 1
-            while idx < n:
-                if sql[idx] == "\\":
-                    idx += 2
-                    continue
-                if sql[idx] == "'":
-                    if idx + 1 < n and sql[idx + 1] == "'":  # '' escape
-                        idx += 2
-                        continue
-                    idx += 1
-                    break
-                idx += 1
-            out.append(" ")
-        elif c == "$" and re.match(r"\$[A-Za-z0-9_]*\$", sql[idx:]):  # heredoc/dollar-quoted string
-            delim = re.match(r"\$[A-Za-z0-9_]*\$", sql[idx:]).group(0)  # $$ or $tag$
-            j = sql.find(delim, idx + len(delim))
-            idx = (j + len(delim)) if j != -1 else n
-            out.append(" ")                   # whole heredoc dropped (a ' inside can't desync)
-        elif c == "`" or c == '"':            # IDENTIFIER quote → keep inner, drop quote chars
-            q = c
-            idx += 1
-            while idx < n:
-                if sql[idx] == "\\":
-                    out.append(sql[idx:idx + 2])
-                    idx += 2
-                    continue
-                if sql[idx] == q:
-                    if idx + 1 < n and sql[idx + 1] == q:  # doubled-quote escape inside identifier
-                        out.append(sql[idx])
-                        idx += 2
-                        continue
-                    idx += 1
-                    break
-                out.append(sql[idx])
-                idx += 1
-        else:
-            out.append(c)
-            idx += 1
-    return "".join(out)
 
 
 def _validate_identifier(name):
@@ -120,17 +52,22 @@ def _validate_identifier(name):
 
 
 def _assert_read_only(sql):
-    stripped = _strip(sql or "")
-    # stacked statements: more than one non-empty ;-separated part
-    if len([p for p in stripped.split(";") if p.strip()]) > 1:
-        raise ValueError("read-only: multiple statements are not allowed")
-    tokens = stripped.strip().split()
-    if not tokens or tokens[0].upper() not in _READ_VERBS:
-        raise ValueError("read-only: only SELECT/WITH/SHOW/DESCRIBE/EXISTS queries are allowed")
-    if _DANGER.search(stripped):
-        raise ValueError("read-only: statement contains a disallowed (write/admin) keyword")
-    if _TABLE_FN.search(stripped):
-        raise ValueError("read-only: table functions (url/file/remote/s3/mysql/...) are not allowed")
+    # SYSTEM blocked for ALL user queries — the admin command AND every system.* read. system.tables/.*
+    # expose create_table_query/engine_full (plaintext creds for MySQL/Kafka/S3 engine tables) and
+    # users/grants/query_log, so the general clickhouse_query tool must never reach system.*. Cross-DB
+    # schema introspection reads system.tables via _run_sql(trusted=True), which bypasses this guard.
+    # (SYSTEM is in the shared DANGER regex; layered here on top with the ClickHouse-only _TABLE_FN.)
+    # nested_block_comment=False (explicit, matches the shared default): ClickHouse block comments
+    # do NOT nest — they terminate at the FIRST `*/`, like MySQL. PR-review round 6: an earlier
+    # version of the shared guard defaulted to Postgres-style nesting unconditionally, which let a
+    # single crafted comment swallow real SQL (incl. a _TABLE_FN call) between two adjacent-looking
+    # comments; see sql_readonly_guard.py's module docstring for the traced PoC.
+    _shared_assert_read_only(
+        sql,
+        extra_forbidden_re=_TABLE_FN,
+        extra_message="read-only: table functions (url/file/remote/s3/mysql/...) are not allowed",
+        nested_block_comment=False,
+    )
 
 
 def _clamp_rows(v):
